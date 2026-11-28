@@ -85,7 +85,7 @@ import {
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
-import { type HostStateStore, hostCredentialFresh, hostStateStore } from "./host-state";
+import { HOST_STATE_RECHECK_MS, type HostStateStore, hostCopyFresh, hostStateStore } from "./host-state";
 import type { HostStateCredential } from "./host-state-object";
 import { primaryD1, replicaD1 } from "./observed-d1";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
@@ -97,6 +97,9 @@ const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
 const AUTH_EVENT_SEND_CONCURRENCY = 6;
 const AUTH_EVENT_CLAIM_MS = 2 * 60_000;
+const HOST_STATE_RETRY_TARGETS = JSON.stringify(["host-state:"]);
+const HOST_STATE_RETRY_MS = 10_000;
+const HOST_STATE_RETRY_DELAY = "1 second";
 const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
 const MAX_PERMANENT_INVITES_PER_HOST = 5;
 const MAX_TELEGRAM_LINK_CODES_PER_HOST = 10;
@@ -457,7 +460,12 @@ interface RemoteAuthEventRow {
 
 export type RemoteAuthEventBindings = Pick<
   WorkerBindings,
-  "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_URLS" | "REMOTE_AUTH_WEBHOOK_SECRET"
+  | "DB"
+  | "REMOTE_AUTH_WEBHOOK_URL"
+  | "REMOTE_AUTH_WEBHOOK_URLS"
+  | "REMOTE_AUTH_WEBHOOK_SECRET"
+  | "HOST_STATE"
+  | "HOST_STATE_MODE"
 >;
 
 export interface RemoteSignalPlan {
@@ -741,6 +749,7 @@ export class RemoteControlPlane {
       fetch?: RemoteFetch;
       now?: () => number;
       schedule?: (delivery: Effect.Effect<void, RemoteFailure>) => void;
+      hostState?: HostStateStore | null;
     } = {},
   ) {
     if (!bindings.REMOTE_TICKET_PRIVATE_JWK || !bindings.REMOTE_TICKET_PUBLIC_JWKS || !bindings.REMOTE_TICKET_KEY_ID) {
@@ -791,7 +800,10 @@ export class RemoteControlPlane {
       signal: remoteSignalPlan(bindings),
       webhookUrls,
       webhookSecret,
-      hostState: hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE),
+      hostState:
+        options.hostState === undefined
+          ? hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE)
+          : options.hostState,
     });
   }
 
@@ -3799,13 +3811,13 @@ export class RemoteControlPlane {
     const dependencies = yield* RemoteDependencies;
     const hostState = dependencies.hostState;
     if (hostState?.mode !== "read") return null;
-    const entry = yield* hostState.read(hostId);
-    if (!entry) return null;
+    const snapshot = yield* hostState.read(hostId, { credential: true });
+    if (!snapshot) return null;
     const checkedAt = dependencies.now();
-    if (hostCredentialFresh(entry, checkedAt) && machineTokenMatches(entry.credential, providedHash))
-      return { host: entry.credential };
+    if (hostCopyFresh(snapshot.credential, checkedAt) && machineTokenMatches(snapshot.credential.value, providedHash))
+      return { host: snapshot.credential.value };
     const host = yield* this.#host(hostId, "primary");
-    if (host) yield* hostState.fill(hostId, host, checkedAt, entry.generation);
+    if (host) yield* hostState.fill(hostId, snapshot.generation, checkedAt, { credential: { value: host, checkedAt } });
     return { host };
   });
 
@@ -3813,8 +3825,25 @@ export class RemoteControlPlane {
     this: RemoteControlPlane,
     hostId: string,
   ): Effect.fn.Return<void, never, RemoteDependencies> {
-    const hostState = (yield* RemoteDependencies).hostState;
-    if (hostState) yield* hostState.invalidate(hostId);
+    const dependencies = yield* RemoteDependencies;
+    const hostState = dependencies.hostState;
+    if (!hostState || (yield* hostState.invalidate(hostId))) return;
+    const queued = yield* Effect.result(
+      remoteCall(() => hostStateRetryStatement(dependencies.database, hostId, dependencies.now()).run()),
+    );
+    if (Result.isFailure(queued)) {
+      console.error("Host state invalidation could not be queued.");
+      return;
+    }
+    dependencies.schedule?.(
+      Effect.sleep(HOST_STATE_RETRY_DELAY).pipe(
+        Effect.andThen(
+          Effect.suspend(() =>
+            retryHostStateInvalidations({ database: dependencies.database, hostState, now: dependencies.now() }),
+          ),
+        ),
+      ),
+    );
   });
 
   readonly #placeHost = Effect.fn("RemoteControlPlane.placeHost")(function* (
@@ -4213,14 +4242,77 @@ export function deliverPendingRemoteAuthEvents(
   now: number,
   fetcher: RemoteFetch = (input, init) => fetch(input, init),
 ) {
-  return deliverRemoteAuthEvents({
-    database: bindings.DB,
-    webhookUrls: remoteAuthWebhookUrls(bindings),
-    webhookSecret: bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null,
-    fetch: fetcher,
-    now,
-  });
+  return Effect.all(
+    [
+      deliverRemoteAuthEvents({
+        database: bindings.DB,
+        webhookUrls: remoteAuthWebhookUrls(bindings),
+        webhookSecret: bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null,
+        fetch: fetcher,
+        now,
+      }),
+      retryHostStateInvalidations({
+        database: bindings.DB,
+        hostState: hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE),
+        now,
+      }),
+    ],
+    { concurrency: "unbounded", discard: true },
+  );
 }
+
+function hostStateRetryStatement(database: D1Database, hostId: string, now: number): D1PreparedStatement {
+  return database
+    .prepare(
+      `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at, pending_targets)
+       VALUES (?, json_object('type', 'host-state-invalidate', 'hostId', ?), ?, 0, ?, ?)`,
+    )
+    .bind(crypto.randomUUID(), hostId, now, now, HOST_STATE_RETRY_TARGETS);
+}
+
+const decodeHostStateRetry = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ type: Schema.Literal("host-state-invalidate"), hostId: Schema.String })),
+);
+
+export const retryHostStateInvalidations = Effect.fn("RemoteControlPlane.retryHostStateInvalidations")(
+  function* (input: { database: D1Database; hostState: HostStateStore | null; now: number }) {
+    const { database, hostState, now } = input;
+    if (!hostState) return;
+    const claimed = yield* remoteCall(() =>
+      database
+        .prepare(
+          `UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ?
+           WHERE event_id IN (
+             SELECT event_id FROM remote_auth_events
+              WHERE next_attempt_at <= ? AND pending_targets = ? ORDER BY created_at LIMIT 50
+           )
+           RETURNING event_id, payload, created_at`,
+        )
+        .bind(now + HOST_STATE_RETRY_MS, now, HOST_STATE_RETRY_TARGETS)
+        .all<{ event_id: string; payload: string; created_at: number }>(),
+    );
+    const byHost = new Map<string, string[]>();
+    const done: string[] = [];
+    for (const event of claimed.results ?? []) {
+      const retry = Option.getOrUndefined(decodeHostStateRetry(event.payload));
+      if (!retry || event.created_at <= now - HOST_STATE_RECHECK_MS) done.push(event.event_id);
+      else byHost.set(retry.hostId, [...(byHost.get(retry.hostId) ?? []), event.event_id]);
+    }
+    const applied = yield* Effect.forEach(
+      [...byHost],
+      ([hostId, events]) => hostState.invalidate(hostId).pipe(Effect.map((ok) => (ok ? events : []))),
+      { concurrency: AUTH_EVENT_SEND_CONCURRENCY },
+    );
+    const deleted = [...done, ...applied.flat()];
+    if (deleted.length === 0) return;
+    yield* remoteCall(() =>
+      database
+        .prepare("DELETE FROM remote_auth_events WHERE event_id IN (SELECT value FROM json_each(?))")
+        .bind(JSON.stringify(deleted))
+        .run(),
+    );
+  },
+);
 
 const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents")(function* (input: {
   database: D1Database;
@@ -4235,10 +4327,13 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
     input.database
       .prepare(
         `UPDATE remote_auth_events SET next_attempt_at = ?
-         WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
+         WHERE event_id IN (
+           SELECT event_id FROM remote_auth_events
+            WHERE next_attempt_at <= ? AND pending_targets IS NOT ? ORDER BY created_at LIMIT 50
+         )
          RETURNING event_id, payload, attempts, pending_targets`,
       )
-      .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
+      .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now, HOST_STATE_RETRY_TARGETS)
       .all<RemoteAuthEventRow>(),
   );
   const send = Effect.fn("RemoteControlPlane.sendAuthEvent")(function* (url: string, payload: string) {

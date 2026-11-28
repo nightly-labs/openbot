@@ -1,13 +1,14 @@
 import { Effect } from "effect";
 import { decodeJwt } from "jose";
-import { HostState, type HostStateEntry } from "../src/server/host-state-object";
-import { RemoteControlPlane } from "../src/server/remote-control-plane";
+import { type HostStateStore, hostStateStore } from "../src/server/host-state";
+import { HostState, type HostStateSnapshot } from "../src/server/host-state-object";
+import { deliverPendingRemoteAuthEvents, RemoteControlPlane } from "../src/server/remote-control-plane";
 import type { AuthUser } from "../src/server/types";
 
 export { HostState };
 
 export class BrokenHostState extends HostState {
-  override read(): HostStateEntry {
+  override read(): HostStateSnapshot {
     throw new Error("host state unavailable");
   }
 
@@ -40,13 +41,17 @@ export type ProbeRequest =
   | { op: "rotate"; hostId: string; token: string; user: AuthUser; ownerMembershipId: string }
   | { op: "revoke-member"; hostId: string; actorUserId: string; membershipId: string }
   | { op: "revoke-host"; hostId: string; token: string; user: AuthUser }
-  | { op: "state"; hostId: string };
+  | { op: "state"; hostId: string }
+  | { op: "host-state-retry" };
 
 interface ProbeOptions {
   mode: string;
   broken: boolean;
   clock: number;
+  failInvalidate?: boolean;
 }
+
+const HOST_STATE_RETRY_TARGETS = JSON.stringify(["host-state:"]);
 
 function compactSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
@@ -85,6 +90,21 @@ function hostStateBinding(env: ProbeEnv, options: ProbeOptions) {
   return env.HOST_STATE;
 }
 
+function probeHostState(env: ProbeEnv, options: ProbeOptions): HostStateStore | null {
+  const store = hostStateStore(hostStateBinding(env, options), options.mode);
+  if (!store || !options.failInvalidate) return store;
+  return { ...store, invalidate: () => Effect.succeed(false) };
+}
+
+async function pendingRetries(env: ProbeEnv, hostId?: string): Promise<number> {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS pending FROM remote_auth_events WHERE pending_targets = ? AND (? IS NULL OR json_extract(payload, '$.hostId') = ?)",
+  )
+    .bind(HOST_STATE_RETRY_TARGETS, hostId ?? null, hostId ?? null)
+    .first<{ pending: number }>();
+  return row?.pending ?? 0;
+}
+
 async function outcome<A>(operation: Effect.Effect<A, object>) {
   const result = await Effect.runPromise(Effect.result(operation));
   if (result._tag === "Success") return { ok: true as const, value: result.success };
@@ -101,7 +121,13 @@ function ticketEpoch(ticket: string): number | null {
   return typeof epoch === "number" ? epoch : null;
 }
 
-async function run(plane: RemoteControlPlane, request: ProbeRequest, env: ProbeEnv) {
+async function run(
+  plane: RemoteControlPlane,
+  request: ProbeRequest,
+  env: ProbeEnv,
+  options: ProbeOptions,
+  database: D1Database,
+) {
   switch (request.op) {
     case "ticket": {
       const result = await outcome(
@@ -145,8 +171,22 @@ async function run(plane: RemoteControlPlane, request: ProbeRequest, env: ProbeE
     }
     case "state": {
       if (!env.HOST_STATE) return { ok: false, code: "no_binding" };
-      const entry = await env.HOST_STATE.get(env.HOST_STATE.idFromName(request.hostId)).read();
-      return { ok: true, generation: entry.generation, cached: entry.credential !== null };
+      const snapshot = await env.HOST_STATE.get(env.HOST_STATE.idFromName(request.hostId)).read({ credential: true });
+      return {
+        ok: true,
+        generation: snapshot.generation,
+        cached: snapshot.credential !== null,
+        pending: await pendingRetries(env, request.hostId),
+      };
+    }
+    case "host-state-retry": {
+      const result = await outcome(
+        deliverPendingRemoteAuthEvents(
+          { DB: database, HOST_STATE: env.HOST_STATE, HOST_STATE_MODE: options.mode },
+          options.clock,
+        ),
+      );
+      return result.ok ? { ok: true, pending: await pendingRetries(env) } : result;
     }
   }
 }
@@ -155,23 +195,24 @@ export default {
   async fetch(request: Request, env: ProbeEnv): Promise<Response> {
     const body = await request.json<{ options: ProbeOptions; request: ProbeRequest }>();
     const calls: D1Call[] = [];
+    const database = countedDatabase(env.DB, calls);
     const plane = new RemoteControlPlane(
       {
-        DB: countedDatabase(env.DB, calls),
+        DB: database,
         REMOTE_TICKET_PRIVATE_JWK: env.REMOTE_TICKET_PRIVATE_JWK,
         REMOTE_TICKET_PUBLIC_JWKS: env.REMOTE_TICKET_PUBLIC_JWKS,
         REMOTE_TICKET_KEY_ID: env.REMOTE_TICKET_KEY_ID,
         REMOTE_SIGNAL_URL: "wss://signal.probe.test",
-        HOST_STATE: hostStateBinding(env, body.options),
         HOST_STATE_MODE: body.options.mode,
       },
       {
         now: () => body.options.clock,
         schedule: () => undefined,
         fetch: async () => new Response(null, { status: 200 }),
+        hostState: probeHostState(env, body.options),
       },
     );
-    const result = await run(plane, body.request, env);
+    const result = await run(plane, body.request, env, body.options, database);
     return Response.json({ ...result, d1: calls });
   },
 };
