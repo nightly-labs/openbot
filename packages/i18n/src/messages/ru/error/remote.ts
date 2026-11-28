@@ -71,6 +71,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "Служба аккаунтов приняла другой хост.",
   "error.remote.inviteIdentityChanged": "Идентификатор хоста приглашения изменился во время принятия.",
   "error.remote.localServerRemove": "Локальный сервер нельзя удалить.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot не может переместить файлы этого сервера в корзину. Закройте программы, которые используют эти файлы, или перезапустите компьютер, а затем повторите попытку.",
   "error.remote.desktopSetupHostUpdate":
     "Обновите OpenBot на хосте, чтобы проверить настройку удалённого рабочего стола.",
   "error.remote.desktopTestHostUpdate":

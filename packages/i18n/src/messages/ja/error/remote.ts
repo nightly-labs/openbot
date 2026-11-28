@@ -74,6 +74,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "アカウントサービスが別のホストを承認しました。",
   "error.remote.inviteIdentityChanged": "招待の承認中に、ホストの ID が変わりました。",
   "error.remote.localServerRemove": "ローカルサーバーは削除できません。",
+  "error.remote.localServerTrashFailed":
+    "OpenBot はこのサーバーのファイルをゴミ箱に移動できません。これらのファイルを使っているプログラムを閉じるか、コンピューターを再起動してから、もう一度お試しください。",
   "error.remote.desktopSetupHostUpdate":
     "リモートデスクトップの設定を確認するには、ホストの OpenBot を更新してください。",
   "error.remote.desktopTestHostUpdate":

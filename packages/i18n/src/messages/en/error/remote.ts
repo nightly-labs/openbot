@@ -70,6 +70,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.inviteAcceptedOtherHost": "The account service accepted a different host.",
   "error.remote.inviteIdentityChanged": "The invitation host identity changed while it was accepted.",
   "error.remote.localServerRemove": "The local server cannot be removed.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot cannot move the files of this server to the trash. Close the programs that use these files, or restart the computer, then try again.",
   "error.remote.desktopSetupHostUpdate": "Update OpenBot on the host to check remote desktop setup.",
   "error.remote.desktopTestHostUpdate": "Update OpenBot on the host to test remote desktop setup.",
   "error.remote.viewerProxyUnavailable": "The local remote viewer proxy is unavailable.",

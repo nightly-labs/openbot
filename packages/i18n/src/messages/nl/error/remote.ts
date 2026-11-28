@@ -75,6 +75,8 @@ export const messages = {
   "error.remote.inviteIdentityChanged":
     "De identiteit van de host van de uitnodiging is gewijzigd tijdens het accepteren.",
   "error.remote.localServerRemove": "De lokale server kan niet worden verwijderd.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot kan de bestanden van deze server niet naar de prullenbak verplaatsen. Sluit de programma's die deze bestanden gebruiken of start de computer opnieuw op. Probeer het daarna opnieuw.",
   "error.remote.desktopSetupHostUpdate":
     "Werk OpenBot bij op de host om de instelling van extern bureaublad te controleren.",
   "error.remote.desktopTestHostUpdate": "Werk OpenBot bij op de host om de instelling van extern bureaublad te testen.",

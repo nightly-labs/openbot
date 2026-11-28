@@ -72,6 +72,8 @@ export const messages = {
   "error.remote.inviteAcceptedOtherHost": "Il servizio account ha accettato un host diverso.",
   "error.remote.inviteIdentityChanged": "L'identità dell'host dell'invito è cambiata mentre veniva accettato.",
   "error.remote.localServerRemove": "Il server locale non può essere rimosso.",
+  "error.remote.localServerTrashFailed":
+    "OpenBot non può spostare i file di questo server nel cestino. Chiudi i programmi che usano questi file o riavvia il computer, poi riprova.",
   "error.remote.desktopSetupHostUpdate":
     "Aggiorna OpenBot sull'host per controllare la configurazione del desktop remoto.",
   "error.remote.desktopTestHostUpdate": "Aggiorna OpenBot sull'host per testare la configurazione del desktop remoto.",
