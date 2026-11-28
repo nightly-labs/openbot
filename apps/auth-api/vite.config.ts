@@ -57,7 +57,7 @@ export default defineConfig(({ command }) => {
           return { vars: { ...config.vars, ...localRuntimeVars } };
         },
       }),
-      lazyLanguageCatalogs({ applyToEnvironment: (environment) => environment.name === "client" }),
+      lazyLanguageCatalogs(),
       bloubServerBuild(),
       tanstackStart(),
       solidPlugin({ ssr: true }),

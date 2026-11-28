@@ -338,6 +338,8 @@ interface RemoteHostRow {
   machine_token_hash: string | null;
   device_public_key: string | null;
   signal_home: string | null;
+  signal_home_failed: string | null;
+  signal_home_failed_at: number | null;
 }
 
 interface RemoteHostKeyHandoverRow {
@@ -535,6 +537,7 @@ const SIGNAL_COUNTRY_PATTERN = /^[A-Z][A-Z0-9]$/u;
 const NEAR_SIGNAL_HOME_MARGIN_KM = 1_000;
 const EARTH_RADIUS_KM = 6_371;
 const SIGNAL_HOME_MOVE_TIMEOUT_MS = 2_000;
+const SIGNAL_HOME_FAILURE_HOLD_MS = 60 * 60_000;
 
 interface RemotePublicJwk extends DynamicRecord {
   kid: string;
@@ -760,6 +763,7 @@ export class RemoteControlPlane {
 
   readonly #database: D1Database;
   readonly #signer: RemoteTicketSigner;
+  #leasedAuthEventIds: string[] = [];
 
   constructor(
     bindings: Pick<
@@ -895,27 +899,52 @@ export class RemoteControlPlane {
         existing.machine_token_hash !== providedMachineTokenHash ||
         LEGACY_SHA256_HEX_PATTERN.test(existing.machine_token_hash ?? "");
       if (!rotateCredential && existing) {
-        const metadata = yield* remoteCall(() =>
-          dependencies.database.batch([
-            dependencies.database
-              .prepare(
-                `UPDATE remote_hosts SET name = ?, device_public_key = ?, updated_at = ?
-             WHERE host_id = ? AND owner_user_id = ?`,
-              )
-              .bind(name, devicePublicKey, now, hostId, user.id),
-            dependencies.database
-              .prepare(
-                `INSERT INTO remote_memberships(
-               membership_id, host_id, user_id, role, status, created_at, updated_at
-             )
-             SELECT ?, host_id, ?, 'owner', 'active', ?, ?
-             FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
-             ON CONFLICT(host_id, user_id) DO UPDATE SET
-               role = 'owner', status = 'active', updated_at = excluded.updated_at`,
-              )
-              .bind(ownerMembershipId, user.id, now, now, hostId, user.id),
-          ]),
+        const current = yield* remoteCall(() =>
+          dependencies.database
+            .prepare(
+              `SELECT membership_id, host_id, user_id, role, status
+             FROM remote_memberships WHERE host_id = ? AND user_id = ? LIMIT 1`,
+            )
+            .bind(hostId, user.id)
+            .first<RemoteMembershipRow>(),
         );
+        const writes = [
+          ...(existing.name === name
+            ? []
+            : [
+                dependencies.database
+                  .prepare(
+                    `UPDATE remote_hosts SET name = ?, device_public_key = ?, updated_at = ?
+                 WHERE host_id = ? AND owner_user_id = ?`,
+                  )
+                  .bind(name, devicePublicKey, now, hostId, user.id),
+              ]),
+          ...(current?.role === "owner" && current.status === "active"
+            ? []
+            : [
+                dependencies.database
+                  .prepare(
+                    `INSERT INTO remote_memberships(
+                   membership_id, host_id, user_id, role, status, created_at, updated_at
+                 )
+                 SELECT ?, host_id, ?, 'owner', 'active', ?, ?
+                 FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
+                 ON CONFLICT(host_id, user_id) DO UPDATE SET
+                   role = 'owner', status = 'active', updated_at = excluded.updated_at`,
+                  )
+                  .bind(ownerMembershipId, user.id, now, now, hostId, user.id),
+              ]),
+        ];
+        if (writes.length === 0 && current) {
+          return {
+            hostId,
+            name,
+            membershipId: current.membership_id,
+            authEpoch: existing.auth_epoch,
+            machineToken: null,
+          };
+        }
+        const metadata = yield* remoteCall(() => dependencies.database.batch(writes));
         if (metadata.some((result) => (result.meta.changes ?? 0) !== 1)) {
           return yield* new RemoteControlPlaneError(
             403,
@@ -937,7 +966,7 @@ export class RemoteControlPlane {
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
       const membershipId = ownerMembershipId;
-      const [, ...registration] = yield* remoteCall(() =>
+      const [, hostWrite, , ...events] = yield* remoteCall(() =>
         dependencies.database.batch([
           dependencies.database
             .prepare(
@@ -969,7 +998,8 @@ export class RemoteControlPlane {
            SELECT ?, host_id, ?, 'owner', 'active', ?, ?
            FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
            ON CONFLICT(host_id, user_id) DO UPDATE SET
-             role = 'owner', status = 'active', updated_at = excluded.updated_at`,
+             role = 'owner', status = 'active', updated_at = excluded.updated_at
+           WHERE remote_memberships.role != 'owner' OR remote_memberships.status != 'active'`,
             )
             .bind(membershipId, user.id, now, now, hostId, user.id),
           this.#authEpochEventStatement(hostId, now, user.id),
@@ -978,7 +1008,7 @@ export class RemoteControlPlane {
             : [this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now)]),
         ]),
       );
-      if (registration.some((result) => (result.meta.changes ?? 0) !== 1)) {
+      if ([hostWrite, ...events].some((result) => (result?.meta.changes ?? 0) !== 1)) {
         return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
       }
       yield* this.#flushAuthEvents();
@@ -3870,7 +3900,8 @@ export class RemoteControlPlane {
     return yield* remoteCall(() =>
       readsFrom(dependencies.database, reads)
         .prepare(
-          `SELECT host_id, owner_user_id, name, logo_key, auth_epoch, machine_token_hash, device_public_key, signal_home
+          `SELECT host_id, owner_user_id, name, logo_key, auth_epoch, machine_token_hash, device_public_key, signal_home,
+           signal_home_failed, signal_home_failed_at
          FROM remote_hosts WHERE host_id = ? LIMIT 1`,
         )
         .bind(hostId)
@@ -3886,24 +3917,34 @@ export class RemoteControlPlane {
     place: SignalHostPlace,
   ): Effect.fn.Return<RemoteSignalHome | null, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
+    const now = dependencies.now();
     const current = configuredSignalHome(signal, host.signal_home);
     const preferred = configuredSignalHome(signal, place.preferred);
-    if (preferred && preferred.url !== failedSignalUrl) {
+    const failed = signalHomeAtUrl(signal, failedSignalUrl);
+    const avoided = avoidedSignalUrls(signal, host, failedSignalUrl, now);
+    const store = (chosen: RemoteSignalHome) =>
+      this.#storeSignalHome(
+        host,
+        signal,
+        chosen,
+        failed && failed.id !== chosen.id ? { id: failed.id, at: now } : null,
+      );
+    if (preferred && !avoided.includes(preferred.url)) {
       if (preferred.id === host.signal_home) return preferred;
       if (yield* signalAnswers(dependencies.fetch, preferred.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
-        return yield* this.#storeSignalHome(host, signal, preferred);
+        return yield* store(preferred);
     }
-    const candidates = nearSignalHomes(signal, failedSignalUrl, place);
+    const candidates = nearSignalHomes(signal, avoided, place);
     if (current && candidates.includes(current.id)) return current;
     const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, candidates));
     if (!chosen || chosen.id === host.signal_home) return chosen;
     if (
       current &&
-      current.url !== failedSignalUrl &&
+      !avoided.includes(current.url) &&
       !(yield* signalAnswers(dependencies.fetch, chosen.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
     )
       return current;
-    return yield* this.#storeSignalHome(host, signal, chosen);
+    return yield* store(chosen);
   });
 
   readonly #storeSignalHome = Effect.fn("RemoteControlPlane.storeSignalHome")(function* (
@@ -3911,13 +3952,21 @@ export class RemoteControlPlane {
     host: RemoteHostRow,
     signal: RemoteSignalPlan,
     chosen: RemoteSignalHome,
+    failed: { id: string; at: number } | null,
   ): Effect.fn.Return<RemoteSignalHome, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
     const stored = yield* remoteCall(() =>
-      dependencies.database
-        .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
-        .bind(chosen.id, host.host_id, host.signal_home)
-        .run(),
+      (failed
+        ? dependencies.database
+            .prepare(
+              `UPDATE remote_hosts SET signal_home = ?, signal_home_failed = ?, signal_home_failed_at = ?
+               WHERE host_id = ? AND signal_home IS ?`,
+            )
+            .bind(chosen.id, failed.id, failed.at, host.host_id, host.signal_home)
+        : dependencies.database
+            .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
+            .bind(chosen.id, host.host_id, host.signal_home)
+      ).run(),
     );
     if ((stored.meta.changes ?? 0) === 1) return chosen;
     const raced = yield* remoteCall(() =>
@@ -3990,8 +4039,14 @@ export class RemoteControlPlane {
     return row !== null;
   });
 
+  #leaseAuthEvent(now: number): { eventId: string; until: number } {
+    const eventId = crypto.randomUUID();
+    this.#leasedAuthEventIds.push(eventId);
+    return { eventId, until: now + AUTH_EVENT_CLAIM_MS };
+  }
+
   #authEventStatement(event: RemoteAuthEvent, now: number, condition?: SqlCondition): D1PreparedStatement {
-    return authEventStatement(this.#database, event, now, condition);
+    return authEventStatement(this.#database, event, now, condition, this.#leaseAuthEvent(now));
   }
 
   #authEpochEventStatement(
@@ -4000,6 +4055,7 @@ export class RemoteControlPlane {
     ownerUserId?: string,
     condition?: SqlCondition,
   ): D1PreparedStatement {
+    const lease = this.#leaseAuthEvent(now);
     return this.#database
       .prepare(
         `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
@@ -4007,9 +4063,9 @@ export class RemoteControlPlane {
          FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)${condition ? ` AND ${condition.sql}` : ""}`,
       )
       .bind(
-        crypto.randomUUID(),
+        lease.eventId,
         now,
-        now,
+        lease.until,
         hostId,
         ownerUserId ?? null,
         ownerUserId ?? null,
@@ -4021,6 +4077,7 @@ export class RemoteControlPlane {
     this: RemoteControlPlane,
   ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
+    const leasedEventIds = this.#leasedAuthEventIds.splice(0);
     const delivery = Effect.suspend(() =>
       deliverRemoteAuthEvents({
         database: dependencies.database,
@@ -4028,6 +4085,7 @@ export class RemoteControlPlane {
         webhookSecret: dependencies.webhookSecret,
         fetch: dependencies.fetch,
         now: dependencies.now(),
+        leasedEventIds,
       }),
     );
     if (!dependencies.schedule) return yield* delivery;
@@ -4052,13 +4110,14 @@ export function authEventStatement(
   event: RemoteAuthEvent,
   now: number,
   condition?: SqlCondition,
+  lease: { eventId: string; until: number } = { eventId: crypto.randomUUID(), until: now },
 ): D1PreparedStatement {
   return database
     .prepare(
       `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
        SELECT ?, ?, ?, 0, ?${condition ? ` WHERE ${condition.sql}` : ""}`,
     )
-    .bind(crypto.randomUUID(), JSON.stringify(event), now, now, ...(condition?.binds ?? []));
+    .bind(lease.eventId, JSON.stringify(event), now, lease.until, ...(condition?.binds ?? []));
 }
 
 function remoteSignalNotConfigured(): RemoteControlPlaneError {
@@ -4153,9 +4212,28 @@ function configuredSignalHome(signal: RemoteSignalPlan, id: string | null): Remo
   return id !== null && url !== undefined ? { id, url } : null;
 }
 
-function nearSignalHomes(signal: RemoteSignalPlan, failedSignalUrl: string | null, place: SignalHostPlace): string[] {
+function signalHomeAtUrl(signal: RemoteSignalPlan, url: string | null): RemoteSignalHome | null {
+  if (url === null) return null;
+  for (const [id, homeUrl] of signal.homes) if (homeUrl === url) return { id, url };
+  return null;
+}
+
+function avoidedSignalUrls(
+  signal: RemoteSignalPlan,
+  host: RemoteHostRow,
+  failedSignalUrl: string | null,
+  now: number,
+): string[] {
+  const failedRecently =
+    host.signal_home_failed_at !== null && now - host.signal_home_failed_at < SIGNAL_HOME_FAILURE_HOLD_MS
+      ? configuredSignalHome(signal, host.signal_home_failed)
+      : null;
+  return [failedSignalUrl, failedRecently?.url ?? null].filter((url): url is string => url !== null);
+}
+
+function nearSignalHomes(signal: RemoteSignalPlan, avoided: readonly string[], place: SignalHostPlace): string[] {
   const homes = [...signal.homes];
-  const available = homes.filter(([, url]) => url !== failedSignalUrl);
+  const available = homes.filter(([, url]) => !avoided.includes(url));
   const ids = (available.length > 0 ? available : homes).map(([id]) => id);
   const countryHomes = place.country === null ? undefined : signal.countries.get(place.country);
   const inCountry = ids.filter((id) => countryHomes?.includes(id));
@@ -4288,19 +4366,44 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
   webhookSecret: string | null;
   fetch: RemoteFetch;
   now: number;
+  leasedEventIds?: readonly string[];
 }) {
   const { webhookUrls, webhookSecret } = input;
   if (webhookUrls.length === 0 || !webhookSecret) return;
-  const result = yield* remoteCall(() =>
-    input.database
-      .prepare(
-        `UPDATE remote_auth_events SET next_attempt_at = ?
-         WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
-         RETURNING event_id, payload, attempts, pending_targets`,
-      )
-      .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
-      .all<RemoteAuthEventRow>(),
-  );
+  const leasedEventIds = input.leasedEventIds ?? [];
+  const leased =
+    leasedEventIds.length === 0
+      ? []
+      : ((yield* remoteCall(() =>
+          input.database
+            .prepare(
+              `SELECT event_id, payload, attempts, pending_targets, created_at FROM remote_auth_events
+               WHERE event_id IN (SELECT value FROM json_each(?)) ORDER BY created_at`,
+            )
+            .bind(JSON.stringify(leasedEventIds))
+            .all<RemoteAuthEventRow & { created_at: number }>(),
+        )).results ?? []);
+  const due =
+    leasedEventIds.length === 0 ||
+    (yield* remoteCall(() =>
+      replicaD1(input.database)
+        .prepare("SELECT 1 FROM remote_auth_events WHERE next_attempt_at <= ? LIMIT 1")
+        .bind(input.now)
+        .first(),
+    )) !== null;
+  const claimed = due
+    ? ((yield* remoteCall(() =>
+        input.database
+          .prepare(
+            `UPDATE remote_auth_events SET next_attempt_at = ?
+             WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
+             RETURNING event_id, payload, attempts, pending_targets, created_at`,
+          )
+          .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
+          .all<RemoteAuthEventRow & { created_at: number }>(),
+      )).results ?? [])
+    : [];
+  const events = [...claimed, ...leased].sort((left, right) => left.created_at - right.created_at);
   const send = Effect.fn("RemoteControlPlane.sendAuthEvent")(function* (url: string, payload: string) {
     const timestamp = Math.floor(input.now / 1_000).toString();
     const signature = yield* hmacSha256(webhookSecret, `${timestamp}.${payload}`).pipe(
@@ -4323,7 +4426,7 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
     if (!response.ok) return yield* new RemoteOperationError({});
   });
   yield* Effect.forEach(
-    result.results ?? [],
+    events,
     (event) =>
       Effect.gen(function* () {
         const targets = pendingAuthEventTargets(event.pending_targets, webhookUrls);
