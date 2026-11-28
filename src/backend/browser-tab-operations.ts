@@ -1,5 +1,6 @@
 import type { BrowserDiagnosticEntry, BrowserSiteMemory, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
 import { Context, Deferred, Effect, Fiber, Option, Result } from "effect";
+import type { WebContents } from "electron";
 import type { BrowserDialog, BrowserDialogOwner, BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
 import {
   CHALLENGE_CLICK_WAIT_MS,
@@ -24,6 +25,11 @@ import { TimeoutError, withTimeout } from "./with-timeout";
 const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
 const OPERATION_UNWIND_GRACE_MS = 1_000;
 const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+const PAINT_NUDGE_FIRST_MS = 250;
+const PAINT_NUDGE_LONGEST_MS = 2_000;
+const PAINT_NUDGES_IN_FLIGHT = 2;
+const NUDGES_UNDRAWN_PAGES = process.platform === "darwin" || process.platform === "win32";
+const paintNudgesInFlight = new WeakMap<WebContents, number>();
 const SILENT_PAGE_ADVICE =
   "The page does not answer because a script on it keeps running. Reload the tab with navigate direction=reload, which ends the stuck page first, or close the tab.";
 
@@ -341,6 +347,30 @@ export const readActionStatus: ActionResultReader<BrowserActionStatus> = Effect.
   },
 );
 
+function nudgePaint(tab: BrowserHostTab): void {
+  const contents = tab.contents;
+  if (tab.closing || contents.isDestroyed()) return;
+  const inFlight = paintNudgesInFlight.get(contents) ?? 0;
+  if (inFlight >= PAINT_NUDGES_IN_FLIGHT) return;
+  paintNudgesInFlight.set(contents, inFlight + 1);
+  const settled = () => paintNudgesInFlight.set(contents, (paintNudgesInFlight.get(contents) ?? 1) - 1);
+  contents.capturePage().then(settled, settled);
+}
+
+const keepPageDrawing = (tab: BrowserHostTab, delayMs = PAINT_NUDGE_FIRST_MS): Effect.Effect<never> =>
+  Effect.sleep(delayMs).pipe(
+    Effect.andThen(
+      Effect.suspend(() => {
+        nudgePaint(tab);
+        return keepPageDrawing(tab, Math.min(delayMs * 2, PAINT_NUDGE_LONGEST_MS));
+      }),
+    ),
+  );
+
+function keepDrawnDuring<A, E>(tab: BrowserHostTab, wait: Effect.Effect<A, E>): Effect.Effect<A, E> {
+  return NUDGES_UNDRAWN_PAGES ? Effect.raceFirst(wait, keepPageDrawing(tab)) : wait;
+}
+
 export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(function* <A>(
   tab: BrowserHostTab,
   operation: Effect.Effect<A, BrowserOperationError>,
@@ -349,7 +379,7 @@ export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(funct
   keepQueueBlocked: KeepQueueBlocked,
 ) {
   const completion = yield* Effect.forkIn(operation, tab.scope, { startImmediately: true });
-  return yield* withTimeout(Fiber.join(completion), timeoutMs, timeoutMessage).pipe(
+  return yield* withTimeout(keepDrawnDuring(tab, Fiber.join(completion)), timeoutMs, timeoutMessage).pipe(
     Effect.onInterrupt(() =>
       Effect.sync(() => {
         if (tab.engine.cancelPendingCommands()) completion.interruptUnsafe();
