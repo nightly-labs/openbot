@@ -196,6 +196,12 @@ function PickerExit(props: { picker: () => HTMLElement | undefined }): JSX.Eleme
   return undefined;
 }
 
+function isSelectAllKey(event: KeyboardEvent): boolean {
+  if (event.key.toLocaleLowerCase() !== "a" || event.altKey || event.shiftKey) return false;
+  if (event.metaKey) return true;
+  return event.ctrlKey && !navigator.platform.toLowerCase().includes("mac");
+}
+
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
     if (target.includes(":")) return match;
@@ -940,7 +946,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return;
     }
 
-    if (event.key.toLocaleLowerCase() === "a" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+    if (isSelectAllKey(event)) {
       event.preventDefault();
       if (!editor) return;
       const range = document.createRange();
