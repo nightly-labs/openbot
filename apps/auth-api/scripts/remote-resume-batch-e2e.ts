@@ -147,7 +147,7 @@ const cases: { name: string; claims: RemoteResumeClaims; valid: boolean }[] = [
   { name: "duplicate of the active member session", claims: memberClaims("session-live"), valid: true },
 ];
 
-function countingD1(database: DatabaseSync, queries: string[], replicaQueries: string[]): D1Database {
+function countingD1(database: DatabaseSync, queries: string[]): D1Database {
   const source = sqliteD1(database);
   return {
     prepare: (query: string) => {
@@ -156,14 +156,7 @@ function countingD1(database: DatabaseSync, queries: string[], replicaQueries: s
     },
     batch: (statements) => source.batch(statements),
     exec: (query) => source.exec(query),
-    withSession: () => ({
-      prepare: (query: string) => {
-        replicaQueries.push(query);
-        return source.prepare(query);
-      },
-      batch: (statements) => source.batch(statements),
-      getBookmark: () => null,
-    }),
+    withSession: (constraint) => source.withSession(constraint),
     dump: () => source.dump(),
   };
 }
@@ -178,12 +171,7 @@ function queryPlan(database: DatabaseSync, query: string, values: (string | numb
 async function scenario() {
   const database = await migratedDatabase();
   const queries: string[] = [];
-  const replicaQueries: string[] = [];
-  const plane = new RemoteControlPlane({ DB: countingD1(database, queries, replicaQueries), ...ticketKeys });
-  const resetQueries = () => {
-    queries.length = 0;
-    replicaQueries.length = 0;
-  };
+  const plane = new RemoteControlPlane({ DB: countingD1(database, queries), ...ticketKeys });
 
   const single: boolean[] = [];
   for (const entry of cases) single.push(await Effect.runPromise(plane.validateResumeClaims(entry.claims)));
@@ -194,20 +182,17 @@ async function scenario() {
     cases.map((entry, index) => ({ case: entry.name, expected: entry.valid, single: single[index] })),
   );
 
-  resetQueries();
+  queries.length = 0;
   const batch = await Effect.runPromise(plane.validateResumeClaimsBatch(cases.map((entry) => entry.claims)));
-  const batchQueries = [...replicaQueries];
-  const batchPrimaryQueries = [...queries];
+  const batchQueries = [...queries];
   check(
     "the batch gives the same answer as the single route for each case, in input order",
     batch.length === cases.length && batch.every((valid, index) => valid === single[index]),
     cases.map((entry, index) => ({ case: entry.name, single: single[index], batch: batch[index] })),
   );
-  check(
-    "the batch reads the replica with one host query and one session query, and the primary only for claims that the replica does not confirm",
-    batchQueries.length === 2 && batchPrimaryQueries.length === 2,
-    { replicaQueries: batchQueries.length, primaryQueries: batchPrimaryQueries.length },
-  );
+  check("the batch reads the database with one host query and one session query", batchQueries.length === 2, {
+    queries: batchQueries.length,
+  });
 
   const [hostQuery, sessionQuery] = batchQueries;
   const hostPlan = hostQuery ? queryPlan(database, hostQuery, [JSON.stringify(["host-a", "host-b"])]) : [];
@@ -222,38 +207,26 @@ async function scenario() {
     { hostPlan, sessionPlan },
   );
 
-  resetQueries();
+  queries.length = 0;
   const hostsOnly = await Effect.runPromise(
     plane.validateResumeClaimsBatch([hostClaims("host-a", 1), hostClaims("host-b", 2)]),
   );
-  check(
-    "a batch of host claims makes one replica query and one primary query for the refused claim",
-    hostsOnly.join() === "true,false" && replicaQueries.length === 1 && queries.length === 1,
-    { answers: hostsOnly, replicaQueries: replicaQueries.length, primaryQueries: queries.length },
-  );
-
-  resetQueries();
-  const confirmed = await Effect.runPromise(
-    plane.validateResumeClaimsBatch([hostClaims("host-a", 1), memberClaims("session-live")]),
-  );
-  check(
-    "a batch that the replica confirms makes no primary query",
-    confirmed.join() === "true,true" && replicaQueries.length === 2 && queries.length === 0,
-    { answers: confirmed, replicaQueries: replicaQueries.length, primaryQueries: queries.length },
-  );
+  check("a batch of host claims only makes one query", hostsOnly.join() === "true,false" && queries.length === 1, {
+    answers: hostsOnly,
+    queries: queries.length,
+  });
 
   const full = Array.from({ length: REMOTE_RESUME_BATCH_LIMIT }, (_, index) =>
     index % 2 === 0 ? hostClaims(index % 4 === 0 ? "host-a" : "host-missing", 1) : memberClaims("session-live"),
   );
-  resetQueries();
+  queries.length = 0;
   const fullAnswers = await Effect.runPromise(plane.validateResumeClaimsBatch(full));
   check(
-    `a full batch of ${REMOTE_RESUME_BATCH_LIMIT} claims makes two replica queries, one primary query for the unknown host and answers each claim`,
+    `a full batch of ${REMOTE_RESUME_BATCH_LIMIT} claims makes two queries and answers each claim`,
     fullAnswers.length === REMOTE_RESUME_BATCH_LIMIT &&
       fullAnswers.every((valid, index) => valid === (index % 2 === 1 || index % 4 === 0)) &&
-      replicaQueries.length === 2 &&
-      queries.length === 1,
-    { answers: fullAnswers.length, replicaQueries: replicaQueries.length, primaryQueries: queries.length },
+      queries.length === 2,
+    { answers: fullAnswers.length, queries: queries.length },
   );
 }
 

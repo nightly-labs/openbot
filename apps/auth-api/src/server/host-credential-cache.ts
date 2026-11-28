@@ -6,7 +6,7 @@ interface AcceptedCredential {
   checkedAt: number;
 }
 
-function sameHash(left: string, right: string): boolean {
+export function sameHash(left: string, right: string): boolean {
   let difference = left.length ^ right.length;
   for (let index = 0; index < right.length; index += 1) {
     difference |= left.charCodeAt(index) ^ right.charCodeAt(index);

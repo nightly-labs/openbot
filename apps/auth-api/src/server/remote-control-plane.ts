@@ -87,7 +87,7 @@ import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 }
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import { updateSessionActivity } from "./d1-auth-repository";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
-import { type HostCredentialCache, isolateHostCredentials } from "./host-credential-cache";
+import { type HostCredentialCache, isolateHostCredentials, sameHash } from "./host-credential-cache";
 import { type HostStateStore, hostCredentialFresh, hostStateStore } from "./host-state";
 import type { HostStateCredential } from "./host-state-object";
 import { primaryD1, replicaD1 } from "./observed-d1";
@@ -341,11 +341,7 @@ function readsFrom(database: D1Database, reads: RemoteReads): D1Database {
 
 function machineTokenMatches(host: RemoteHostRow, providedHash: string): boolean {
   const expected = host.machine_token_hash ?? "";
-  let difference = expected.length ^ providedHash.length;
-  for (let index = 0; index < providedHash.length; index += 1) {
-    difference |= expected.charCodeAt(index) ^ providedHash.charCodeAt(index);
-  }
-  return expected !== "" && difference === 0;
+  return expected !== "" && sameHash(expected, providedHash);
 }
 
 export interface SqlCondition {
@@ -572,56 +568,6 @@ function signedInSession(row: SignedInSessionRow): SignedInSession {
   const { account_user_id: userId, account_last_used_at: _, ...session } = row;
   return { userId, session: session.session_id === null ? null : session };
 }
-
-interface ResumeRows {
-  hosts: ReadonlyMap<string, RemoteResumeHostRow>;
-  sessions: ReadonlyMap<string, RemoteSessionRow>;
-}
-
-function resumeClaimsMatch(claims: RemoteResumeClaims, rows: ResumeRows, now: number): boolean {
-  if (claims.role === "host") return hostResumeClaimsMatch(claims, rows.hosts.get(claims.hostId));
-  return sessionResumeClaimsMatch(claims, rows.sessions.get(claims.sessionId), now);
-}
-
-const resumeRows = Effect.fn("RemoteControlPlane.resumeRows")(function* (
-  database: D1Database,
-  claims: readonly RemoteResumeClaims[],
-  now: number,
-): Effect.fn.Return<ResumeRows, RemoteFailure> {
-  const hostIds = [...new Set(claims.filter((entry) => entry.role === "host").map((entry) => entry.hostId))];
-  const sessionIds = [...new Set(claims.filter((entry) => entry.role !== "host").map((entry) => entry.sessionId))];
-  const [hostRows, sessionRows] = yield* Effect.all(
-    [
-      hostIds.length === 0
-        ? Effect.succeed([])
-        : remoteCall(() =>
-            database
-              .prepare(
-                `SELECT host_id, owner_user_id, auth_epoch FROM remote_hosts
-                  WHERE host_id IN (SELECT value FROM json_each(?))`,
-              )
-              .bind(JSON.stringify(hostIds))
-              .all<RemoteResumeHostRow>(),
-          ).pipe(Effect.map((result) => result.results)),
-      sessionIds.length === 0
-        ? Effect.succeed([])
-        : remoteCall(() =>
-            database
-              .prepare(
-                `SELECT ${RESUME_SESSION_COLUMNS}
-                  WHERE s.session_id IN (SELECT value FROM json_each(?)) AND ${RESUME_SESSION_ACTIVE}`,
-              )
-              .bind(JSON.stringify(sessionIds), now)
-              .all<RemoteSessionRow>(),
-          ).pipe(Effect.map((result) => result.results)),
-    ],
-    { concurrency: "unbounded" },
-  );
-  return {
-    hosts: new Map(hostRows.map((row) => [row.host_id, row])),
-    sessions: new Map(sessionRows.map((row) => [row.session_id, row])),
-  };
-});
 
 function remoteSessionActive(session: RemoteSessionRow | null, now: number): session is RemoteSessionRow {
   return session !== null && !session.ended_at && session.expires_at > now && session.status === "active";
@@ -2784,21 +2730,16 @@ export class RemoteControlPlane {
       const now = dependencies.now();
       if (!resumeClaimsLive(claims, now)) return false;
       if (claims.role === "host") {
-        const replica = yield* this.#host(claims.hostId, "replica");
-        if (hostResumeClaimsMatch(claims, replica ?? undefined)) return true;
-        const host = yield* this.#host(claims.hostId, "primary");
+        const host = yield* this.#host(claims.hostId);
         return hostResumeClaimsMatch(claims, host ?? undefined);
       }
-      const resumeSession = (database: D1Database) =>
-        remoteCall(() =>
-          database
-            .prepare(`SELECT ${RESUME_SESSION_COLUMNS} WHERE s.session_id = ? AND ${RESUME_SESSION_ACTIVE} LIMIT 1`)
-            .bind(claims.sessionId, now)
-            .first<RemoteSessionRow>(),
-        );
-      const replica = yield* resumeSession(replicaD1(dependencies.database));
-      if (sessionResumeClaimsMatch(claims, replica, now)) return true;
-      return sessionResumeClaimsMatch(claims, yield* resumeSession(primaryD1(dependencies.database)), now);
+      const session = yield* remoteCall(() =>
+        dependencies.database
+          .prepare(`SELECT ${RESUME_SESSION_COLUMNS} WHERE s.session_id = ? AND ${RESUME_SESSION_ACTIVE} LIMIT 1`)
+          .bind(claims.sessionId, now)
+          .first<RemoteSessionRow>(),
+      );
+      return sessionResumeClaimsMatch(claims, session, now);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2841,15 +2782,44 @@ export class RemoteControlPlane {
       const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
       const live = batch.filter((claims) => resumeClaimsLive(claims, now));
-      const replica = yield* resumeRows(replicaD1(dependencies.database), live, now);
-      const unconfirmed = live.filter((claims) => !resumeClaimsMatch(claims, replica, now));
-      const primary =
-        unconfirmed.length === 0 ? replica : yield* resumeRows(primaryD1(dependencies.database), unconfirmed, now);
-      return batch.map(
-        (claims) =>
-          resumeClaimsLive(claims, now) &&
-          (resumeClaimsMatch(claims, replica, now) || resumeClaimsMatch(claims, primary, now)),
+      const hostIds = [...new Set(live.filter((claims) => claims.role === "host").map((claims) => claims.hostId))];
+      const sessionIds = [
+        ...new Set(live.filter((claims) => claims.role !== "host").map((claims) => claims.sessionId)),
+      ];
+      const [hostRows, sessionRows] = yield* Effect.all(
+        [
+          hostIds.length === 0
+            ? Effect.succeed([])
+            : remoteCall(() =>
+                dependencies.database
+                  .prepare(
+                    `SELECT host_id, owner_user_id, auth_epoch FROM remote_hosts
+                      WHERE host_id IN (SELECT value FROM json_each(?))`,
+                  )
+                  .bind(JSON.stringify(hostIds))
+                  .all<RemoteResumeHostRow>(),
+              ).pipe(Effect.map((result) => result.results)),
+          sessionIds.length === 0
+            ? Effect.succeed([])
+            : remoteCall(() =>
+                dependencies.database
+                  .prepare(
+                    `SELECT ${RESUME_SESSION_COLUMNS}
+                      WHERE s.session_id IN (SELECT value FROM json_each(?)) AND ${RESUME_SESSION_ACTIVE}`,
+                  )
+                  .bind(JSON.stringify(sessionIds), now)
+                  .all<RemoteSessionRow>(),
+              ).pipe(Effect.map((result) => result.results)),
+        ],
+        { concurrency: "unbounded" },
       );
+      const hosts = new Map(hostRows.map((row) => [row.host_id, row]));
+      const sessions = new Map(sessionRows.map((row) => [row.session_id, row]));
+      return batch.map((claims) => {
+        if (!resumeClaimsLive(claims, now)) return false;
+        if (claims.role === "host") return hostResumeClaimsMatch(claims, hosts.get(claims.hostId));
+        return sessionResumeClaimsMatch(claims, sessions.get(claims.sessionId), now);
+      });
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
