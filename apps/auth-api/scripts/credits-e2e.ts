@@ -1648,6 +1648,62 @@ async function freeMonthlyCredits() {
   );
 }
 
+async function welcomeOncePerInbox() {
+  const { database, state, creditEvents } = await harness("unissued");
+  const addUser = (id: string, email: string) =>
+    database
+      .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
+      .run(id, `email:${email}`, email);
+  addUser("inbox-first", "ana.lopez@gmail.com");
+  addUser("inbox-dots", "AnaLopez@GoogleMail.com");
+  addUser("inbox-tag", "a.n.a.lopez+promo@gmail.com");
+  addUser("inbox-other", "ana.lopez2@gmail.com");
+  const grants = () =>
+    database
+      .prepare("SELECT user_id FROM credit_grants WHERE source = 'welcome' ORDER BY user_id")
+      .all()
+      .map((row) => String(row.user_id));
+  const inboxRows = () => database.prepare("SELECT inbox, user_id FROM credit_welcome_inboxes ORDER BY inbox").all();
+
+  const first = await state("inbox-first");
+  const dots = await state("inbox-dots");
+  const tag = await state("inbox-tag");
+  const other = await state("inbox-other");
+  const plain = await state(OWNER.id);
+  const firstAgain = await state("inbox-first");
+  const events = await creditEvents();
+  const granted = ["inbox-first", "inbox-dots", "inbox-tag", "inbox-other", OWNER.id].map(
+    (id) => eventsOf(events, id, { action: "granted", wallet: "personal", credits: 10 }).length,
+  );
+  check(
+    "free credits go once to a Gmail inbox: dot and +tag aliases get none, other inboxes and other domains get 10",
+    first.welcome === 10 &&
+      firstAgain.welcome === 10 &&
+      dots.welcome === undefined &&
+      dots.balance === 0 &&
+      tag.welcome === undefined &&
+      tag.balance === 0 &&
+      other.welcome === 10 &&
+      plain.welcome === 10 &&
+      JSON.stringify(grants()) === JSON.stringify(["inbox-first", "inbox-other", OWNER.id].sort()) &&
+      JSON.stringify(inboxRows()) ===
+        JSON.stringify([
+          { inbox: "analopez2@gmail.com", user_id: "inbox-other" },
+          { inbox: "analopez@gmail.com", user_id: "inbox-first" },
+        ]) &&
+      JSON.stringify(granted) === JSON.stringify([1, 0, 0, 1, 1]),
+    { first, dots, tag, other, plain, grants: grants(), inboxes: inboxRows(), granted },
+  );
+
+  database.prepare("DELETE FROM users WHERE id = 'inbox-first'").run();
+  const afterDelete = await state("inbox-dots");
+  check(
+    "a deleted account frees its Gmail inbox for free credits",
+    afterDelete.welcome === 10 && grants().includes("inbox-dots"),
+    { afterDelete, grants: grants() },
+  );
+}
+
 async function welcomeCredits() {
   const { database, credits, deliver, session, state, analytics, creditEvents } = await harness("unissued");
   const spending = new CreditSpending({ database: sqliteD1(database), now: () => Date.now(), analytics });
@@ -2114,6 +2170,7 @@ try {
   await holdLimits();
   await freeMonthlyCredits();
   await welcomeCredits();
+  await welcomeOncePerInbox();
   await creditCodes();
   passed = checks.every((item) => item.passed);
 } finally {
