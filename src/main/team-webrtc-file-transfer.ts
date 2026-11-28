@@ -108,6 +108,7 @@ export class TeamWebRtcFileTransfer {
   readonly #incoming = new Map<string, IncomingTransfer>();
   readonly #outgoing = new Map<string, OutgoingTransfer>();
   readonly #writing = new Set<SpoolReservation>();
+  readonly #spoolWaiting = new Set<SpoolReservation>();
   readonly #completed = new Map<string, ReceivedWebRtcFile>();
   readonly #waitingOpens = new Map<string, { peerId: string; frame: FileOpenFrame }>();
   readonly #watches = new Set<IncomingWatch>();
@@ -147,7 +148,13 @@ export class TeamWebRtcFileTransfer {
   }
 
   hasActiveTransfers(): boolean {
-    return this.#incoming.size > 0 || this.#outgoing.size > 0 || this.#writing.size > 0 || this.#waitingOpens.size > 0;
+    return (
+      this.#incoming.size > 0 ||
+      this.#outgoing.size > 0 ||
+      this.#writing.size > 0 ||
+      this.#spoolWaiting.size > 0 ||
+      this.#waitingOpens.size > 0
+    );
   }
 
   readonly send = Effect.fn("TeamFileTransfer.send")(function* (
@@ -198,12 +205,15 @@ export class TeamWebRtcFileTransfer {
         const deadline = Date.now() + this.#resumeMilliseconds;
         const pending: SpoolReservation = { peerId, size: 0, reserved: spoolReservation(input.expectedSize) };
         return yield* Effect.acquireUseRelease(
-          this.#waitUntilEffect(() => this.#reserveSpool(pending), deadline).pipe(
-            Effect.mapError((error) => this.#noRoomError(error)),
-            Effect.andThen(Effect.sync(() => recordRestartActivity())),
-          ),
+          Effect.sync(() => {
+            this.#spoolWaiting.add(pending);
+            recordRestartActivity();
+          }),
           () =>
             Effect.gen({ self: this }, function* () {
+              yield* this.#waitUntilEffect(() => this.#reserveSpool(pending), deadline).pipe(
+                Effect.mapError((error) => this.#noRoomError(error)),
+              );
               const hash = createHash("sha256");
               const check = (size: number) => this.#checkSpool(pending, size);
               yield* remoteCall(() =>
@@ -245,6 +255,7 @@ export class TeamWebRtcFileTransfer {
             }),
           () =>
             Effect.gen({ self: this }, function* () {
+              this.#spoolWaiting.delete(pending);
               this.#writing.delete(pending);
               this.#notifyStateChange();
               yield* remoteCall(() => (file ? file.close() : Promise.resolve())).pipe(Effect.catch(() => Effect.void));
@@ -269,6 +280,7 @@ export class TeamWebRtcFileTransfer {
 
   #reserveSpool(pending: SpoolReservation): boolean {
     if (this.#heldSpoolBytes(pending.peerId, pending) + pending.reserved > SPOOL_BYTES) return false;
+    this.#spoolWaiting.delete(pending);
     this.#writing.add(pending);
     return true;
   }
