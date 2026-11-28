@@ -16,7 +16,7 @@ import {
   parseChatVisualMessage,
 } from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { Button, Maximize2, PanelRight, Wallpaper } from "@openbot/ui";
+import { Button, buttonVariants, DropdownMenu, Ellipsis, Maximize2, PanelRight, Wallpaper } from "@openbot/ui";
 import { Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import { documentColorScheme } from "../../document-color-scheme";
@@ -349,16 +349,23 @@ function VisualFrame(props: ChatVisualProps) {
           </Show>
           <Show when={props.onUseAsBackdrop}>
             {(setBackdrop) => (
-              <Button
-                variant="secondary"
-                size="icon-sm"
-                type="button"
-                aria-label={t("chat.menu.useAsBackdrop")}
-                title={t("chat.menu.useAsBackdrop")}
-                onClick={() => setBackdrop()()}
-              >
-                <Wallpaper aria-hidden="true" />
-              </Button>
+              <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+                <DropdownMenu.Trigger
+                  class={buttonVariants({ variant: "secondary", size: "icon-sm" })}
+                  aria-label={t("chat.actions.more")}
+                  title={t("chat.actions.more")}
+                >
+                  <Ellipsis aria-hidden="true" />
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content aria-label={t("chat.actions.more")}>
+                    <DropdownMenu.Item onSelectAfterClose={setBackdrop()}>
+                      <Wallpaper aria-hidden="true" />
+                      <span>{t("chat.menu.useAsBackdrop")}</span>
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
             )}
           </Show>
           <Button
