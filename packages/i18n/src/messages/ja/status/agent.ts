@@ -11,6 +11,8 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "スキップ: 前回の実行がまだ終わっていませんでした",
   "status.agent.routineSkippedUsageLimit": "スキップ: 使用量の上限に達しました",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
+  "status.agent.modelSwitchedForErrorWithReason":
+    "プロバイダーのエラーが発生しました。{model} に切り替えました。\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",

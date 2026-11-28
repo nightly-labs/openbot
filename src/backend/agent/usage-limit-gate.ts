@@ -49,6 +49,7 @@ interface ProviderFailure extends UsageLimitKey {
   spent: boolean;
   refused: boolean;
   notOffered: boolean;
+  reason: string | null;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -155,6 +156,10 @@ export class UsageLimitGate {
     return this.#failures.has(limitKey(limit.provider, limit.accountId, limit.model));
   }
 
+  failureReason(limit: UsageLimitKey): string | null {
+    return this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model))?.reason ?? null;
+  }
+
   isSpent(limit: UsageLimitKey): boolean {
     return this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === true;
   }
@@ -182,6 +187,7 @@ export class UsageLimitGate {
     spent = false,
     refused = false,
     notOffered = false,
+    reason: string | null = null,
   ): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
@@ -208,6 +214,7 @@ export class UsageLimitGate {
       spent: spent || previous?.spent === true,
       refused: refused || previous?.refused === true,
       notOffered: notOffered || previous?.notOffered === true,
+      reason,
       timer: this.#armFailure(key, endsAt),
     });
     if (dropped) this.#wakeReturning(provider, turnModel);

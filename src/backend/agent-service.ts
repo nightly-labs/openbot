@@ -1589,6 +1589,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                     resetDelayMs,
                     spent,
                     failed.causeCode === "authentication",
+                    false,
+                    failed.message,
                   );
                 }
                 return Effect.void;
@@ -4863,10 +4865,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const accountName = account?.label || (email ? account?.email : null);
       return accountName ? `${accountName} · ${model}` : model;
     };
+    const failure = reason === "provider-error" && left ? this.#usageLimits.failureReason(usageLimitOf(left)) : null;
+    const failureReason = failure ? this.#mcp.redact(failure).trim() : "";
     const note = (email: boolean) => {
       const model = name(joined, email);
       if (spent && left)
         return sourceText("status.agent.modelSwitchedForSpentBalance", { previous: name(left, email), model });
+      if (failureReason)
+        return sourceText("status.agent.modelSwitchedForErrorWithReason", { model, reason: failureReason });
       if (reason === "model-removed")
         return sourceText("status.agent.modelSwitchedForRemovedModel", {
           previous: name(left ?? joined, email),

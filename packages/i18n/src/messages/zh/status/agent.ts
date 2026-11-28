@@ -10,6 +10,7 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "已跳过：上一次运行尚未结束",
   "status.agent.routineSkippedUsageLimit": "已跳过：已达到使用额度上限",
   "status.agent.modelSwitchedForError": "服务商出错，已切换到 {model}。",
+  "status.agent.modelSwitchedForErrorWithReason": "服务商出错，已切换到 {model}。\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} 的额度已用完。已切换到 {model}。要再次使用它，请添加额度，然后选择它。",
   "status.agent.modelReturnedAfterError": "服务商出错后，已切回 {model}。",

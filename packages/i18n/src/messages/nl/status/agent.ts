@@ -11,6 +11,7 @@ export const messages = {
   "status.agent.routineSkippedRunOpen": "Overgeslagen: de vorige uitvoering was nog niet klaar",
   "status.agent.routineSkippedUsageLimit": "Overgeslagen: gebruikslimiet bereikt",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
+  "status.agent.modelSwitchedForErrorWithReason": "Fout bij de aanbieder. Overgeschakeld naar {model}.\n{reason}",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
