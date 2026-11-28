@@ -21,6 +21,7 @@ const WAIT_MS = 5_000;
 const AGENT = "agent-support";
 const TRIAGE = "priority: high|normal|low\ncount: number";
 const REPORT = "summary: text\ndone: yes/no";
+const FINDINGS = "summary: text\nissues: list";
 
 type DeliveryState = { status: "running" | "completed"; turnId: string | null; error: string | null };
 
@@ -82,6 +83,23 @@ const triageGraph = (check: string, agentAnswer: string): WorkflowGraph => ({
     { id: "gate-agent", from: "gate", to: "agent", type: "text", branch: "yes" },
     { id: "gate-quiet", from: "gate", to: "quiet", type: "text", branch: "no" },
     { id: "agent-tell", from: "agent", to: "tell", type: "text" },
+  ],
+  strokes: [],
+});
+
+const findingsGraph = (): WorkflowGraph => ({
+  nodes: [
+    node("prompt", "prompt", 0, { text: "Check the last build." }),
+    node("agent", "agent", 300, { agentId: AGENT, task: "List the failed jobs.", answer: FINDINGS }),
+    node("gate", "condition", 600, { check: "not issues" }),
+    node("clean", "output", 900, { target: "notify" }),
+    node("broken", "output", 900, { target: "notify" }),
+  ],
+  edges: [
+    { id: "prompt-agent", from: "prompt", to: "agent", type: "text" },
+    { id: "agent-gate", from: "agent", to: "gate", type: "text" },
+    { id: "gate-clean", from: "gate", to: "clean", type: "text", branch: "yes" },
+    { id: "gate-broken", from: "gate", to: "broken", type: "text", branch: "no" },
   ],
   strokes: [],
 });
@@ -522,8 +540,8 @@ try {
   complete(blankId, '{"summary":"   ","done":true}');
   await runUntil(workflows, blank, () => report.handoffs.at(-1)?.deliveryId !== blankId);
   check(
-    "a blank required text gets the fix message",
-    report.handoffs.at(-1)?.text.includes("summary is missing") === true,
+    "a blank required text gets the fix message that names it as empty",
+    report.handoffs.at(-1)?.text.includes("summary is empty") === true,
     report.handoffs.at(-1)?.text,
   );
   complete(report.handoffs.at(-1)?.deliveryId ?? "", "");
@@ -531,6 +549,96 @@ try {
   check(
     "an empty reply after the fix fails the step",
     stepOf(detail, "agent")?.error === sourceText("error.workflow.answerInvalid", { fields: "summary, done" }),
+    stepOf(detail, "agent"),
+  );
+
+  const emptyList = await startRun(workflows, "Empty list", findingsGraph());
+  await runUntil(workflows, emptyList, (run) => stepOf(run, "agent")?.status === "running");
+  const emptyHandoffs = report.handoffs.length;
+  complete(
+    report.handoffs.at(-1)?.deliveryId ?? "",
+    'No job failed.\n```json\n{"summary":"All jobs passed","issues":[]}\n```',
+  );
+  detail = await runUntil(workflows, emptyList, ended);
+  check(
+    "an empty list in a required list field ends the step with no fix message",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"All jobs passed","issues":[]}' &&
+      report.handoffs.length === emptyHandoffs,
+    { step: stepOf(detail, "agent"), handoffs: report.handoffs.length - emptyHandoffs },
+  );
+  check(
+    "a check for an empty list takes the yes branch",
+    stepOf(detail, "gate")?.branch === "yes" && stepOf(detail, "clean")?.status === "done",
+    detail.steps,
+  );
+
+  const wrapped = await startRun(workflows, "Wrapped answer", findingsGraph());
+  await runUntil(workflows, wrapped, (run) => stepOf(run, "agent")?.status === "running");
+  const wrappedHandoffs = report.handoffs.length;
+  complete(
+    report.handoffs.at(-1)?.deliveryId ?? "",
+    'The tool is not available.\n{"answer":{"summary":"The test job failed","issues":["test"]}}',
+  );
+  detail = await runUntil(workflows, wrapped, ended);
+  check(
+    "an answer in the tool's answer wrapper ends the step with no fix message",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"The test job failed","issues":["test"]}' &&
+      stepOf(detail, "gate")?.branch === "no" &&
+      report.handoffs.length === wrappedHandoffs,
+    { steps: detail.steps, handoffs: report.handoffs.length - wrappedHandoffs },
+  );
+
+  const absent = await startRun(workflows, "Absent list", findingsGraph());
+  await runUntil(workflows, absent, (run) => stepOf(run, "agent")?.status === "running");
+  const absentId = report.handoffs.at(-1)?.deliveryId ?? "";
+  complete(absentId, '{"summary":"All jobs passed"}');
+  await runUntil(workflows, absent, () => report.handoffs.at(-1)?.deliveryId !== absentId);
+  check(
+    "a required list that is not in the answer still gets the fix message",
+    report.handoffs.at(-1)?.text.includes("issues is missing") === true,
+    report.handoffs.at(-1)?.text,
+  );
+  complete(report.handoffs.at(-1)?.deliveryId ?? "", '{"summary":"All jobs passed","issues":[]}');
+  detail = await runUntil(workflows, absent, ended);
+  check(
+    "the fixed answer with an empty list ends the step",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"All jobs passed","issues":[]}',
+    stepOf(detail, "agent"),
+  );
+
+  const blankItems = await startRun(workflows, "Blank list items", findingsGraph());
+  await runUntil(workflows, blankItems, (run) => stepOf(run, "agent")?.status === "running");
+  const blankItemsId = report.handoffs.at(-1)?.deliveryId ?? "";
+  complete(blankItemsId, '{"summary":"The build broke","issues":[""," "]}');
+  await runUntil(workflows, blankItems, () => report.handoffs.at(-1)?.deliveryId !== blankItemsId);
+  check(
+    "a required list with only blank items still gets the fix message",
+    report.handoffs.at(-1)?.text.includes("issues is empty") === true,
+    report.handoffs.at(-1)?.text,
+  );
+  complete(report.handoffs.at(-1)?.deliveryId ?? "", '{"summary":"The build broke","issues":["test"]}');
+  detail = await runUntil(workflows, blankItems, ended);
+  check(
+    "the fixed answer with list items ends the step",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"The build broke","issues":["test"]}',
+    stepOf(detail, "agent"),
+  );
+
+  const emptyTool = await startRun(workflows, "Empty list with the tool", findingsGraph());
+  await runUntil(workflows, emptyTool, (run) => stepOf(run, "agent")?.status === "running");
+  const emptyToolDelivery = report.handoffs.at(-1)?.deliveryId ?? "";
+  const emptyToolAnswer = await answerTool({ answer: { summary: "All jobs passed", issues: [] } }, [emptyToolDelivery]);
+  check("workflow_answer keeps an empty list in a required list field", emptyToolAnswer.ok, emptyToolAnswer.text);
+  complete(emptyToolDelivery, "All jobs passed.");
+  detail = await runUntil(workflows, emptyTool, ended);
+  check(
+    "the step takes the tool answer with the empty list",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"All jobs passed","issues":[]}',
     stepOf(detail, "agent"),
   );
 
