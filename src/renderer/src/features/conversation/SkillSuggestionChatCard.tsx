@@ -6,8 +6,12 @@ import {
   type MarketplaceSuggestionSkillAction,
 } from "@openbot/ui/features/conversation/MarketplaceSuggestionCard";
 import { useText } from "@openbot/ui/text";
-import { createSignal } from "solid-js";
 import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./marketplace-suggestion-dismissals";
+import {
+  type SkillSuggestionPressKey,
+  setSkillSuggestionPress,
+  skillSuggestionPress,
+} from "./skill-suggestion-presses";
 
 export type SkillSuggestionOutcome = "open" | "working" | "saved" | "answered";
 
@@ -40,6 +44,7 @@ export type SkillSuggestionSaveResult = "saved" | "sent" | null;
 
 export interface SkillSuggestionChatCardProps {
   messageId: string;
+  pressKey: SkillSuggestionPressKey;
   suggestion: SkillSuggestionEvent;
   outcome: SkillSuggestionOutcome;
   onSave?: ((reply: string) => Promise<SkillSuggestionSaveResult>) | undefined;
@@ -48,7 +53,7 @@ export interface SkillSuggestionChatCardProps {
 
 export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const { t } = useText();
-  const [press, setPress] = createSignal<"pending" | "sent" | "saved" | null>(null);
+  const press = () => skillSuggestionPress(props.pressKey);
   const state = () => {
     if (props.outcome === "saved" || press() === "saved") return "connected";
     if (press() === "pending" || (press() === "sent" && props.outcome === "working")) return "busy";
@@ -57,16 +62,17 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const handedToChat = () => press() === "sent" && state() !== "busy";
   const save = async () => {
     if (state() !== "available" || handedToChat()) return;
-    setPress("pending");
+    const key = props.pressKey;
+    const messageId = props.messageId;
+    setSkillSuggestionPress(key, "pending");
     const reply =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
-    const result = await props.onSave?.(reply);
-    if (result === "saved") setPress("saved");
-    else if (result === "sent") setPress("sent");
+    const result = await props.onSave?.(reply).catch(() => null);
+    if (result === "saved" || result === "sent") setSkillSuggestionPress(key, result);
     else {
-      setPress(null);
+      setSkillSuggestionPress(key, null);
       toast.error(t("chat.suggestion.saveFailed"), {
-        id: `skill-suggestion-save:${props.messageId}`,
+        id: `skill-suggestion-save:${messageId}`,
         report: { operation: "memory", source: "action", cause_code: "unknown" },
       });
     }
