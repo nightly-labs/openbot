@@ -287,6 +287,7 @@ interface AcpTurn {
   answer: Deferred.Deferred<void>;
   retrying?: "agent" | "model";
   waitingOnUser: number;
+  userAnswered: Deferred.Deferred<void> | null;
   openbotToolCalls: number;
   awaitingCommands: boolean;
   ownReply: "none" | "reported" | "open" | "ended";
@@ -454,6 +455,12 @@ function markAnswered(turn: AcpTurn): void {
 
 function endAnswerWait(turn: AcpTurn): void {
   Deferred.doneUnsafe(turn.answer, Effect.void);
+}
+
+function releaseUserWait(turn: AcpTurn): void {
+  if (!turn.userAnswered) return;
+  Deferred.doneUnsafe(turn.userAnswered, Effect.void);
+  turn.userAnswered = null;
 }
 
 function asksForStartModels(params: unknown): boolean {
@@ -1353,6 +1360,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           turn.stopped ||
           turn.completing ||
           turn.stallCancel !== null ||
+          turn.userAnswered !== null ||
           (!steer && (turn.unprompted || turn.waitingOnUser > 0));
         if (turnChanged()) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         if (!steer && !turn.answered)
@@ -1380,6 +1388,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.stopped = true;
         turn.stop.abort();
         endAnswerWait(turn);
+        releaseUserWait(turn);
         const cancel = providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id }));
         if (turn.unprompted) {
           turn.abandoned = true;
@@ -2704,6 +2713,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       answered: false,
       answer: Deferred.makeUnsafe(),
       waitingOnUser: 0,
+      userAnswered: null,
       openbotToolCalls: 0,
       awaitingCommands: false,
       ownReply: "none",
@@ -2846,6 +2856,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         promptedAgain = true;
       }
       this.#reportPromptUsage(thread, turn, response);
+      if (
+        this.#flavor.holdsTurnWhileAsking &&
+        response.stopReason === "end_turn" &&
+        !turn.stopped &&
+        turn.waitingOnUser > 0
+      ) {
+        const answered = Deferred.makeUnsafe<void>();
+        turn.userAnswered = answered;
+        yield* Deferred.await(answered);
+        if (thread.activeTurn !== turn || turn.completing) return;
+      }
       const emptyAnswerFailure =
         response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional && !turn.stopped
           ? (this.#flavor.emptyAnswerFailure?.(turn, this.#label) ?? null)
@@ -4283,6 +4304,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         Effect.sync(() => {
           turn.waitingOnUser -= 1;
           turn.lastActivityAt = Date.now();
+          if (turn.waitingOnUser === 0) releaseUserWait(turn);
         }),
       ),
     );
@@ -4732,29 +4754,33 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
     const filePaths = kind === "file-change" ? permissionFilePaths(toolCall, thread?.cwd) : [];
-    const result = yield* this.#waitForUser(
+    const answer = yield* this.#waitForUser(
       turn,
-      this.#serverRequests.call(
-        `item/${kind === "command" ? "commandExecution" : kind === "file-change" ? "fileChange" : "permissions"}/requestApproval`,
-        {
-          threadId: params.sessionId,
-          turnId,
-          command: toolKind === "execute" ? printableInput(toolCall.rawInput) : null,
-          reason: toolCall.title ?? null,
-          permissions: requestedPermissions,
-          grantRoot: filePaths.length === 1 ? filePaths[0] : null,
-          ...(this.options.confine && toolKind !== "move" ? { confinedWritePaths: filePaths } : {}),
-        },
-        turn?.stop.signal,
-      ),
-    ).pipe(
-      toProviderClientOperationError,
-      Effect.catchIf(
-        () => turn?.stopped === true,
-        () => Effect.succeed(null),
-      ),
+      this.#serverRequests
+        .call(
+          `item/${kind === "command" ? "commandExecution" : kind === "file-change" ? "fileChange" : "permissions"}/requestApproval`,
+          {
+            threadId: params.sessionId,
+            turnId,
+            command: toolKind === "execute" ? printableInput(toolCall.rawInput) : null,
+            reason: toolCall.title ?? null,
+            permissions: requestedPermissions,
+            grantRoot: filePaths.length === 1 ? filePaths[0] : null,
+            ...(this.options.confine && toolKind !== "move" ? { confinedWritePaths: filePaths } : {}),
+          },
+          turn?.stop.signal,
+        )
+        .pipe(
+          toProviderClientOperationError,
+          Effect.catchIf(
+            () => turn?.stopped === true,
+            () => Effect.succeed(null),
+          ),
+          Effect.map((result) => ({ result, turnEnded: turn?.stopped === true || turn?.completing === true })),
+        ),
     );
-    if (turn?.stopped || turn?.completing) return { outcome: { outcome: "cancelled" } };
+    if (answer.turnEnded) return { outcome: { outcome: "cancelled" } };
+    const { result } = answer;
     const accepted =
       isRecord(result) &&
       (result.decision === "accept" ||
