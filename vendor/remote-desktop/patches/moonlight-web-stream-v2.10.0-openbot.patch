@@ -2715,10 +2715,10 @@ index 0cbbad6..b4fff64 100644
          try {
              const raw = localStorage.getItem("mlSettings");
 diff --git a/web/stream.ts b/web/stream.ts
-index 28fa35e..ec27049 100644
+index 28fa35e..d85640e 100644
 --- a/web/stream.ts
 +++ b/web/stream.ts
-@@ -17,7 +17,36 @@ import { requestKeyboardLock } from "./iframe.js";
+@@ -17,7 +17,58 @@ import { requestKeyboardLock } from "./iframe.js";
  
  let I = getTranslations(getCurrentLanguage())
  
@@ -2750,12 +2750,34 @@ index 28fa35e..ec27049 100644
 +    }
 +}
 +
++// The video track arrives before the browser decodes a frame. Report "connected" only when the
++// video element shows a picture, so that OpenBot can show an error when no picture comes.
++function waitForOpenBotFirstFrame(): Promise<void> {
++    const video = document.querySelector<HTMLVideoElement>("video.video-stream")
++    if (!video || video.videoWidth > 0) {
++        // Canvas renderers have no frame event. They keep the report at "videoReady".
++        return Promise.resolve()
++    }
++    return new Promise((resolve) => {
++        const onFrame = () => {
++            if (video.videoWidth == 0) {
++                return
++            }
++            video.removeEventListener("resize", onFrame)
++            video.removeEventListener("loadeddata", onFrame)
++            resolve()
++        }
++        video.addEventListener("resize", onFrame)
++        video.addEventListener("loadeddata", onFrame)
++    })
++}
++
  async function startApp() {
 +    void reportOpenBotState("connecting")
      const api = await getApi()
  
      const bootstrapRole = await apiGetRole(api, { id: null })
-@@ -102,6 +131,9 @@ class ViewerApp implements Component {
+@@ -102,6 +153,9 @@ class ViewerApp implements Component {
          this.api = api
  
          const settings = getLocalStreamSettings(bootstrapRole.default_settings)
@@ -2765,7 +2787,7 @@ index 28fa35e..ec27049 100644
          Object.assign(this.inputConfig, {
              mouseMode: settings.mouseMode,
              mouseScrollMode: settings.mouseScrollMode,
-@@ -175,8 +207,6 @@ class ViewerApp implements Component {
+@@ -175,8 +229,6 @@ class ViewerApp implements Component {
      private addListeners(element: GlobalEventHandlers) {
          element.addEventListener("keydown", this.onKeyDown.bind(this), { passive: false })
          element.addEventListener("keyup", this.onKeyUp.bind(this), { passive: false })
@@ -2774,7 +2796,7 @@ index 28fa35e..ec27049 100644
          element.addEventListener("mousedown", this.onMouseButtonDown.bind(this), { passive: false })
          element.addEventListener("mouseup", this.onMouseButtonUp.bind(this), { passive: false })
          element.addEventListener("mousemove", this.onMouseMove.bind(this), { passive: false })
-@@ -197,19 +227,6 @@ class ViewerApp implements Component {
+@@ -197,19 +249,6 @@ class ViewerApp implements Component {
          // Add app info listener
          this.stream.addInfoListener(this.onInfo.bind(this))
  
@@ -2794,11 +2816,12 @@ index 28fa35e..ec27049 100644
          // Start animation frame loop
          this.onTouchUpdate()
          this.onGamepadUpdate()
-@@ -232,6 +249,11 @@ class ViewerApp implements Component {
+@@ -232,6 +271,12 @@ class ViewerApp implements Component {
              document.title = `Stream: ${app.title}`
          } else if (data.type == "connectionComplete") {
              this.sidebar.onCapabilitiesChange(data.capabilities)
 +        } else if (data.type == "videoReady") {
++            await waitForOpenBotFirstFrame()
 +            const transport = await this.stream.getConnectionRoute()
 +            void reportOpenBotState("connected", transport)
 +        } else if (data.type == "addDebugLine" && (data.additional?.type == "fatal" || data.additional?.type == "fatalDescription")) {
@@ -2806,7 +2829,7 @@ index 28fa35e..ec27049 100644
          }
      }
  
-@@ -246,7 +268,6 @@ class ViewerApp implements Component {
+@@ -246,7 +291,6 @@ class ViewerApp implements Component {
          this.focusInput()
  
          this.stream.getVideoRenderer()?.onUserInteraction()
