@@ -62,7 +62,7 @@ import {
   retainedAutoReadState,
   sameReadState,
 } from "./conversation-read-state";
-import type { ConversationMessagePins, SendMessageResult } from "./conversation-types";
+import type { AgentSendMessageResult, ConversationMessagePins } from "./conversation-types";
 import { useDirectMessages } from "./direct-messages-context";
 import { noteAgentMessageSent } from "./github-star-prompt";
 import { noteSocialFollowMessageSent } from "./social-follow-prompt";
@@ -1072,7 +1072,7 @@ const Conversation = createSimpleContext({
       target?: { agentId: string; serverId: string },
       clientMessageId?: string,
       voiceRecordingDraftId?: string,
-    ): Promise<SendMessageResult> {
+    ): Promise<AgentSendMessageResult> {
       const agentId = target?.agentId ?? activeAgent()?.id;
       const serverId = target?.serverId ?? activeServerId();
       if (!agentId || (!body.trim() && attachmentDraftIds.length === 0))
@@ -1096,7 +1096,7 @@ const Conversation = createSimpleContext({
       serverId = activeServerId(),
       clientMessageId?: string,
       voiceRecordingDraftId?: string,
-    ): Promise<SendMessageResult> {
+    ): Promise<AgentSendMessageResult> {
       const analytics = desktopAnalytics.scope();
       const properties = analyticsAgentProperties(agentId);
       const attachmentKinds = takeAttachmentKinds(attachmentDraftIds);

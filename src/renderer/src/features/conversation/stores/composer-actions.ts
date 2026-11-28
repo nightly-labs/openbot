@@ -871,12 +871,12 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         pending.clientMessageId,
         pending.voiceRecordingDraftId ?? undefined,
       );
-      if ("error" in result) {
-        playActionSound("error");
-        voice?.onFailed();
-      } else {
+      if ("messageId" in result) {
         dictatedSent?.(result.messageId);
         if (steer && onScreen()) steerQueued?.(result.messageId);
+      } else {
+        playActionSound("error");
+        voice?.onFailed();
       }
       return result;
     });

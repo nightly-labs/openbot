@@ -182,7 +182,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     _target?: unknown,
     clientMessageId?: string,
   ): Promise<SendMessageResult> {
-    if (!env.connectionReady() || readOnly()) return { error: t("channel.error.action") };
+    if (!env.connectionReady()) return { error: t("error.kind.network") };
+    if (readOnly()) return { error: t("error.backend.channelArchived") };
     const sequenceBefore = page()?.throughSequence ?? 0;
     const mention = leadingAddress(body).mentions[0];
     try {
@@ -196,9 +197,9 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
         attachmentDraftIds,
       });
       const messageId = sentChannelMessageId(after, sequenceBefore, body, env.isOwnSender);
-      return messageId ? { messageId } : { error: t("channel.error.action") };
+      return messageId ? { messageId } : { unconfirmed: true };
     } catch (error) {
-      const details = errorDetails(error, t("channel.error.action"));
+      const details = errorDetails(error, t("chat.errorStatus.send"));
       return { error: details.message, reference: details.reference };
     }
   }
