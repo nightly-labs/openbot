@@ -570,10 +570,10 @@ export function AgentDock(props: AgentDockProps) {
     if (moving) return report(null);
     const parts: Element[] = [dockEdge, ...(props.onDrag ? [handleHit] : [])];
     if (panelOpen.value > 0.001) parts.push(panelEdge);
-    if (shelf && !shelf.hidden) parts.push(...shelfCards.map((card) => card.element));
+    const rects: AgentDockShapeRect[] = parts.map((element) => element.getBoundingClientRect());
+    if (shelf && !shelf.hidden) rects.push(...shelfCardBoxes(shelf));
     report(
-      parts
-        .map((element) => element.getBoundingClientRect())
+      rects
         .filter((rect) => rect.width > 0 && rect.height > 0)
         .map((rect) => ({
           x: rect.x - SHAPE_MARGIN,
@@ -582,6 +582,17 @@ export function AgentDock(props: AgentDockProps) {
           height: rect.height + SHAPE_MARGIN * 2,
         })),
     );
+  }
+
+  function shelfCardBoxes(list: HTMLUListElement) {
+    const origin = list.getBoundingClientRect();
+    const mirrored = props.side === "left";
+    return shelfCards.map(({ element }) => ({
+      x: mirrored ? origin.right - element.offsetLeft - element.offsetWidth : origin.left + element.offsetLeft,
+      y: origin.top + element.offsetTop,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+    }));
   }
 
   const menuPlacement = (): "right-end" | "left-end" => (props.side === "left" ? "right-end" : "left-end");
