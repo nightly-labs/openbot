@@ -25,7 +25,12 @@ import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
 import { remoteDesktopKeyboardScript } from "./remote-desktop-keyboard";
 import { remoteDesktopPasteScript } from "./remote-desktop-paste";
-import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
+import {
+  displayMacosVersion,
+  isMacosOlderThan,
+  type RemoteDesktopRuntimePaths,
+  readRuntimeMinimumMacosVersion,
+} from "./remote-desktop-runtime-artifact";
 import { remoteDesktopStreamWatchScript } from "./remote-desktop-stream-watch";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import {
@@ -74,6 +79,7 @@ export type RemoteScreenGatewayCreateRuntime = (
 
 interface RemoteScreenGatewayOptions {
   platform: "darwin" | "win32" | "linux";
+  systemVersion?: string | undefined;
   sessionEnvironment?: Readonly<Record<string, string | undefined>>;
   unattended: boolean;
   runtimePaths: RemoteDesktopRuntimePaths | null;
@@ -178,6 +184,7 @@ export class RemoteScreenGateway {
   #screenRecordingDenied = false;
   #activeStreamStart: { sessionId: string; timeout: ReturnType<typeof setTimeout> } | null = null;
   #linuxWithoutX11: boolean;
+  #macosUpdate: RemoteScreenError | null | undefined;
 
   constructor(options: RemoteScreenGatewayOptions) {
     this.#options = {
@@ -247,6 +254,11 @@ export class RemoteScreenGateway {
         this.#options.platform !== "darwin"
           ? sourceText("status.remote.setupMacOnly")
           : sourceText("status.remote.setupInstallHost");
+      return result;
+    }
+    const macosUpdate = yield* this.#macosUpdateRequired();
+    if (macosUpdate) {
+      result.message = macosUpdate.message;
       return result;
     }
     yield* Effect.acquireUseRelease(
@@ -546,6 +558,8 @@ export class RemoteScreenGateway {
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissing")),
       });
     }
+    const macosUpdate = yield* this.#macosUpdateRequired();
+    if (macosUpdate) return yield* new RemoteWorkflowError({ cause: macosUpdate });
     if (this.#options.platform === "win32" && this.#options.sessionDisconnected?.()) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsSessionDisconnected")),
@@ -1101,6 +1115,8 @@ export class RemoteScreenGateway {
     const paths = this.#options.runtimePaths;
     if (!paths || this.#linuxWithoutX11)
       return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.runtimeUnavailable")) });
+    const macosUpdate = yield* this.#macosUpdateRequired();
+    if (macosUpdate) return yield* new RemoteWorkflowError({ cause: macosUpdate });
     const dependencies = yield* ScreenDependencies;
     if (!this.#runtime) {
       const onDiagnostic = this.#options.onDiagnostic;
@@ -1130,6 +1146,25 @@ export class RemoteScreenGateway {
       .pipe(Effect.mapError(({ cause }: RemoteDesktopOperationError) => new RemoteWorkflowError({ cause })));
     this.#selectedDisplayId = this.#runtimeState.selectedDisplayId;
     return this.#runtimeState;
+  });
+
+  readonly #macosUpdateRequired = Effect.fn("RemoteScreenGateway.macosUpdateRequired")(function* (
+    this: RemoteScreenGateway,
+  ) {
+    const { platform, systemVersion, runtimePaths } = this.#options;
+    if (platform !== "darwin" || !systemVersion || !runtimePaths) return null;
+    if (this.#macosUpdate !== undefined) return this.#macosUpdate;
+    const { minimum, complete } = yield* readRuntimeMinimumMacosVersion(runtimePaths);
+    const update =
+      minimum && isMacosOlderThan(systemVersion, minimum)
+        ? new RemoteScreenError(
+            503,
+            "host_unavailable",
+            sourceText("error.remote.macosUpdateRequired", { version: displayMacosVersion(minimum) }),
+          )
+        : null;
+    if (complete) this.#macosUpdate = update;
+    return update;
   });
 
   #runtimeStartRefusal(error: unknown): RemoteScreenError {

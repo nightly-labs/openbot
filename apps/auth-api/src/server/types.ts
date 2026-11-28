@@ -10,6 +10,7 @@ import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMe
 
 export interface WorkerBindings {
   DB: D1Database;
+  CF_VERSION_METADATA?: WorkerVersionMetadata;
   AVATARS: R2Bucket;
   SKILLS: R2Bucket;
   SITES: R2Bucket;

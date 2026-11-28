@@ -1570,6 +1570,18 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      - name: Run the account Worker cost E2E test
+        run: bun run test:worker-cost
+
+      - name: Upload the account Worker cost report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-cost-report
+          path: .openbot-build/worker-cost/report.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   storybook:
     name: Storybook build
     needs: detect

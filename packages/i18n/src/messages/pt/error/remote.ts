@@ -19,6 +19,8 @@ export const messages = {
   "error.remote.sessionCapacity": "O computador anfitrião já tem quatro sessões ativas.",
   "error.remote.linuxNeedsX11":
     "A área de trabalho remota no Linux precisa de uma sessão X11. Não há suporte para Wayland.",
+  "error.remote.macosUpdateRequired":
+    "A área de trabalho remota precisa do macOS {version} ou posterior no host. Atualize o macOS no host e tente novamente.",
   "error.remote.runtimeMissing":
     "O ambiente de execução do Sunshine e do Moonlight Web está ausente ou não é compatível com este computador anfitrião. Instale a versão completa do OpenBot em um Mac, um computador anfitrião Windows x64 ou Linux x64 e reinicie o OpenBot.",
   "error.remote.testActive": "Um teste de área de trabalho remota está ativo. Tente novamente quando terminar.",
