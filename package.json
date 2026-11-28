@@ -334,6 +334,7 @@
     "test:codex-sign-in-watch": "bun scripts/codex-sign-in-watch-e2e.ts",
     "test:antigravity-session-files": "bun scripts/antigravity-session-files-e2e.ts",
     "test:acp-sign-in-errors": "bun scripts/acp-sign-in-errors-e2e.ts",
+    "test:gemini-linux-code-sign-in": "bun scripts/gemini-linux-code-sign-in-e2e.ts",
     "test:workflow-model-steps": "bun scripts/workflow-model-steps-e2e.ts",
     "test:credit-media-agent-tools": "bun scripts/credit-media-agent-tools-e2e.ts",
     "test:credit-media-analytics": "bun scripts/credit-media-analytics-e2e.ts",

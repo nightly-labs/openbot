@@ -563,9 +563,11 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   const route = (provider: AgentProviderId) => providerConnectRoute(provider, options.place());
   const signingIn = (provider: AgentProviderId) =>
     options.agentStatus().providers?.find((row) => row.id === provider)?.connectionState === "connecting";
+  const codeLoginRuns = (provider: AgentProviderId) =>
+    codeLoginProvider() === provider && codeLoginMethod !== "address";
   const alternativeMethod = (provider: AgentProviderId): ProviderSignInMethod | null => {
     const { alternative, addressWhileSigningIn } = route(provider);
-    return addressWhileSigningIn && signingIn(provider) ? "address" : alternative;
+    return addressWhileSigningIn && signingIn(provider) && !codeLoginRuns(provider) ? "address" : alternative;
   };
 
   return {
