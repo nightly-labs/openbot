@@ -19,6 +19,8 @@ export const messages = {
   "error.remote.sessionCapacity": "L’hôte a déjà quatre sessions actives.",
   "error.remote.linuxNeedsX11":
     "Sous Linux, le bureau à distance nécessite une session X11. Wayland n’est pas pris en charge.",
+  "error.remote.macosUpdateRequired":
+    "Le bureau à distance nécessite macOS {version} ou une version ultérieure sur l’hôte. Mettez à jour macOS sur l’hôte, puis réessayez.",
   "error.remote.runtimeMissing":
     "Le runtime Sunshine et Moonlight Web est absent ou n’est pas pris en charge sur cet hôte. Installez la version complète d’OpenBot sur un hôte Mac, Windows x64 ou Linux x64, puis redémarrez OpenBot.",
   "error.remote.testActive": "Un test du bureau à distance est en cours. Réessayez quand il sera terminé.",
