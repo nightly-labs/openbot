@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -11,7 +12,12 @@ import {
   workflowAnswerProblems,
   workflowGraphFormat,
 } from "@openbot/contracts/ipc";
+import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { TEAM_CAPABILITIES_HEADER, TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol/v1";
+import { WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { decodeRemoteWorkflowRunDetail } from "@openbot/team-client/workflow-decoding";
 import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -22,12 +28,25 @@ import { WorkflowStore } from "../src/backend/workflows/workflow-store";
 import { handleWorkflowTool } from "../src/backend/workflows/workflow-tools";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
 import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../src/backend/workflows/workflows";
+import { HttpError } from "../src/main/team-api/http-error";
+import { requestCapabilities, requestProtocol } from "../src/main/team-api/request-helpers";
+import { routeWorkflows } from "../src/main/team-api/route-workflows";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-output-templates-e2e");
 const WAIT_MS = 5_000;
 const REPOSITORY = "acme/app";
 const ANSWER = "priority: high|normal|low\nsummary: text\ntags: list\nowner: text";
 const REPLY = '{"priority":"high","summary":"Login fails","tags":["bug","auth"],"owner":"ana"}';
+const TEAM_PROTOCOL = 9;
+const OWNER = {
+  id: "owner-1",
+  username: "owner@example.com",
+  email: "owner@example.com",
+  name: "Owner",
+  role: "owner",
+  createdAt: new Date(0).toISOString(),
+  disabled: false,
+} as const;
 
 interface Report {
   checks: string[];
@@ -112,6 +131,74 @@ async function saved(title: string, graph: WorkflowGraph) {
   );
   assert.ok(result.ok, JSON.stringify(result));
   return created.summary.id;
+}
+
+async function readRunThroughTeamApi(workflows: WorkflowsHandle, runId: string): Promise<WorkflowRunDetail> {
+  const path = WORKFLOWS_ROUTES.run;
+  const codec = teamSideRouteCodec(path);
+  assert.ok(codec, "The workflow run route has no Team API codec.");
+  const server = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const method = request.method ?? "POST";
+    const protocol = requestProtocol(request);
+    routeWorkflows(
+      {
+        request,
+        response,
+        method,
+        url,
+        protocol,
+        capabilities: requestCapabilities(request),
+        member: OWNER,
+        token: "token",
+        sessionId: "session",
+        sessionExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+        fromChrome: false,
+        agentLevel: () => "manage",
+        json: (status, value) => {
+          response
+            .writeHead(status, { "content-type": "application/json" })
+            .end(JSON.stringify(codec.response(url.pathname, status, value)));
+          return "handled";
+        },
+        empty: (status) => {
+          response.writeHead(status).end();
+          return "handled";
+        },
+      },
+      {
+        ...workflows,
+        rotateWorkflowSecret: () => Effect.die(new Error("No webhook secret changes in this test.")),
+      },
+      { listAgents: () => [] },
+      new Set(),
+    )
+      .then((outcome) => {
+        if (outcome === "unmatched") response.writeHead(404).end();
+      })
+      .catch((error: unknown) => {
+        response.writeHead(error instanceof HttpError ? error.status : 500).end(String(error));
+      });
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  try {
+    const address = server.address();
+    assert.ok(address !== null && typeof address === "object", "The server has no TCP address.");
+    const response = await fetch(`http://127.0.0.1:${address.port}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL),
+        [TEAM_CAPABILITIES_HEADER]: teamCapabilitiesForProtocol(TEAM_PROTOCOL).join(","),
+      },
+      body: JSON.stringify(codec.request(path, { runId })),
+    });
+    const text = await response.text();
+    assert.equal(response.status, 200, text.slice(0, 300));
+    return decodeRemoteWorkflowRunDetail(codec.response(path, 200, JSON.parse(text)));
+  } finally {
+    server.close();
+  }
 }
 
 async function startRun(title: string, graph: WorkflowGraph) {
@@ -239,6 +326,36 @@ try {
       JSON.stringify(assigned?.people) === JSON.stringify(["ana"]) &&
       assigned?.number === 12,
     { step: stepOf(github, "assign"), assigned },
+  );
+
+  modelReplies = [REPLY];
+  const approvalWorkflow = await saved(
+    "Approve with names",
+    typedGraph([node("ask", "approval", 600, { question: "Close the {{priority}} ticket of {{owner}}?" })]),
+  );
+  const approvalRun = await runCauseEffect(
+    workflows.startRun({ workflowId: approvalWorkflow, requestId: crypto.randomUUID() }),
+  );
+  const asking = await runUntil(approvalRun.run.id, (detail) => stepOf(detail, "ask")?.status === "approval");
+  const question = "Close the high ticket of ana?";
+  check(
+    "a waiting approval step gives its question with the names filled, the same text as its notification",
+    stepOf(asking, "ask")?.question === question &&
+      report.notices.some((sent) => sent.kind === "approval" && sent.text === question),
+    { step: stepOf(asking, "ask"), notices: report.notices.filter((sent) => sent.kind === "approval") },
+  );
+  const remote = await readRunThroughTeamApi(workflows, approvalRun.run.id);
+  check(
+    "a joined client reads the filled approval question through the Team API",
+    stepOf(remote, "ask")?.question === question,
+    stepOf(remote, "ask"),
+  );
+  await runCauseEffect(workflows.decide({ stepId: stepOf(asking, "ask")?.id ?? "", approved: true }));
+  const decided = await runUntil(approvalRun.run.id, ended);
+  check(
+    "after the decision the step keeps its output and no longer gives a question",
+    stepOf(decided, "ask")?.status === "done" && stepOf(decided, "ask")?.question === undefined,
+    stepOf(decided, "ask"),
   );
 
   const missing = typedGraph([node("tell", "output", 600, { target: "notify", message: "Owner: {{assignee}}" })]);

@@ -106,7 +106,8 @@ export const sameWorkflowStep = (left: WorkflowStep, right: WorkflowStep): boole
   left.error === right.error &&
   left.startedAt === right.startedAt &&
   left.endedAt === right.endedAt &&
-  left.waiting === right.waiting;
+  left.waiting === right.waiting &&
+  left.question === right.question;
 
 const sameResult = (left: WorkflowNodeResult, right: WorkflowNodeResult | undefined): boolean =>
   left.id === right?.id &&

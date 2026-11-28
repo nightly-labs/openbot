@@ -741,6 +741,7 @@ export interface WorkflowStep {
   startedAt: string | null;
   endedAt: string | null;
   waiting?: boolean;
+  question?: string;
 }
 
 export interface WorkflowStepSource {
@@ -1046,7 +1047,8 @@ export function isWorkflowStep(value: unknown): value is WorkflowStep {
     isNullableString(value.error) &&
     isNullableString(value.startedAt) &&
     isNullableString(value.endedAt) &&
-    (value.waiting === undefined || typeof value.waiting === "boolean")
+    (value.waiting === undefined || typeof value.waiting === "boolean") &&
+    (value.question === undefined || typeof value.question === "string")
   );
 }
 

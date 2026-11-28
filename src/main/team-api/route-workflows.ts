@@ -286,6 +286,7 @@ export async function routeWorkflows(
     ...step,
     output: clip(step.output),
     error: clip(step.error),
+    ...(step.question === undefined ? {} : { question: step.question.slice(0, WORKFLOW_STEP_TEXT_LIMIT) }),
   });
   const memberRun = (detail: WorkflowRunDetail): WorkflowRunDetail => ({
     run: { ...detail.run, error: clip(detail.run.error) },
