@@ -131,7 +131,7 @@ export interface TaskLanes {
   limit(agentId: string): number;
   oneTurnAtATime(agentId: string): boolean;
   isRoutineThread(taskId: string): boolean;
-  taskReport(taskId: string): TaskReportState | null;
+  taskReport(taskId: string, messageId: string): TaskReportState | null;
 }
 
 interface Lane {
@@ -1464,7 +1464,9 @@ export class DrainScheduler {
   taskReport(context: DeliveryContext): TaskReportState | null {
     const { sender, recipientAgentId } = context.delivery;
     const ownTask = sender.kind === "agent" && sender.agentId === recipientAgentId;
-    return ownTask && context.senderTaskId ? this.#tasks.taskReport(context.senderTaskId) : null;
+    return ownTask && context.senderTaskId
+      ? this.#tasks.taskReport(context.senderTaskId, context.delivery.messageId)
+      : null;
   }
 
   taskReportWaiting(context: DeliveryContext): string[] {

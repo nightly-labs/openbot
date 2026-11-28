@@ -150,6 +150,7 @@ export interface TaskReportState {
   outcome: "completed" | "failed" | "interrupted" | "stopped" | null;
   closed: boolean;
   stillRunning: ReadonlyArray<{ taskId: string; title: string }>;
+  resultsShown: boolean;
 }
 
 export interface AnsweredRoutine {
@@ -388,6 +389,9 @@ function taskReportFraming(taskId: string, report: TaskReportState | null, waiti
   return [
     status,
     `The user can read the whole task in its tab. When the text ends with "${TASK_REPORT_CUT_MARK}", it is cut: openbot.history_read with this taskId gives the rest.`,
+    ...(report?.resultsShown && waiting.length === 0
+      ? ["The pages and files that the task attached are already in your chat; do not attach them again."]
+      : []),
     ...running,
     "While other tasks still run, tell the user in one line what is done, and give all results together after the last report. To continue a task, call openbot.message_task with {taskId, text}. To stop one, call openbot.close_task with {taskId}.",
     ...(waiting.length === 0
