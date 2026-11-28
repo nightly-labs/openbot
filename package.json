@@ -282,6 +282,7 @@
     "test:pi-steer": "bun scripts/pi-steer-e2e.ts",
     "test:pi-idle-release": "bun scripts/pi-idle-release-e2e.ts",
     "test:pi-slow-start": "bun scripts/pi-slow-start-e2e.ts",
+    "test:pi-setup-timeout": "bun scripts/pi-setup-timeout-e2e.ts",
     "test:pi-long-instructions": "bun scripts/pi-long-instructions-e2e.ts",
     "test:custom-provider-pi": "bun scripts/custom-provider-pi-harness-e2e.ts",
     "test:pi-usage-cost": "bun scripts/pi-usage-cost-e2e.ts",
