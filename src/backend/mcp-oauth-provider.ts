@@ -89,6 +89,7 @@ function builtInMcpClient(resource: string, issuer: string | undefined): BuiltIn
 
 const CALLBACK_PATH_MCP_SERVERS: readonly { resource: string; issuer: string }[] = [
   { resource: "https://mcp.newrelic.com/mcp", issuer: "https://oauth2.service.newrelic.com" },
+  { resource: "https://mcp.eu.newrelic.com/mcp", issuer: "https://oauth2.service.newrelic.com" },
 ];
 
 function needsCallbackPath(resource: string, issuer: string | undefined): boolean {
@@ -808,7 +809,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     this.#options = options;
     this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
     const { unansweredRedirectUrl: unanswered } = options;
-    const localhostNames = [this.#localhostRedirectUrl, localhostRedirectUrl(options.firstRedirectUrl)];
+    const localhostNames = [this.#localhostRedirectUrl, localhostRedirectUrl(this.#firstRedirectUrl())];
     this.#deepLinkRedirectUrl =
       unanswered && localhostNames.includes(unanswered) ? (options.deepLinkRedirectUrl?.() ?? null) : null;
     this.#retryRedirectUrl = this.#deepLinkRedirectUrl ?? this.#otherRedirectName(unanswered);
@@ -821,10 +822,13 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #openedUrl: string | null = null;
   #authorizedClient: OAuthClientInformationFull | undefined;
 
+  #usesCallbackPath = false;
+
   #firstRedirectUrl(): string {
     const first = this.#options.firstRedirectUrl;
-    if (!needsCallbackPath(this.#options.resource, this.#activeIssuer)) return first;
-    return callbackRedirectUrl(first) ?? first;
+    const issuer = this.#activeIssuer ?? this.#record().discovery?.authorizationServerUrl;
+    this.#usesCallbackPath ||= needsCallbackPath(this.#options.resource, issuer);
+    return this.#usesCallbackPath ? (callbackRedirectUrl(first) ?? first) : first;
   }
 
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
