@@ -237,14 +237,26 @@ export function WorkspaceShell(props: {
       loading: activeServer()?.state === "online",
       hasContent: scope.connection.synced,
     });
+  const [troubledServerId, setTroubledServerId] = createSignal<string | null>(null);
+  createEffect(
+    () => (activeServer()?.issue ? (activeServer()?.id ?? null) : scope.connection.synced ? null : undefined),
+    (serverId) => {
+      if (serverId !== undefined) setTroubledServerId(serverId);
+    },
+  );
+  const activeServerTroubled = () => {
+    const server = activeServer();
+    return Boolean(server?.issue) || (server !== undefined && troubledServerId() === server.id);
+  };
   const fullWindowLoading = () =>
     connectionShown() &&
     !scope.connection.synced &&
     (connectionPhase() === "loading" || connectionPhase() === "connecting") &&
     (!serversLoaded() ||
-      activeServer()?.state === "online" ||
-      activeServer()?.state === "connecting" ||
-      (activeServer()?.state === "offline" && !activeServer()?.issue));
+      (!activeServerTroubled() &&
+        (activeServer()?.state === "online" ||
+          activeServer()?.state === "connecting" ||
+          activeServer()?.state === "offline")));
   const [loadingCover, setLoadingCover] = createSignal(false);
   const [coverOpen, setCoverOpen] = createSignal(false);
   const chatHeld = () => !!props.behindSplash?.() || (loadingCover() && !coverOpen());

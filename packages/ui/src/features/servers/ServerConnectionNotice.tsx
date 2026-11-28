@@ -220,17 +220,15 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   );
   const toastCard = () => (
     <section class="server-connection-toast" aria-label={title()}>
-      <Show when={!urgent()}>
-        <IconButton
-          class="ui-toast-card-close"
-          size="icon-xs"
-          variant="ghost"
-          label={t("common.close")}
-          onClick={() => setToastClosed(true)}
-        >
-          <X aria-hidden="true" />
-        </IconButton>
-      </Show>
+      <IconButton
+        class="ui-toast-card-close"
+        size="icon-xs"
+        variant="ghost"
+        label={t("common.close")}
+        onClick={() => setToastClosed(true)}
+      >
+        <X aria-hidden="true" />
+      </IconButton>
       <strong class="server-connection-toast-title">{title()}</strong>
       <Show when={detail()}>{(text) => <p class="server-connection-toast-body">{text()}</p>}</Show>
       <ErrorReference reference={reference()} />
@@ -246,12 +244,12 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
       </Show>
     </section>
   );
+  const closedWithProblem = () =>
+    toastClosed() && (urgent() || Boolean(props.detail)) && !props.ready && !props.fullWindow;
   let toastShown = false;
   createEffect(
     () =>
-      props.initial && !props.ready && waitedLong() && !toastClosed() && !detailsOpen()
-        ? { title: title(), locked: urgent() }
-        : null,
+      props.initial && !props.ready && waitedLong() && !toastClosed() && !detailsOpen() ? { title: title() } : null,
     (message) => {
       toastShown = message !== null;
       if (message === null) {
@@ -266,7 +264,6 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         unstyled: true,
         closeButton: false,
         class: "server-connection-toast-host",
-        dismissible: !message.locked,
         onDismiss: () => {
           if (toastShown) setToastClosed(true);
         },
@@ -280,7 +277,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   return (
     <>
       <Show
-        when={props.initial}
+        when={props.initial && !closedWithProblem()}
         fallback={
           <section class="server-connection-notice" role="status" aria-live="polite">
             <div>
