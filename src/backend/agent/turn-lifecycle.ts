@@ -1665,7 +1665,7 @@ export class TurnLifecycle {
         if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
         if (status !== "running" && status !== "completed" && status !== "failed") return;
-        if (status !== "failed")
+        if (status === "completed")
           for (const turn of this.#runningTurns.values())
             if (turn.threadId === threadId && turn.client === source) turn.compacted = true;
         if (source.compactsOnDemand === true && this.#compaction.requested(threadId)) return;
