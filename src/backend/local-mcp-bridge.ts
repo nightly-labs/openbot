@@ -44,6 +44,7 @@ export interface LocalMcpSession {
   reached(): boolean;
   dropped(sentAt: number, limitMs: number): boolean;
   listedWithin(from: number, limitMs: number): boolean;
+  calledSince(from: number): boolean;
   renew(): LocalMcpSession["servers"];
   close(): void;
 }
@@ -79,6 +80,7 @@ interface BridgeMember {
   threadId: string;
   activeTurnId: () => string | null;
   namespaces: ReadonlyMap<string, DynamicToolNamespace>;
+  calledAt: number | null;
 }
 
 interface BridgeRoute {
@@ -132,6 +134,7 @@ export class LocalMcpBridge {
       threadId,
       activeTurnId,
       namespaces: new Map(namespaces.map((namespace) => [namespace.name, namespace])),
+      calledAt: null,
     };
     const routes = namespaces.map((namespace) => {
       const shareKey = directory === undefined ? null : JSON.stringify([directory, namespace.name]);
@@ -190,6 +193,7 @@ export class LocalMcpBridge {
       },
       listedWithin: (from, limitMs) =>
         routes.some((route) => route.listedTimes.some((at) => at >= from && at - from <= limitMs)),
+      calledSince: (from) => member.calledAt !== null && member.calledAt >= from,
       renew: () => {
         for (const route of routes) if (route.dropped) this.#renewToken(route, member);
         current.splice(0, current.length, ...servers());
@@ -214,6 +218,7 @@ export class LocalMcpBridge {
     route.listedAt = null;
     route.listedTimes = [];
     route.dropped = false;
+    member.calledAt = null;
     this.#routes.set(token, route);
     if (route.shareKey !== null) this.#shared.set(route.shareKey, token);
   }
@@ -348,6 +353,7 @@ export class LocalMcpBridge {
             .get(route.namespace.name)
             ?.tools.find((candidate) => candidate.name === params.name);
           if (!tool) return yield* mcpFailure(new Error(`Unknown ${route.namespace.name} tool: ${params.name}`));
+          if (token === route.tokens.at(-1)) member.calledAt = Date.now();
           const abandoned = new AbortController();
           const abandon = () => abandoned.abort();
           const stopWaiting = () => abandoned.abort(PROVIDER_STOPPED_WAITING);

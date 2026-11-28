@@ -11,7 +11,7 @@ import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { McpServerDrop } from "../src/backend/mcp-provider-shapes";
-import { getRecord, getString } from "../src/backend/protocol";
+import { type AppServerRequest, getRecord, getString } from "../src/backend/protocol";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
@@ -512,6 +512,10 @@ try {
       { apiKey: () => null, customProviders: () => [], mcpServers: () => [] },
     );
     clients.push(listClient);
+    listClient.on("request", (request: AppServerRequest) => {
+      if (request.method !== "item/tool/call") return;
+      listClient.respond(request.id, { success: true, contentItems: [{ type: "inputText", text: "Research" }] });
+    });
     listClient.on("notification", (notification: { method: string; params?: unknown }) => {
       if (notification.method !== "error") return;
       const threadId = getString(notification.params, "threadId");
@@ -565,6 +569,24 @@ try {
   const keptTurn = await runTurn(never.listClient, never.threadId, plain);
   report.turns.toolsKept = keptTurn;
   assert.equal(keptTurn.status, "completed", "The session keeps the tools for the next prompt.");
+
+  const called = await listAgent("called", { FAKE_OPEN_LIST: "never" });
+  const calledTurn = await runTurn(called.listClient, called.threadId, { ...plain, text: "call the tool" });
+  report.turns.toolCalledWithoutList = calledTurn;
+  assert.equal(calledTurn.status, "completed", "A turn that ran an OpenBot tool completes.");
+  assert.equal(calledTurn.error, null, "A turn that ran an OpenBot tool has no error.");
+  const calledLog = await readJsonl<{ method: string; listed: number | null; called?: boolean | null }>(called.log);
+  assert.ok(
+    calledLog.some((entry) => entry.method === "session/prompt" && entry.called === true),
+    "The fake ran an OpenBot tool over the bridge with no tool list.",
+  );
+  assert.ok(
+    calledLog.every((entry) => (entry.listed ?? 0) === 0),
+    "The fake did not list OpenBot's tools.",
+  );
+  const afterCallTurn = await runTurn(called.listClient, called.threadId, plain);
+  report.turns.toolsKeptAfterCall = afterCallTurn;
+  assert.equal(afterCallTurn.status, "completed", "The session keeps the tools after a tool call.");
 
   const older = await listAgent("older", { FAKE_OPEN_LIST: "never", FAKE_VERSION: "1.5.10" });
   const olderTurn = await runTurn(older.listClient, older.threadId, plain);
