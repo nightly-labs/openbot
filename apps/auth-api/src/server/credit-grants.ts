@@ -250,13 +250,14 @@ export class CreditGrants {
     const known = yield* billingCall(() =>
       this.#database
         .prepare(
-          `SELECT EXISTS (SELECT 1 FROM credit_grants WHERE grant_id = ?1) AS issued,
-                  ${welcomeInboxTakenSql("?2")} AS taken`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM credit_grants WHERE grant_id = ?1) THEN 1
+                       WHEN ${welcomeInboxTakenSql("?2")} THEN 1
+                       ELSE 0 END AS closed`,
         )
         .bind(grantId, userId)
-        .first<{ issued: number; taken: number }>(),
+        .first<{ closed: number }>(),
     );
-    if (known?.issued || known?.taken) return false;
+    if (known?.closed) return false;
     const now = this.#now();
     const [inserted] = yield* billingCall(() =>
       this.#database.batch([
