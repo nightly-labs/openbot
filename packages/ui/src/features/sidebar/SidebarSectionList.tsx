@@ -14,7 +14,7 @@ export function SidebarSectionList() {
           sectionId === SIDEBAR_PEOPLE_SECTION_ID ? (
             <SidebarPeopleSection sectionId={sectionId} />
           ) : (
-            <SidebarAgentSection sectionId={sectionId} depth={0} />
+            <SidebarAgentSection sectionId={sectionId} depth={0} stickyLevel={0} />
           )
         }
       </For>
