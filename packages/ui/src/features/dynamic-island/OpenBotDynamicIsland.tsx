@@ -15,6 +15,7 @@ import {
   DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT,
   DYNAMIC_ISLAND_SIZE_LIMITS,
   dynamicIslandCompactHeight,
+  MCP_ELICITATION_DECISION_QUESTION_ID,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -1305,7 +1306,7 @@ function QuestionContent(props: {
   onHaptic?: (() => void) | undefined;
   onClose: () => void;
 }): JSX.Element {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const [questionIndex, setQuestionIndex] = createSignal(0);
   const [answers, setAnswers] = createSignal<Record<string, string[]>>({});
   const [questionTransitioning, setQuestionTransitioning] = createSignal(false);
@@ -1339,6 +1340,8 @@ function QuestionContent(props: {
     () => Boolean(props.inlineReply) && questions().length > 0 && questions().every((question) => !question.isSecret),
   );
   const currentQuestion = () => questions()[questionIndex()];
+  const optionText = (text: string) =>
+    currentQuestion()?.id === MCP_ELICITATION_DECISION_QUESTION_ID ? sourceText(text) : text;
   const answerFieldKey = () => {
     const question = currentQuestion();
     return question
@@ -1454,15 +1457,18 @@ function QuestionContent(props: {
                   <li>
                     <Button
                       variant="ghost"
-                      aria-label={t("island.question.option", { label: option.label, description: option.description })}
+                      aria-label={t("island.question.option", {
+                        label: optionText(option.label),
+                        description: optionText(option.description),
+                      })}
                       onClick={() => answerWith(option.label)}
                     >
                       <span class="dynamic-island-surface-question-option-index" aria-hidden="true">
                         {index() + 1}
                       </span>
                       <span class="dynamic-island-surface-question-option-copy">
-                        <strong>{option.label}</strong>
-                        <small>{option.description}</small>
+                        <strong>{optionText(option.label)}</strong>
+                        <small>{optionText(option.description)}</small>
                       </span>
                     </Button>
                   </li>

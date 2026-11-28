@@ -24,7 +24,7 @@ import {
 import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { isLocationRequest } from "@/features/chat/model/location-request";
-import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { promptAnswerLabel, promptOptionText } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { useRemoteChatContent } from "@/features/servers/model/use-remote-chat-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -47,7 +47,7 @@ export function ChatQuestionPrompt({
   canSend: boolean;
   onActivate?: () => void;
 }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const canEditPreview = useMobileWorkspaceSelector((workspace) => workspace.canEditUiBlockPreview(serverId));
@@ -135,10 +135,12 @@ export function ChatQuestionPrompt({
                 <Typography>
                   {item.id === UI_CHOICE_QUESTION_ID
                     ? promptAnswerLabel(item, resolution, t).split("\n").filter(Boolean).join(", ")
-                    : promptAnswerLabel(item, resolution, t)}
+                    : promptOptionText(item, promptAnswerLabel(item, resolution, t), sourceText)}
                 </Typography>
               ) : item.options?.length ? (
-                <Typography type="body-sm">{item.options.map((option) => option.label).join(", ")}</Typography>
+                <Typography type="body-sm">
+                  {item.options.map((option) => promptOptionText(item, option.label, sourceText)).join(", ")}
+                </Typography>
               ) : null}
             </View>
           ))
@@ -181,10 +183,10 @@ export function ChatQuestionPrompt({
             {described.map((option) => (
               <View key={option.label}>
                 <Typography type="body-sm" weight="medium">
-                  {option.label}
+                  {promptOptionText(question, option.label, sourceText)}
                 </Typography>
                 <Typography type="body-sm" className="text-text-secondary">
-                  {option.description}
+                  {promptOptionText(question, option.description, sourceText)}
                 </Typography>
               </View>
             ))}
@@ -251,8 +253,8 @@ export function ChatQuestionPrompt({
               className="h-auto min-h-10 max-w-full rounded-full py-2"
               isDisabled={disabled}
               accessibilityRole={question.multiSelect ? "checkbox" : "button"}
-              accessibilityLabel={option.label}
-              accessibilityHint={option.description}
+              accessibilityLabel={promptOptionText(question, option.label, sourceText)}
+              accessibilityHint={promptOptionText(question, option.description, sourceText)}
               accessibilityState={question.multiSelect ? { checked, disabled } : { disabled }}
               onPress={() => {
                 if (question.multiSelect) return togglePick(option.label);
@@ -260,7 +262,9 @@ export function ChatQuestionPrompt({
                 answer([option.label]);
               }}
             >
-              <Button.Label className="shrink text-center font-sans font-semibold">{option.label}</Button.Label>
+              <Button.Label className="shrink text-center font-sans font-semibold">
+                {promptOptionText(question, option.label, sourceText)}
+              </Button.Label>
             </Button>
           );
         })}

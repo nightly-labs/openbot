@@ -1,4 +1,8 @@
-import type { AgentPromptQuestion, AgentPromptResolution } from "@openbot/contracts/ipc";
+import {
+  type AgentPromptQuestion,
+  type AgentPromptResolution,
+  MCP_ELICITATION_DECISION_QUESTION_ID,
+} from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 
 export function nextUnansweredQuestion(
@@ -44,4 +48,12 @@ export function promptAnswerLabel(
   if (!response || response.status === "skipped") return t("mobile.chat.question.answerSkipped");
   if (question.isSecret || !response.answers) return t("mobile.chat.question.privateAnswer");
   return response.answers.join(", ") || t("mobile.chat.question.answerSkipped");
+}
+
+export function promptOptionText(
+  question: AgentPromptQuestion,
+  text: string,
+  sourceText: (text: string) => string,
+): string {
+  return question.id === MCP_ELICITATION_DECISION_QUESTION_ID ? sourceText(text) : text;
 }

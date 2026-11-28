@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "אישור פעם אחת",
+  "status.agent.mcpConsentAllowOnceDetail": "אישור הבקשה הזו של {name}.",
+  "status.agent.mcpConsentAllowAlways": "אישור תמיד",
+  "status.agent.mcpConsentAllowAlwaysDetail": "לזכור את הגישה הזו לבקשות הבאות של {name}.",
+  "status.agent.mcpConsentDecline": "לא לאשר",
+  "status.agent.mcpConsentDeclineDetail": "הגישה תישאר חסומה.",
   "status.agent.claudeWriteOutside": "כתיבה אל {path}, מחוץ לסביבת העבודה של הסוכן, לתיקייה המשותפת ולתיקיות הזמניות.",
   "status.agent.contextCleared": "ההקשר נוקה. צ'אט חדש מתחיל כאן.",
   "status.agent.instructionsChanged": "עדכן את ההוראות שלו",

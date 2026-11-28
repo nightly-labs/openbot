@@ -33,9 +33,9 @@ import type { SavedApiKey } from "../agent-api-keys";
 import type { BrowserToolArguments } from "../browser-tools";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
-const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
-const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
-const MCP_ELICITATION_DECLINE = "Don't allow";
+const MCP_ELICITATION_ALLOW_ONCE = sourceText("status.agent.mcpConsentAllowOnce");
+const MCP_ELICITATION_ALLOW_ALWAYS = sourceText("status.agent.mcpConsentAllowAlways");
+const MCP_ELICITATION_DECLINE = sourceText("status.agent.mcpConsentDecline");
 const MCP_SIGN_IN_PAGE_DONE = sourceText("status.provider.confirmContinue");
 const MCP_SIGN_IN_PAGE_DECLINE = sourceText("status.agent.mcpSignInPageDecline");
 const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
@@ -146,11 +146,19 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
     question: message.slice(0, INPUT_LIMITS.promptQuestion),
     isSecret: false,
     options: [
-      { label: MCP_ELICITATION_ALLOW_ONCE, description: `Allow this ${subject} request.` },
+      {
+        label: MCP_ELICITATION_ALLOW_ONCE,
+        description: sourceText("status.agent.mcpConsentAllowOnceDetail", { name: subject }),
+      },
       ...(persistence.includes("always")
-        ? [{ label: MCP_ELICITATION_ALLOW_ALWAYS, description: `Remember this access for future ${subject} requests.` }]
+        ? [
+            {
+              label: MCP_ELICITATION_ALLOW_ALWAYS,
+              description: sourceText("status.agent.mcpConsentAllowAlwaysDetail", { name: subject }),
+            },
+          ]
         : []),
-      { label: MCP_ELICITATION_DECLINE, description: "Keep access blocked." },
+      { label: MCP_ELICITATION_DECLINE, description: sourceText("status.agent.mcpConsentDeclineDetail") },
     ],
   };
 }

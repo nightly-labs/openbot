@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "السماح مرة واحدة",
+  "status.agent.mcpConsentAllowOnceDetail": "السماح بهذا الطلب من {name}.",
+  "status.agent.mcpConsentAllowAlways": "السماح دائمًا",
+  "status.agent.mcpConsentAllowAlwaysDetail": "تذكّر هذا الوصول لطلبات {name} القادمة.",
+  "status.agent.mcpConsentDecline": "عدم السماح",
+  "status.agent.mcpConsentDeclineDetail": "يبقى الوصول محظورًا.",
   "status.agent.claudeWriteOutside": "الكتابة إلى {path}، خارج مساحة عمل الوكيل والمجلد المشترك والمجلدات المؤقتة.",
   "status.agent.contextCleared": "تم مسح السياق. تبدأ دردشة جديدة هنا.",
   "status.agent.instructionsChanged": "حدّث تعليماته",

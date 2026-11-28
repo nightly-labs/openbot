@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "Einmal erlauben",
+  "status.agent.mcpConsentAllowOnceDetail": "Diese Anfrage von {name} erlauben.",
+  "status.agent.mcpConsentAllowAlways": "Immer erlauben",
+  "status.agent.mcpConsentAllowAlwaysDetail": "Diesen Zugriff für künftige Anfragen von {name} merken.",
+  "status.agent.mcpConsentDecline": "Nicht erlauben",
+  "status.agent.mcpConsentDeclineDetail": "Der Zugriff bleibt gesperrt.",
   "status.agent.claudeWriteOutside":
     "In {path} schreiben, außerhalb des Agentenarbeitsbereichs, des geteilten Ordners und der temporären Ordner.",
   "status.agent.contextCleared": "Kontext geleert. Hier beginnt ein neuer Chat.",

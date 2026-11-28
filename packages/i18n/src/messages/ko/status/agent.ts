@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "한 번만 허용",
+  "status.agent.mcpConsentAllowOnceDetail": "이 {name} 요청을 허용해요.",
+  "status.agent.mcpConsentAllowAlways": "항상 허용",
+  "status.agent.mcpConsentAllowAlwaysDetail": "앞으로의 {name} 요청에도 이 액세스를 기억해요.",
+  "status.agent.mcpConsentDecline": "허용 안 함",
+  "status.agent.mcpConsentDeclineDetail": "액세스는 계속 차단돼요.",
   "status.agent.claudeWriteOutside": "에이전트의 워크스페이스, 공유 폴더, 임시 폴더 밖에 있는 {path}에 써요.",
   "status.agent.contextCleared": "컨텍스트를 지웠어요. 여기서 새 채팅이 시작돼요.",
   "status.agent.instructionsChanged": "지침을 업데이트했어요",

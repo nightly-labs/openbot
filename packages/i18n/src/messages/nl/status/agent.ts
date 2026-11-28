@@ -2,6 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpConsentAllowOnce": "Eén keer toestaan",
+  "status.agent.mcpConsentAllowOnceDetail": "Dit verzoek van {name} toestaan.",
+  "status.agent.mcpConsentAllowAlways": "Altijd toestaan",
+  "status.agent.mcpConsentAllowAlwaysDetail": "Deze toegang onthouden voor volgende verzoeken van {name}.",
+  "status.agent.mcpConsentDecline": "Niet toestaan",
+  "status.agent.mcpConsentDeclineDetail": "De toegang blijft geblokkeerd.",
   "status.agent.claudeWriteOutside":
     "{path} schrijven, buiten de werkruimte van de agent, de gedeelde map en de tijdelijke mappen.",
   "status.agent.contextCleared": "Context gewist. Hier begint een nieuwe chat.",
