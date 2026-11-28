@@ -157,6 +157,7 @@ export const messages = {
   "conversation.voice.talkMode": "طريقة التحدث",
   "conversation.voice.talkMode.open": "ميكروفون مفتوح",
   "conversation.voice.talkMode.push": "اضغط للتحدث",
+  "conversation.voice.pauseLabel": "التوقف قبل الإرسال: {seconds} ث",
   "conversation.voice.holdToTalk": "اضغط مطولًا للتحدث",
   "conversation.voice.downloading": "جارٍ التجهيز {progress}%",
   "conversation.voice.spaceKey": "مسافة",

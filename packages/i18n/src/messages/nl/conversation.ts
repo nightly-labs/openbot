@@ -154,6 +154,7 @@ export const messages = {
   "conversation.voice.talkMode": "Manier van praten",
   "conversation.voice.talkMode.open": "Open microfoon",
   "conversation.voice.talkMode.push": "Indrukken om te praten",
+  "conversation.voice.pauseLabel": "Pauze voor verzenden: {seconds} s",
   "conversation.voice.holdToTalk": "Ingedrukt houden om te praten",
   "conversation.voice.downloading": "Voorbereiden {progress}%",
   "conversation.voice.spaceKey": "Spatie",

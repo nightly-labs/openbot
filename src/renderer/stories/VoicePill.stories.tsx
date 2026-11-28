@@ -1,4 +1,4 @@
-import { nextSpeechSpeed } from "@openbot/contracts/ipc";
+import { isVoiceTurnPause, nextSpeechSpeed, nextVoiceTurnPause, type VoiceTurnPause } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
 import { defaultTalkKey } from "@openbot/ui/features/conversation/talk-key";
 import { VoicePill } from "@openbot/ui/features/conversation/VoicePill";
@@ -34,6 +34,8 @@ const meta = {
     onEnd: fn(),
     speed: 1,
     onCycleSpeed: fn(),
+    turnPauseMs: 1_500,
+    onCycleTurnPause: fn(),
   },
   render: (args) => {
     const { t } = useText();
@@ -41,6 +43,9 @@ const meta = {
     const [talkMode, setTalkMode] = createSignal(untrack(() => args.talkMode));
     const [talking, setTalking] = createSignal(untrack(() => args.talking));
     const [speed, setSpeed] = createSignal(untrack(() => args.speed ?? 1));
+    const [turnPause, setTurnPause] = createSignal<VoiceTurnPause>(
+      untrack(() => (isVoiceTurnPause(args.turnPauseMs) ? args.turnPauseMs : 1_500)),
+    );
     const [open, setOpen] = createSignal(true);
     const [shown, setShown] = createSignal(true);
     return (
@@ -96,6 +101,15 @@ const meta = {
                 ? () => {
                     setSpeed(nextSpeechSpeed(speed()));
                     args.onCycleSpeed?.();
+                  }
+                : undefined
+            }
+            turnPauseMs={turnPause()}
+            onCycleTurnPause={
+              args.onCycleTurnPause
+                ? () => {
+                    setTurnPause(nextVoiceTurnPause(turnPause()));
+                    args.onCycleTurnPause?.();
                   }
                 : undefined
             }

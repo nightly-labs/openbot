@@ -153,6 +153,7 @@ export const messages = {
   "conversation.voice.talkMode": "말하는 방식",
   "conversation.voice.talkMode.open": "마이크 항상 켜기",
   "conversation.voice.talkMode.push": "눌러서 말하기",
+  "conversation.voice.pauseLabel": "보내기 전 멈춤: {seconds}초",
   "conversation.voice.holdToTalk": "누르고 있는 동안 말하기",
   "conversation.voice.downloading": "준비 중 {progress}%",
   "conversation.voice.spaceKey": "스페이스",

@@ -152,6 +152,7 @@ export const messages = {
   "conversation.voice.talkMode": "話し方",
   "conversation.voice.talkMode.open": "マイク常時オン",
   "conversation.voice.talkMode.push": "押して話す",
+  "conversation.voice.pauseLabel": "送信までの間：{seconds} 秒",
   "conversation.voice.holdToTalk": "押している間に話す",
   "conversation.voice.downloading": "準備中 {progress}%",
   "conversation.voice.spaceKey": "スペース",
