@@ -15,6 +15,7 @@ import {
   type AcceptedOwnerTransfer,
   decodeAcceptedOwnerTransfer,
   decodeIncomingOwnerTransfers,
+  decodeListedOwnerTransfers,
   decodeOwnerTransfer,
   decodePendingOwnerTransfer,
   type OwnerTransfer,
@@ -38,6 +39,7 @@ import {
   remoteHostFingerprint,
 } from "./host-key-handover";
 import type { TeamClientFetch } from "./index";
+import { ListedOwnerTransfers } from "./listed-owner-transfers";
 
 export interface RemoteTeamHost {
   hostId: string;
@@ -154,6 +156,7 @@ export class RemoteTeamDirectoryClient {
   readonly #inviteLinks: InviteLinkOptions;
   readonly #verifyHostKeySignature: HostKeySignatureCheck;
   readonly #pinLock = Semaphore.makeUnsafe(1);
+  readonly #listedTransfers = new ListedOwnerTransfers();
 
   constructor(
     input: {
@@ -186,6 +189,7 @@ export class RemoteTeamDirectoryClient {
       const value = yield* this.#request("/v2/remote/hosts/");
       if (!isDynamicRecord(value) || !Array.isArray(value.hosts))
         return yield* directoryFailure("The server list is invalid.");
+      this.#listedTransfers.record(decodeListedOwnerTransfers(value));
       const handoversByHost = new Map<string, HostKeyHandover[]>();
       const hosts = yield* Effect.all(
         value.hosts.map((candidate) =>
@@ -403,9 +407,15 @@ export class RemoteTeamDirectoryClient {
 
   incomingOwnerTransfers(): Effect.Effect<OwnerTransfer[], DirectoryFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<OwnerTransfer[], DirectoryFailure> {
+      const listed = this.#listedTransfers.fresh();
+      if (listed) return listed;
       const value = yield* this.#request("/v2/remote/owner-transfers/");
       return yield* directoryDecode(() => decodeIncomingOwnerTransfers(value));
     });
+  }
+
+  listedOwnerTransfersKey(): string | null {
+    return this.#listedTransfers.key();
   }
 
   acceptOwnerTransfer(transferId: string): Effect.Effect<AcceptedOwnerTransfer, DirectoryFailure> {
@@ -413,6 +423,7 @@ export class RemoteTeamDirectoryClient {
       const value = yield* this.#request(`/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/accept`, {
         method: "POST",
       });
+      this.#listedTransfers.settle(transferId);
       return yield* directoryDecode(() => decodeAcceptedOwnerTransfer(value));
     });
   }
@@ -422,6 +433,7 @@ export class RemoteTeamDirectoryClient {
       yield* this.#request(`/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/decline`, {
         method: "POST",
       });
+      this.#listedTransfers.settle(transferId);
     });
   }
 

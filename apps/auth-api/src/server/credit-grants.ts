@@ -5,6 +5,10 @@ import { Effect } from "effect";
 import { type AccountAnalytics, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { type BillingError, type BillingOperationError, billingCall } from "./billing-errors";
 
+export function welcomeGrantId(userId: string): string {
+  return `${WELCOME_SOURCE}:${userId}`;
+}
+
 export function welcomeTenthsSql(column: WalletColumn, idParam: string): string {
   return `MAX(0, (SELECT COALESCE(SUM(remaining_tenths), 0) FROM credit_grants
       WHERE ${column} = ${idParam} AND scope = 'welcome' AND status = 'active')
@@ -20,6 +24,21 @@ const EXPIRE_BATCH = 50;
 const WELCOME_TENTHS = creditTenths(CREDIT_WELCOME);
 const WELCOME_SOURCE = "welcome";
 const WELCOME_ENDS_AT = Date.UTC(9999, 11, 31);
+
+function gmailInboxSql(email: string): string {
+  const plus = `CASE WHEN instr(${email}, '+') BETWEEN 1 AND instr(${email}, '@') THEN instr(${email}, '+') ELSE instr(${email}, '@') END`;
+  return `CASE WHEN substr(${email}, instr(${email}, '@') + 1) IN ('gmail.com', 'googlemail.com')
+    THEN replace(substr(${email}, 1, ${plus} - 1), '.', '') || '@gmail.com' END`;
+}
+
+function welcomeInboxTakenSql(userParam: string): string {
+  return `EXISTS (
+    SELECT 1 FROM credit_welcome_inboxes w
+      JOIN (SELECT ${gmailInboxSql("e")} AS inbox FROM (SELECT lower(email) AS e FROM users WHERE id = ${userParam})) u
+        ON w.inbox = u.inbox
+     WHERE w.user_id <> ${userParam}
+  )`;
+}
 
 export interface CreditGrantsOptions {
   database: D1Database;
@@ -231,11 +250,26 @@ export class CreditGrants {
     this: CreditGrants,
     userId: string,
   ): Effect.fn.Return<boolean, Failure> {
-    const grantId = `${WELCOME_SOURCE}:${userId}`;
-    const issued = yield* billingCall(() =>
-      this.#database.prepare("SELECT 1 AS issued FROM credit_grants WHERE grant_id = ?1").bind(grantId).first(),
+    const grantId = welcomeGrantId(userId);
+    const known = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM credit_grants WHERE grant_id = ?1) THEN 1
+                       WHEN ${welcomeInboxTakenSql("?2")} THEN 1
+                       ELSE 0 END AS closed`,
+        )
+        .bind(grantId, userId)
+        .first<{ closed: number }>(),
     );
-    if (issued) return false;
+    if (known?.closed) return false;
+    return yield* this.issueWelcome(userId);
+  }).bind(this);
+
+  readonly issueWelcome = Effect.fn("CreditGrants.issueWelcome")(function* (
+    this: CreditGrants,
+    userId: string,
+  ): Effect.fn.Return<boolean, Failure> {
+    const grantId = welcomeGrantId(userId);
     const now = this.#now();
     const [inserted] = yield* billingCall(() =>
       this.#database.batch([
@@ -246,8 +280,9 @@ export class CreditGrants {
                created_at
              )
              SELECT ?1, ?2, NULL, ?3, ?3, ?4, 'welcome', ?5, ?6, ?5
-              WHERE EXISTS (SELECT 1 FROM users WHERE id = ?2)
-             ON CONFLICT(grant_id) DO NOTHING`,
+              WHERE EXISTS (SELECT 1 FROM users WHERE id = ?2) AND NOT ${welcomeInboxTakenSql("?2")}
+             ON CONFLICT(grant_id) DO NOTHING
+             RETURNING grant_id`,
           )
           .bind(grantId, userId, WELCOME_TENTHS, WELCOME_SOURCE, now, WELCOME_ENDS_AT),
         this.#database
@@ -262,7 +297,7 @@ export class CreditGrants {
           .bind(grantId),
       ]),
     );
-    if (inserted?.meta.changes !== 1) return false;
+    if (!inserted?.results.length) return false;
     this.#analytics.track(userId, {
       name: "credit_action",
       action: "granted",

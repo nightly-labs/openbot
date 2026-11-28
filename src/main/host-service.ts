@@ -211,6 +211,7 @@ interface HostServiceOptions {
     appPath: string,
   ) => Effect.Effect<void, RemoteWorkflowError>;
   remoteDesktopRuntimePaths?: RemoteDesktopRuntimePaths | null;
+  systemVersion?: string;
   remoteDesktopStateDirectory?: string;
   createRemoteDesktopRuntime?: RemoteScreenGatewayCreateRuntime;
   getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
@@ -353,6 +354,7 @@ export class HostService extends EventEmitter<HostEvents> {
     this.#remoteScreen = new RemoteScreenGateway({
       platform: options.platform ?? normalizeRemoteDesktopPlatform(process.platform),
       unattended: options.unattended ?? false,
+      systemVersion: options.systemVersion,
       runtimePaths: options.remoteDesktopRuntimePaths ?? null,
       runtimeStateDirectory: options.remoteDesktopStateDirectory ?? ".openbot-remote-desktop",
       getRuntimeCredentials:

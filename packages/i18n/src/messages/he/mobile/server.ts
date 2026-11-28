@@ -1809,6 +1809,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window}: נותרו {percent}%",
   "mobile.server.planLimits.resetsAt": "מתאפס {time}",
   "mobile.server.planLimits.empty": "אף ספק עדיין לא דיווח על המגבלות שלו.",
+  "mobile.server.planLimits.notReported": "אין נתוני שימוש",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "מגבלה",
   "mobile.server.planLimits.window.weekly": "שבועי",

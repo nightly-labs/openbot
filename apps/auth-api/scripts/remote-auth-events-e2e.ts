@@ -2,7 +2,14 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect, Fiber } from "effect";
-import { deliverPendingRemoteAuthEvents, verifyRemoteServiceSignature } from "../src/server/remote-control-plane";
+import { pruneExpiredAuthData } from "../src/server/auth-data-retention";
+import {
+  deliverPendingRemoteAuthEvents,
+  REMOTE_AUTH_EVENT_DELIVERED,
+  REMOTE_AUTH_EVENT_PAGE_LIMIT,
+  RemoteControlPlane,
+  verifyRemoteServiceSignature,
+} from "../src/server/remote-control-plane";
 import { createWorkerHandler } from "../src/server/worker-handler";
 import { sqliteD1 } from "./sqlite-d1";
 
@@ -106,8 +113,10 @@ function duplicates(bodies: string[]) {
 
 function remaining(database: DatabaseSync) {
   return database
-    .prepare("SELECT event_id, attempts, next_attempt_at FROM remote_auth_events ORDER BY event_id")
-    .all()
+    .prepare(
+      "SELECT event_id, attempts, next_attempt_at FROM remote_auth_events WHERE next_attempt_at <> ? ORDER BY event_id",
+    )
+    .all(REMOTE_AUTH_EVENT_DELIVERED)
     .map((row) => ({
       event_id: String(row.event_id),
       attempts: Number(row.attempts),
@@ -136,7 +145,7 @@ async function parallelDrainsSendEachEventOnce() {
   check("parallel drains send all 60 events", new Set(signal.state.bodies).size === 60, {
     distinct: new Set(signal.state.bodies).size,
   });
-  check("parallel drains delete every sent event", remaining(database).length === 0, {
+  check("parallel drains mark every sent event as delivered", remaining(database).length === 0, {
     remaining: remaining(database).length,
   });
 }
@@ -198,7 +207,7 @@ async function aStoppedDrainKeepsTheSentEvents() {
   await Effect.runPromise(Fiber.interrupt(fiber));
   const rows = remaining(database);
   check(
-    "a stopped drain deletes each event that Signal accepted",
+    "a stopped drain marks each event that Signal accepted as delivered",
     nineDeleted && rows.length === 1 && rows[0]?.event_id === "event-9",
     { answered, rows },
   );
@@ -294,7 +303,9 @@ async function cronSendsTheEventsOfItsDeletesOnceAfterThem() {
   check("the cron sends the 5 earlier events and the 4 events of its deletes", signal.state.bodies.length === 9, {
     sends: signal.state.bodies.length,
   });
-  check("the cron leaves no event in the outbox", remaining(database).length === 0, { remaining: remaining(database) });
+  check("the cron leaves no pending event in the outbox", remaining(database).length === 0, {
+    remaining: remaining(database),
+  });
   const states = database
     .prepare("SELECT observed_state FROM hosted_servers")
     .all()
@@ -308,8 +319,10 @@ async function cronSendsTheEventsOfItsDeletesOnceAfterThem() {
 
 function pendingTargets(database: DatabaseSync) {
   return database
-    .prepare("SELECT event_id, attempts, next_attempt_at, pending_targets FROM remote_auth_events ORDER BY event_id")
-    .all()
+    .prepare(
+      "SELECT event_id, attempts, next_attempt_at, pending_targets FROM remote_auth_events WHERE next_attempt_at <> ? ORDER BY event_id",
+    )
+    .all(REMOTE_AUTH_EVENT_DELIVERED)
     .map((row) => ({
       event_id: String(row.event_id),
       attempts: Number(row.attempts),
@@ -385,9 +398,13 @@ async function eachSignalGetsEachEventAndOnlyTheFailedOneRetries() {
     received.get(SIGNAL_URL)?.length === 3 && received.get(SECOND_SIGNAL_URL)?.length === 6,
     { first: received.get(SIGNAL_URL)?.length, second: received.get(SECOND_SIGNAL_URL)?.length },
   );
-  check("the outbox deletes each event after both Signals accepted it", pendingTargets(database).length === 0, {
-    rows: pendingTargets(database),
-  });
+  check(
+    "the outbox marks each event as delivered after both Signals accepted it",
+    pendingTargets(database).length === 0,
+    {
+      rows: pendingTargets(database),
+    },
+  );
 
   database
     .prepare(
@@ -402,7 +419,7 @@ async function eachSignalGetsEachEventAndOnlyTheFailedOneRetries() {
     );
   await Effect.runPromise(deliverPendingRemoteAuthEvents(bindings, state.sentAt, signalFetch));
   check(
-    "an event whose targets are no longer configured is deleted with no send",
+    "an event whose targets are no longer configured is marked as delivered with no send",
     pendingTargets(database).length === 0 &&
       received.get(SIGNAL_URL)?.length === 3 &&
       received.get(SECOND_SIGNAL_URL)?.length === 6,
@@ -415,7 +432,134 @@ async function eachSignalGetsEachEventAndOnlyTheFailedOneRetries() {
   );
 }
 
+async function ticketKeys() {
+  const { publicKey, privateKey } = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+    "sign",
+    "verify",
+  ]);
+  return {
+    REMOTE_TICKET_PRIVATE_JWK: JSON.stringify({
+      ...(await crypto.subtle.exportKey("jwk", privateKey)),
+      kid: "ticket-1",
+    }),
+    REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({
+      keys: [{ ...(await crypto.subtle.exportKey("jwk", publicKey)), kid: "ticket-1" }],
+    }),
+    REMOTE_TICKET_KEY_ID: "ticket-1",
+  };
+}
+
+async function deliveredEventsStayForCatchUpForOneDay() {
+  const database = await migratedDatabase();
+  const now = Date.UTC(2026, 10, 28, 0);
+  seedProfileEvents(database, 7, now);
+  database
+    .prepare(
+      "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES ('old', ?, ?, 0, ?)",
+    )
+    .run(JSON.stringify({ type: "account-profile-changed", userId: "old" }), now - 25 * 60 * 60_000, now);
+  const signal = fakeSignal(now);
+  signal.release();
+  await Effect.runPromise(
+    deliverPendingRemoteAuthEvents(
+      { DB: sqliteD1(database), REMOTE_AUTH_WEBHOOK_URL: SIGNAL_URL, REMOTE_AUTH_WEBHOOK_SECRET: SECRET },
+      now,
+      signal.fetch,
+    ),
+  );
+  const kept = Number(
+    database
+      .prepare("SELECT count(*) AS count FROM remote_auth_events WHERE next_attempt_at = ?")
+      .get(REMOTE_AUTH_EVENT_DELIVERED)?.count,
+  );
+  check("a delivered event stays in the outbox as delivered", kept === 8 && remaining(database).length === 0, {
+    kept,
+    pending: remaining(database).length,
+  });
+  const second = fakeSignal(now + 60_000);
+  second.release();
+  await Effect.runPromise(
+    deliverPendingRemoteAuthEvents(
+      { DB: sqliteD1(database), REMOTE_AUTH_WEBHOOK_URL: SIGNAL_URL, REMOTE_AUTH_WEBHOOK_SECRET: SECRET },
+      now + 60_000,
+      second.fetch,
+    ),
+  );
+  check("a later drain does not send a delivered event again", second.state.bodies.length === 0, {
+    sends: second.state.bodies.length,
+  });
+
+  database
+    .prepare(
+      "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES ('waiting', ?, ?, 0, ?)",
+    )
+    .run(JSON.stringify({ type: "account-profile-changed", userId: "waiting" }), now, now + 60 * 60_000);
+  const plane = new RemoteControlPlane({ DB: sqliteD1(database), ...(await ticketKeys()) });
+  const pages: string[][] = [];
+  let cursor = { attemptedAt: 0, eventId: "" };
+  for (let page = 0; page < 10; page += 1) {
+    const result = await Effect.runPromise(plane.authEventsAfter(cursor, 3));
+    pages.push(result.events.map((event) => event.eventId));
+    const last = result.events.at(-1);
+    if (last) cursor = { attemptedAt: last.attemptedAt, eventId: last.eventId };
+    if (!result.more) break;
+  }
+  const order = pages.flat();
+  check(
+    "the catch-up pages return each sent event once, in send order, with the page limit",
+    order.length === 8 && new Set(order).size === 8 && pages.every((page) => page.length <= 3) && pages.length === 3,
+    { pages },
+  );
+  check("the catch-up returns an event that was created long ago but sent late", order.includes("old"), { order });
+  check("the catch-up does not return an event that was not sent", !order.includes("waiting"), { order });
+  const fromCursor = await Effect.runPromise(
+    plane.authEventsAfter({ attemptedAt: now, eventId: "event-4" }, REMOTE_AUTH_EVENT_PAGE_LIMIT + 50),
+  );
+  check(
+    "the catch-up starts after the cursor and caps the limit",
+    fromCursor.events.map((event) => event.eventId).join(",") === "event-5,event-6,old" && !fromCursor.more,
+    { events: fromCursor.events.map((event) => event.eventId) },
+  );
+  const plan = database
+    .prepare(
+      `EXPLAIN QUERY PLAN SELECT event_id, payload, attempted_at FROM remote_auth_events
+        WHERE (attempted_at, event_id) > (?, ?) ORDER BY attempted_at, event_id LIMIT ?`,
+    )
+    .all(0, "", 10)
+    .map((row) => String(row.detail));
+  check(
+    "the catch-up query reads the attempted index with no sort",
+    plan.some((detail) => detail.includes("remote_auth_events_attempted")) &&
+      !plan.some((detail) => detail.includes("TEMP B-TREE")),
+    { plan },
+  );
+  database.prepare("DELETE FROM remote_auth_events WHERE event_id = 'waiting'").run();
+
+  const pruned = await Effect.runPromise(pruneExpiredAuthData(sqliteD1(database), now));
+  const left = database
+    .prepare("SELECT event_id FROM remote_auth_events ORDER BY event_id")
+    .all()
+    .map((row) => String(row.event_id));
+  check(
+    "the daily prune deletes delivered events older than 24 hours only",
+    pruned.remoteAuthEvents === 1 && !left.includes("old") && left.length === 7,
+    { pruned: pruned.remoteAuthEvents, left },
+  );
+  database
+    .prepare(
+      "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES ('stuck', ?, ?, 3, ?)",
+    )
+    .run(JSON.stringify({ type: "account-profile-changed", userId: "stuck" }), now - 30 * 60 * 60_000, now + 60_000);
+  await Effect.runPromise(pruneExpiredAuthData(sqliteD1(database), now));
+  check(
+    "the daily prune keeps an old event that is not delivered",
+    remaining(database).some((row) => row.event_id === "stuck"),
+    { pending: remaining(database) },
+  );
+}
+
 const scenarios = [
+  deliveredEventsStayForCatchUpForOneDay,
   parallelDrainsSendEachEventOnce,
   oneDrainSendsSixAtATimeAndBacksOff,
   aStoppedDrainKeepsTheSentEvents,

@@ -4,7 +4,7 @@ import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
 import { OPENBOT_SECURITY_HEADERS, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
-import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
+import { type AuthRetentionResult, pruneExpiredAuthData, pruneExpiredRateLimits } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
 import { captureBillingSnapshot } from "./billing-snapshots";
@@ -22,6 +22,7 @@ import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
 import { mediaGatewayFromBinding } from "./media-gateway";
 import { d1OverloadedRecently, observedD1 } from "./observed-d1";
+import { sharedPageCache } from "./page-cache";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
   deliverPendingRemoteAuthEvents,
@@ -40,7 +41,10 @@ type WorkerExecutionContext = Pick<ExecutionContext, "waitUntil">;
 type RemoteAuthEventDelivery = typeof deliverPendingRemoteAuthEvents;
 type WorkerFetchBindings = Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
   Partial<
-    Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">
+    Pick<
+      WorkerBindings,
+      "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET" | "CF_VERSION_METADATA"
+    >
   >;
 
 const OVERLOAD_RETRY_AFTER_MIN_SECONDS = 10;
@@ -72,6 +76,7 @@ export function createWorkerHandler(
     const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
     const hostRedirect = canonicalHostRedirect(request) ?? passkeyWalletHostResponse(request, OPENBOT_SITE_URL);
     if (hostRedirect) return hostRedirect;
+    if (isMissingAssetRequest(request)) return missingAssetResponse();
     if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
       return runApiEffect(checkoutReturnResponse(request, bindings));
     }
@@ -104,9 +109,14 @@ export function createWorkerHandler(
     if (earlyResponse) return earlyResponse;
     const markdown = await pageMarkdownResponse(request, fetchHandler);
     if (markdown) return markdown;
-    const response = Promise.resolve(fetchHandler(request)).then((result) =>
-      withOverloadRetryAfter(permanentTrailingSlashRedirect(request, result)),
-    );
+    const sharedPage = sharedPageCache(request, bindings.CF_VERSION_METADATA?.id, context);
+    const cachedPage = await sharedPage?.cached();
+    if (cachedPage) return cachedPage;
+    const response = Promise.resolve(fetchHandler(request)).then((result) => {
+      const finished = withOverloadRetryAfter(permanentTrailingSlashRedirect(request, result));
+      sharedPage?.remember(finished);
+      return finished;
+    });
     if (context && isEmailSignInStart(request)) {
       context.waitUntil(
         response.then(
@@ -140,6 +150,9 @@ export function createWorkerHandler(
         if (hostingResult && Object.values(hostingResult).some(Boolean)) {
           console.info("Hosted server check completed.", hostingResult);
         }
+        yield* pruneExpiredRateLimits(bindings.DB, now).pipe(
+          Effect.catch(() => Effect.sync(() => console.warn("Rate limit retention failed."))),
+        );
         return isDailyRetentionRun(now) ? yield* prune(bindings.DB, now) : null;
       });
       const [retention, , sites] = await runApiEffect(
@@ -358,10 +371,10 @@ function tickHostedServers(
   bindings: RemoteAuthEventBindings & Partial<Pick<WorkerBindings, HostedServerTickBindingKey>>,
   now: number,
 ) {
-  let authEvents: Effect.Effect<void, RemoteFailure> | null = null;
+  const authEvents: Effect.Effect<void, RemoteFailure>[] = [];
   const remote = new RemoteControlPlane(bindings, {
     schedule: (delivery) => {
-      authEvents = delivery;
+      authEvents.push(delivery);
     },
   });
   const sends: Effect.Effect<void>[] = [];
@@ -379,8 +392,13 @@ function tickHostedServers(
         Effect.all(
           [
             ...sends,
-            (authEvents ?? Effect.void).pipe(
-              Effect.catch(() => Effect.sync(() => console.warn("Remote auth event delivery failed."))),
+            Effect.forEach(
+              authEvents,
+              (delivery) =>
+                delivery.pipe(
+                  Effect.catch(() => Effect.sync(() => console.warn("Remote auth event delivery failed."))),
+                ),
+              { discard: true },
             ),
           ],
           { concurrency: "unbounded", discard: true },
@@ -422,6 +440,19 @@ function serveLocalHostedSite(
     { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true", ACCOUNT_ORIGIN: configuredOrigin.origin },
     Date.now(),
   );
+}
+
+function isMissingAssetRequest(request: Request): boolean {
+  return (
+    (request.method === "GET" || request.method === "HEAD") && new URL(request.url).pathname.startsWith("/assets/")
+  );
+}
+
+function missingAssetResponse(): Response {
+  return new Response(null, {
+    status: 404,
+    headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+  });
 }
 
 function isEmailSignInStart(request: Request): boolean {

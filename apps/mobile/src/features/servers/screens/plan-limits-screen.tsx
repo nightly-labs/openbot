@@ -1,10 +1,12 @@
+import { agentProviderName } from "@openbot/contracts/ipc";
 import { type PlanLimitListedWindow, usagePaceRemainingPercent } from "@openbot/team-client/plan-limits";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
-import { PLAN_LIMIT_TONE_TEXT, PlanLimitRing } from "@/features/servers/components/plan-limit-ring";
+import { LOGO_RATIO, PLAN_LIMIT_TONE_TEXT, PlanLimitRing } from "@/features/servers/components/plan-limit-ring";
+import { ProviderMark } from "@/features/servers/components/provider-mark";
 import {
   lowestPlanLimitsFirst,
   PLAN_LIMIT_RESET_FORMAT,
@@ -17,10 +19,12 @@ import {
 import { SettingsContent, SettingsNote, SettingsSection } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
+const RING_SIZE = 34;
+
 export function PlanLimitsScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
-  const { rows, accounts, loading } = usePlanLimits(serverId);
+  const { rows, notReported, accounts, loading } = usePlanLimits(serverId);
   const lowest = lowestPlanLimitsFirst(rows);
   return (
     <SettingsContent>
@@ -28,7 +32,7 @@ export function PlanLimitsScreen() {
       {lowest.map((row) => (
         <SettingsSection key={`${row.provider}-${row.accountId ?? ""}`}>
           <View className="min-h-14 flex-row items-center gap-3 px-4 py-3">
-            <PlanLimitRing row={row} size={34} />
+            <PlanLimitRing row={row} size={RING_SIZE} />
             <Typography.Paragraph className="min-w-0 flex-1 font-semibold" numberOfLines={1}>
               {planLimitName(row, accounts, t)}
             </Typography.Paragraph>
@@ -36,6 +40,21 @@ export function PlanLimitsScreen() {
           {row.listedWindows.map((window, index) => (
             <PlanLimitWindowRow key={planLimitWindowKey(window, index)} window={window} />
           ))}
+        </SettingsSection>
+      ))}
+      {notReported.map((provider) => (
+        <SettingsSection key={provider}>
+          <View className="min-h-14 flex-row items-center gap-3 px-4 py-3">
+            <View style={{ width: RING_SIZE, height: RING_SIZE }} className="items-center justify-center">
+              <ProviderMark provider={provider} size={Math.round(RING_SIZE * LOGO_RATIO)} />
+            </View>
+            <Typography.Paragraph className="min-w-0 flex-1 font-semibold" numberOfLines={1}>
+              {agentProviderName(provider)}
+            </Typography.Paragraph>
+            <Typography.Paragraph className="shrink-0 text-grouped-secondary">
+              {t("mobile.server.planLimits.notReported")}
+            </Typography.Paragraph>
+          </View>
         </SettingsSection>
       ))}
     </SettingsContent>
