@@ -83,6 +83,8 @@ import {
   type StatusReaction,
   TelegramCallError,
   WhatsAppAnswerPartlySent,
+  WhatsAppPostNeedsConfirmation,
+  WhatsAppPostUnconfirmed,
   WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
@@ -1695,7 +1697,9 @@ export class MessagingService {
           }
         : {};
     if (!text.trim() && !embeds.length && files.length) {
-      const result = yield* Effect.result(live.adapter.upload(target, files));
+      const result = yield* Effect.result(
+        live.adapter.upload(target, files).pipe(Effect.provideService(WhatsAppPostNeedsConfirmation, false)),
+      );
       if (Result.isFailure(result))
         return {
           error: `${refusal(result.failure)} A file can be in the place already. Do not post it again only because of this error.`,
@@ -1724,6 +1728,9 @@ export class MessagingService {
         return {
           error: refusal(captioned.failure),
           failure: "unknown" as const,
+          ...(captioned.failure.cause instanceof WhatsAppPostUnconfirmed
+            ? directPing(`${text}\nFiles: ${single.name}`)
+            : {}),
         };
       if (captioned.success) {
         live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
@@ -1752,12 +1759,14 @@ export class MessagingService {
         Effect.succeed({
           error: `${refusal(failure)} A long text goes in more than one post, so a part of it can be posted already. Do not post it again only because of this error.`,
           failure: "unknown" as const,
+          ...(failure.cause instanceof WhatsAppPostUnconfirmed ? directPing(text) : {}),
         }),
       ),
     );
     if (!("posted" in posted)) return posted;
     const skippedFiles = files.length
       ? yield* live.adapter.upload(target, files).pipe(
+          Effect.provideService(WhatsAppPostNeedsConfirmation, false),
           Effect.map((uploaded) => uploaded.skipped),
           Effect.catch((failure) =>
             Effect.sync(() => {
@@ -2454,7 +2463,7 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ["not_linked", WHATSAPP_NOT_CONNECTED],
   [
     "not_confirmed",
-    "The WhatsApp connection dropped before WhatsApp confirmed the message, also after OpenBot sent it again. It can be in the chat already. Do not post it again only because of this error: tell the user to check the chat.",
+    "WhatsApp did not confirm the message. It can be in the chat already, or it can be missing. Do not post it again only because of this error: tell the user to check the chat.",
   ],
 ]);
 

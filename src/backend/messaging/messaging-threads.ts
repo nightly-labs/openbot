@@ -36,6 +36,7 @@ import {
   type InboundFile,
   type MessageTarget,
   type MessagingPlace,
+  WhatsAppPostNeedsConfirmation,
 } from "./messaging-types";
 
 export interface MessagingAnswerFile {
@@ -138,7 +139,7 @@ export interface MessagingOutbound {
         ping?: MessagingPostPing;
       }
     | { posted: true; messageId?: string; skippedFiles?: string[]; ping?: MessagingPostPing }
-    | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
+    | { error: string; failure: Exclude<MessagingPostFailure, "gone">; ping?: MessagingPostPing }
   >;
   discord(
     connectionId: string,
@@ -450,18 +451,19 @@ export class MessagingThreads {
             Effect.timeout(HISTORY_TIMEOUT_MS),
             Effect.catch(() => Effect.succeed({ error: "The platform did not answer. Try again in a minute." })),
           )
-        : yield* outbound.post(
-            record.connectionId,
-            { platformChannelId: call.place, replyThreadId: call.replyTo },
-            call.text,
-            call.files.length ? yield* openFiles(call.files) : [],
-            call.embeds,
-          );
-    if ("error" in answer) return openBotToolFailure(answer.error);
-    if (!("posted" in answer) || !answer.ping) return openBotToolResult(answer);
-    const { ping, ...result } = answer;
-    const threadKey = call.tool === "messaging_post" ? (ping.threadKey ?? call.replyTo ?? result.messageId) : null;
-    if (call.tool === "messaging_post" && threadKey)
+        : yield* outbound
+            .post(
+              record.connectionId,
+              { platformChannelId: call.place, replyThreadId: call.replyTo },
+              call.text,
+              call.files.length ? yield* openFiles(call.files) : [],
+              call.embeds,
+            )
+            .pipe(Effect.provideService(WhatsAppPostNeedsConfirmation, true));
+    const ping = "ping" in answer ? answer.ping : undefined;
+    const messageId = "posted" in answer ? answer.messageId : undefined;
+    const threadKey = call.tool === "messaging_post" && ping ? (ping.threadKey ?? call.replyTo ?? messageId) : null;
+    if (call.tool === "messaging_post" && ping && threadKey)
       yield* this.recordPings({
         connectionId: record.connectionId,
         platformChannelId: ping.platformChannelId ?? call.place,
@@ -470,6 +472,9 @@ export class MessagingThreads {
         agentId,
         text: ping.text,
       });
+    if ("error" in answer) return openBotToolFailure(answer.error);
+    if (!("posted" in answer) || !answer.ping) return openBotToolResult(answer);
+    const { ping: _sentPing, ...result } = answer;
     return openBotToolResult(result);
   });
 

@@ -7,7 +7,7 @@ import type {
   TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
-import { type Effect, Schema } from "effect";
+import { Context, type Effect, Schema } from "effect";
 import type { MessagingOperationFailed } from "./messaging-service";
 import type { MessagingAnswerFile } from "./messaging-threads";
 
@@ -259,6 +259,19 @@ export class TelegramCallError extends Error {
     super(description);
     this.name = "TelegramCallError";
     this.code = `telegram_${errorCode}`;
+  }
+}
+
+export const WhatsAppPostNeedsConfirmation = Context.Reference<boolean>("openbot/WhatsAppPostNeedsConfirmation", {
+  defaultValue: () => false,
+});
+
+export class WhatsAppPostUnconfirmed extends Error {
+  readonly messageId: string;
+  constructor(messageId: string) {
+    super("not_confirmed");
+    this.name = "WhatsAppPostUnconfirmed";
+    this.messageId = messageId;
   }
 }
 
