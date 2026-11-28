@@ -301,6 +301,8 @@ const answer = (request) => {
       return reply({ data: thread.turns.toReversed(), nextCursor: null });
     case "thread/items/list": return reply({ data: (thread.turns.find((turn) => turn.id === params.turnId)?.items ?? []).map((item) => ({ turnId: params.turnId, item })), nextCursor: null });
     case "turn/start": {
+      if (!reset && JSON.stringify(params.input).split("--- current message ---").at(-1).includes("usage-at-start"))
+        return write({ id: request.id, error: { code: -32000, message: "You've hit your usage limit. Try again later." } });
       const turn = { id: randomUUID(), status: "inProgress", items: [] };
       thread.turns.push(turn);
       const input = JSON.stringify(params.input);
@@ -1477,6 +1479,95 @@ try {
       "A request with no work is retried normally.",
     );
     return outcome;
+  });
+
+  const messagingRequest = async (agentId: string, text: string, place: string) => {
+    const ends: { status: string; answer: string | null; reason: string | null }[] = [];
+    const stopListening = service.messaging.onActivity((activity) => {
+      if (activity.type === "finished" && activity.link.platformChannelId === place)
+        ends.push({ status: activity.status, answer: activity.answer, reason: activity.reason ?? null });
+    });
+    const connection = service.messaging.store.ensureConnection("whatsapp", "48100000000", "Phone");
+    service.messaging.store.updateConnection(connection.connectionId, { enabled: true });
+    const received = await runCauseEffect(
+      service.messaging.receive({
+        connectionId: connection.connectionId,
+        agentId,
+        platformChannelId: place,
+        threadKey: "dm",
+        isDirect: true,
+        title: "Owner",
+        text,
+        sourcePaths: [],
+        origin: { authorId: "48100000000", authorName: "Owner", platformMessageId: `${place}-message` },
+        idempotencyKey: `whatsapp:${place}`,
+      }),
+    );
+    assert.equal(received.status, "queued");
+    return {
+      ends,
+      stopListening,
+      linkId: received.status === "queued" ? received.link.linkId : "",
+      deliveryId: received.status === "queued" ? received.deliveryId : "",
+    };
+  };
+
+  for (const [name, text, caseId] of [
+    ["before work", "usage-empty", null],
+    ["after work", "usage-tool-only case:messaging", "messaging"],
+    ["at turn start", "usage-at-start", null],
+  ] as const) {
+    await check(`a WhatsApp message refused at the usage limit ${name} runs on its backup`, async () => {
+      await restart();
+      const agent = await createCodex(`WhatsApp ${name}`, automaticBackups);
+      const before = turns().length;
+      const request = await messagingRequest(
+        agent.id,
+        text,
+        `limit-${caseId ?? name.replace(/ /g, "-")}@s.whatsapp.net`,
+      );
+      try {
+        await waitFor("the WhatsApp request to end", () => request.ends.length > 0);
+        await waitFor(
+          "the WhatsApp request to settle",
+          () => mailbox.unresolvedMessagingDeliveries(request.linkId).length === 0,
+        );
+      } finally {
+        request.stopListening();
+      }
+      assert.deepEqual(
+        request.ends,
+        [{ status: "completed", answer: "Done.", reason: null }],
+        "The WhatsApp chat gets the backup's answer, not a failure.",
+      );
+      assert.equal(agentOf(agent.id).provider, "claude", "The agent moved to its backup model.");
+      assert.equal(turns().length, before + 1, "The backup ran the request once.");
+      if (caseId) {
+        assert.ok(turns()[before]?.input.includes(`checkpoint-result=${caseId}`), "The backup gets the work done.");
+        assert.ok(turns()[before]?.input.includes("Continue the unfinished task"));
+      }
+      return { ends: request.ends, model: turns()[before]?.model };
+    });
+  }
+
+  await check("a WhatsApp message refused at the usage limit with no backup waits for the reset", async () => {
+    await restart();
+    const agent = await createCodex("WhatsApp no backup");
+    const request = await messagingRequest(agent.id, "usage-empty", "limit-no-backup@s.whatsapp.net");
+    try {
+      await waitFor("the WhatsApp request to wait for the limit", () => {
+        const status = mailbox.getDelivery(request.deliveryId)?.delivery.status;
+        return (
+          status === "queued" && service.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id)
+        );
+      });
+    } finally {
+      request.stopListening();
+    }
+    assert.deepEqual(request.ends, [], "The WhatsApp chat gets no failure while the request waits.");
+    assert.equal(agentOf(agent.id).provider, "codex");
+    await runCauseEffect(service.cancelQueuedMessage(agent.id, request.deliveryId));
+    return { status: mailbox.getDelivery(request.deliveryId)?.delivery.status };
   });
 
   await check("a task keeps its conversation and completed work through fallback", async () => {
