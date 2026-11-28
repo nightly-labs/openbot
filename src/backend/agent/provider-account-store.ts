@@ -34,23 +34,25 @@ const POOL_STRATEGY_MAX_LENGTH = 64;
 const Provider = Schema.Literals(AGENT_PROVIDERS.filter((provider) => provider !== "acp"));
 const LabelText = Schema.String.check(Schema.isMaxLength(PROVIDER_ACCOUNT_LABEL_MAX_LENGTH));
 const Label = Schema.NullOr(LabelText);
+const Pools = Schema.optionalKey(
+  Schema.Record(
+    Schema.String,
+    Schema.Struct({
+      leftOut: Schema.Array(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))).check(
+        Schema.isMaxLength(MAX_PROVIDER_ACCOUNTS),
+      ),
+      strategy: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(POOL_STRATEGY_MAX_LENGTH))),
+    }),
+  ),
+);
 const ProviderAccountsFile = Schema.Struct({
   version: Schema.Literal(1),
   accounts: Schema.Array(
     Schema.Struct({ id: Schema.String.check(Schema.isPattern(ACCOUNT_ID)), provider: Provider, label: Label }),
   ),
   defaultLabels: Schema.Record(Schema.String, LabelText),
-  pools: Schema.optionalKey(
-    Schema.Record(
-      Schema.String,
-      Schema.Struct({
-        leftOut: Schema.Array(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))).check(
-          Schema.isMaxLength(MAX_PROVIDER_ACCOUNTS),
-        ),
-        strategy: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(POOL_STRATEGY_MAX_LENGTH))),
-      }),
-    ),
-  ),
+  pools: Pools,
+  offPools: Pools,
   liveVoiceAccount: Schema.optionalKey(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))),
 });
 type ProviderAccountsFile = typeof ProviderAccountsFile.Type;
@@ -118,16 +120,25 @@ export class ProviderAccountStore {
     pool: StoredProviderAccountPool | null,
   ) {
     return yield* this.#change((file) => {
-      const { [provider]: previous, ...pools } = file.pools ?? {};
-      const strategy = pool?.strategy ?? previous?.strategy;
-      const next = pool
-        ? {
-            leftOut: [...new Set(pool.leftOut)],
-            ...(strategy && strategy !== "fillFirst" ? { strategy } : {}),
-          }
-        : null;
+      const { [provider]: on, ...pools } = file.pools ?? {};
+      const { [provider]: off, ...offPools } = file.offPools ?? {};
+      if (!pool) {
+        const kept = on ?? off;
+        const keep = kept && (kept.leftOut.length > 0 || kept.strategy);
+        return Effect.succeed({
+          file: withOffPools({ ...file, pools }, keep ? { ...offPools, [provider]: kept } : offPools),
+          result: undefined,
+        });
+      }
+      const turnsOnWithNoList = !on && pool.leftOut.length === 0;
+      const leftOut = turnsOnWithNoList ? (off?.leftOut ?? []) : pool.leftOut;
+      const strategy = pool.strategy ?? on?.strategy ?? off?.strategy;
+      const next = {
+        leftOut: [...new Set(leftOut)],
+        ...(strategy && strategy !== "fillFirst" ? { strategy } : {}),
+      };
       return Effect.succeed({
-        file: { ...file, pools: next ? { ...pools, [provider]: next } : pools },
+        file: withOffPools({ ...file, pools: { ...pools, [provider]: next } }, offPools),
         result: undefined,
       });
     });
@@ -234,6 +245,7 @@ export class ProviderAccountStore {
           ...rest,
           accounts: file.accounts.filter((candidate) => candidate.id !== account.id),
           ...(file.pools ? { pools: withoutPoolAccount(file.pools, account.id) } : {}),
+          ...(file.offPools ? { offPools: withoutPoolAccount(file.offPools, account.id) } : {}),
           ...(liveVoiceAccount && liveVoiceAccount !== account.id ? { liveVoiceAccount } : {}),
         },
         result: undefined,
@@ -264,6 +276,14 @@ export class ProviderAccountStore {
       }).pipe(Effect.uninterruptible),
     );
   }
+}
+
+function withOffPools(
+  file: ProviderAccountsFile,
+  offPools: NonNullable<ProviderAccountsFile["offPools"]>,
+): ProviderAccountsFile {
+  const { offPools: _previous, ...rest } = file;
+  return Object.keys(offPools).length > 0 ? { ...rest, offPools } : rest;
 }
 
 function withoutPoolAccount(

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
@@ -191,6 +192,15 @@ const report: {
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
   pool?: { second: string | null; default: string | null; null: string | null };
+  poolSwitch?: {
+    leftOut: readonly string[] | null;
+    off: readonly string[] | null;
+    onAgain: readonly string[] | null;
+    named: readonly string[] | null;
+    allBack: readonly string[] | null;
+    spread: string | null;
+    spreadOnAgain: string | null;
+  };
   liveVoice?: { saved: string | null; afterRemove: string | null; automatic: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -656,6 +666,57 @@ try {
     pooledAgain.text,
   );
   await runCauseEffect(accounts.setPool("codex", null));
+
+  const poolLeftOut = () =>
+    agents.getStatus().providers?.find((row) => row.id === "codex")?.accountPool?.leftOut ?? null;
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, []));
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, [second.id]));
+  const leftOut = poolLeftOut();
+  await runCauseEffect(agents.setProviderAccountPool("codex", false, [second.id]));
+  const off = poolLeftOut();
+  await runCauseEffect(accounts.load());
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, []));
+  const onAgain = poolLeftOut();
+  await runCauseEffect(agents.setProviderAccountPool("codex", false, [second.id]));
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, ["default"]));
+  const named = poolLeftOut();
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, []));
+  const allBack = poolLeftOut();
+  await runCauseEffect(agents.setProviderAccountPool("codex", false, []));
+  report.poolSwitch = {
+    leftOut,
+    off,
+    onAgain,
+    named,
+    allBack,
+    spread: null,
+    spreadOnAgain: null,
+  };
+  pass(
+    "Pool accounts off and on again keeps the accounts that the user left out, also after a restart",
+    isDeepStrictEqual(leftOut, [second.id]) && off === null && isDeepStrictEqual(onAgain, [second.id]),
+    JSON.stringify(report.poolSwitch),
+  );
+  pass(
+    "A pool update that names left-out accounts uses that list, and an empty list with the pool on puts every account back",
+    isDeepStrictEqual(named, ["default"]) && isDeepStrictEqual(allBack, []),
+    JSON.stringify(report.poolSwitch),
+  );
+
+  const poolStrategy = () =>
+    agents.getStatus().providers?.find((row) => row.id === "codex")?.accountPool?.strategy ?? null;
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, [], "spread"));
+  report.poolSwitch.spread = poolStrategy();
+  await runCauseEffect(agents.setProviderAccountPool("codex", false, []));
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, []));
+  report.poolSwitch.spreadOnAgain = poolStrategy();
+  await runCauseEffect(agents.setProviderAccountPool("codex", true, [], "fillFirst"));
+  await runCauseEffect(agents.setProviderAccountPool("codex", false, []));
+  pass(
+    "Pool accounts off and on again keeps the Spread choice",
+    report.poolSwitch.spread === "spread" && report.poolSwitch.spreadOnAgain === "spread",
+    JSON.stringify(report.poolSwitch),
+  );
 
   await runCauseEffect(accounts.setLiveVoiceAccount(second.id));
   const reloaded = new ProviderAccountStore(join(userData, "openbot-provider-accounts-v1.json"), accountsRoot);

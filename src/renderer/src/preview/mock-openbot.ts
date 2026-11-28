@@ -160,6 +160,7 @@ import {
   type PinnedMessagesSnapshot,
   PLAN_CONTINUATION_ITEM_TYPE,
   type PromptCacheTtlSetting,
+  type ProviderAccountPool,
   type ProviderAccountStatus,
   type ProviderDetectionSettings,
   type ProviderEnvironment,
@@ -565,6 +566,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
   let agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
+  const offAccountPools = new Map<string, ProviderAccountPool>();
   const changeProviderAccounts = (
     provider: AgentProviderId,
     change: (accounts: ProviderAccountStatus[]) => ProviderAccountStatus[],
@@ -1651,10 +1653,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         providers: agentStatus.providers?.map((row) => {
           if (row.id !== provider) return row;
           const { accountPool: old, ...rest } = row;
-          if (!enabled) return rest;
-          const inUse = row.accounts?.find((account) => !leftOut.includes(account.id))?.id ?? null;
-          const kept = strategy ?? old?.strategy;
-          return { ...rest, accountPool: { leftOut: [...leftOut], inUse, ...(kept ? { strategy: kept } : {}) } };
+          const off = offAccountPools.get(provider);
+          if (!enabled) {
+            const saved = old ?? off;
+            if (saved && (saved.leftOut.length > 0 || saved.strategy)) offAccountPools.set(provider, saved);
+            return rest;
+          }
+          offAccountPools.delete(provider);
+          const list = !old && leftOut.length === 0 ? (off?.leftOut ?? []) : leftOut;
+          const inUse = row.accounts?.find((account) => !list.includes(account.id))?.id ?? null;
+          const kept = strategy ?? old?.strategy ?? off?.strategy;
+          return { ...rest, accountPool: { leftOut: [...list], inUse, ...(kept ? { strategy: kept } : {}) } };
         }),
       };
       return clone(agentStatus);
