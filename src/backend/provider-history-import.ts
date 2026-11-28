@@ -14,6 +14,7 @@ import {
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
 import type { DeliveryContext } from "./mailbox-store";
+import { runIdOrigins } from "./message-run-ids";
 import type { ThreadItem } from "./protocol";
 import { type ProviderClientOperationError, providerFailure, providerSync } from "./provider-client-effects";
 import type {
@@ -436,7 +437,29 @@ function storedPromptTurnId(
       )
       .get(threadId, messageId),
   );
-  return row ? requiredStringColumn(row, "turn_id") : null;
+  return row ? requiredStringColumn(row, "turn_id") : storedRunOriginTurnId(database, threadId, messageId);
+}
+
+function storedRunOriginTurnId(
+  database: ProviderHistoryImportDatabase,
+  threadId: string,
+  messageId: string,
+): string | null {
+  const origins = runIdOrigins(messageId).slice(1);
+  if (origins.length === 0) return null;
+  const turnIds = database.connection
+    .prepare(
+      `SELECT DISTINCT turn_id FROM projection_thread_messages
+       WHERE thread_id = ? AND message_id IN (${origins.map(() => "?").join(", ")})
+         AND author <> 'assistant' AND turn_id IS NOT NULL
+       LIMIT 2`,
+    )
+    .all(threadId, ...origins)
+    .flatMap((row) => {
+      const value = databaseRow(row);
+      return value ? [requiredStringColumn(value, "turn_id")] : [];
+    });
+  return turnIds.length === 1 ? (turnIds[0] ?? null) : null;
 }
 
 function readStoredTurnMessages(

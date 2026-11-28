@@ -684,7 +684,13 @@ async function verifyHistoryKeepsRequests(agentId: string) {
       .messages.filter((message) => message.author === "user")
       .map((message) => ({ id: message.id, text: message.text }))
       .sort((left, right) => left.id.localeCompare(right.id));
+  const answers = () =>
+    database
+      .readConversation(agentId, threadId)
+      .messages.filter((message) => message.author === "assistant" && message.itemType === "agentMessage")
+      .map((message) => message.text);
   const before = users();
+  const answersBefore = answers();
   const client = clients.at(-1);
   const session = database.listProviderSessions(threadId).find((session) => session.state === "active");
   assert.ok(client && session);
@@ -710,6 +716,7 @@ async function verifyHistoryKeepsRequests(agentId: string) {
   assert.deepEqual(users(), before, "History import keeps one user request after independent continuation turn IDs.");
   const texts = users().map((message) => message.text);
   assert.equal(new Set(texts).size, texts.length, "History import adds no second copy of a user request.");
+  assert.deepEqual(answers(), answersBefore, "History import adds no second copy of an answer.");
 }
 
 try {
