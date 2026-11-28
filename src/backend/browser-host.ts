@@ -2469,7 +2469,7 @@ export class BrowserHost {
           tab.viewInvalidations.delete(invalidate);
           stopEvents();
           logger.warn("The live browser view stopped.", { error: toLogValue(error) });
-          onEnded?.("The live browser view stopped. Open a new view to continue.");
+          onEnded?.(sourceText("error.backend.browserViewStopped"));
         },
       );
     const pauseUntilProtectionEnds = (previous: () => Effect.Effect<void>) => {
