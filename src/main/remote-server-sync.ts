@@ -454,6 +454,7 @@ export class RemoteServerSync {
   readonly #options: RemoteServerSyncOptions;
   readonly #servers = new Map<string, ServerSync>();
   readonly #registrations: RemoteSyncRegistration[] = [];
+  readonly #channelRevisions = new Map<string, Map<string, number>>();
 
   readonly channels = this.#list(
     new RemoteSyncedList<ChannelSummary>(CHANNELS_SYNC_COLLECTION.name, CHANNEL_CHATS_CAPABILITY, () =>
@@ -648,8 +649,45 @@ export class RemoteServerSync {
       this.agentPages.retain(serverId, agentIds);
     });
     this.channels.onSynced((serverId, channels) => {
-      this.channelPages.retain(serverId, new Set(channels.map((channel) => channel.id)));
+      const ids = new Set(channels.map((channel) => channel.id));
+      this.channelPages.retain(serverId, ids);
+      const revisions = this.#channelRevisions.get(serverId);
+      if (revisions) {
+        for (const channelId of [...revisions.keys()]) if (!ids.has(channelId)) revisions.delete(channelId);
+        if (revisions.size === 0) this.#channelRevisions.delete(serverId);
+      }
     });
+    this.channelPages.onPage((serverId, channelId, page) => {
+      const revisions = this.#channelRevisions.get(serverId);
+      const required = revisions?.get(channelId);
+      if (required !== undefined && page.channel.revision >= required) {
+        revisions?.delete(channelId);
+        if (revisions?.size === 0) this.#channelRevisions.delete(serverId);
+      }
+    });
+  }
+
+  noteChannelRevision(serverId: string, channelId: string, revision: number): void {
+    if (!this.#servers.has(serverId)) return;
+    let revisions = this.#channelRevisions.get(serverId);
+    if (!revisions) {
+      revisions = new Map();
+      this.#channelRevisions.set(serverId, revisions);
+    }
+    const previous = revisions.get(channelId);
+    if (previous === undefined || revision > previous) revisions.set(channelId, revision);
+  }
+
+  latestChannelPage(serverId: string, channelId: string): ChannelPage | null {
+    const page = this.channelPages.latest(serverId, channelId);
+    if (!page) return null;
+    const revisions = this.#channelRevisions.get(serverId);
+    const required = revisions?.get(channelId);
+    if (required === undefined) return page;
+    if (page.channel.revision < required) return null;
+    revisions?.delete(channelId);
+    if (revisions?.size === 0) this.#channelRevisions.delete(serverId);
+    return page;
   }
 
   latestConversationPage(
@@ -709,6 +747,7 @@ export class RemoteServerSync {
   }
 
   forget(serverId: string): void {
+    this.#channelRevisions.delete(serverId);
     const entry = this.#servers.get(serverId);
     if (!entry) return;
     this.#servers.delete(serverId);

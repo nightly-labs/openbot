@@ -14,6 +14,7 @@ import {
   type ClientAgentSummary,
   type ConversationMessage,
   type ConversationPage,
+  decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
   IPC_ENDPOINTS,
@@ -927,7 +928,7 @@ try {
     name: syncName(CHANNEL_MESSAGES_SYNC_LOG.name, first),
     method: "POST",
     path: CHANNEL_ROUTES.read,
-    synced: (target, id) => target.sync.channelPages.latest(id, first),
+    synced: (target, id) => target.sync.latestChannelPage(id, first),
     http: (target, id) =>
       target.request(id, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: { channelId: first } }),
   };
@@ -1020,6 +1021,64 @@ try {
       };
     },
   );
+
+  await step("channel-messages.v1: a read right after a channel send never returns a stale synced page", async () => {
+    const before = channelRead.synced(manager, serverId);
+    assert.ok(before, "The channel page is not synced before send.");
+    const nextRevision = before.channel.revision + 1;
+    manager.sync.noteChannelRevision(serverId, first, nextRevision);
+    assert.equal(
+      channelRead.synced(manager, serverId),
+      null,
+      "latestChannelPage returned a synced page older than the noted channel revision.",
+    );
+    const text = "Fresh channel send.";
+    const sent = await runCauseEffect(
+      manager.request(serverId, CHANNEL_ROUTES.command, decodeChannel, {
+        method: "POST",
+        body: {
+          type: "send",
+          operationId: randomUUID(),
+          channelId: first,
+          text,
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+      }),
+    );
+    manager.sync.noteChannelRevision(serverId, sent.id, sent.revision);
+    const after = await readThroughSync(channelRead, manager, serverId);
+    assert.ok(
+      after.channel.revision >= sent.revision,
+      `Post-send channel read returned stale revision ${after.channel.revision} < ${sent.revision}.`,
+    );
+    assert.ok(
+      after.messages.some((entry) => entry.sequence > before.throughSequence && entry.message.text === text),
+      "Post-send channel read missed the sent message.",
+    );
+    const synced = await until(manager, () => {
+      const page = channelRead.synced(manager, serverId);
+      return page && page.channel.revision >= sent.revision ? page : null;
+    });
+    const callsBefore = httpCallCount(proxyKey, channelRead.method, channelRead.path);
+    const cached = await readThroughSync(channelRead, manager, serverId);
+    assert.equal(
+      httpCallCount(proxyKey, channelRead.method, channelRead.path),
+      callsBefore,
+      "Channel read used HTTP after sync caught up.",
+    );
+    assert.ok(
+      cached.messages.some((entry) => entry.sequence > before.throughSequence && entry.message.text === text),
+      "Synced channel page missed the sent message.",
+    );
+    return {
+      beforeRevision: before.channel.revision,
+      sentRevision: sent.revision,
+      afterRevision: after.channel.revision,
+      syncedRevision: synced.channel.revision,
+    };
+  });
 
   await step("Message logs: offline, then online, the client gets only the diff", async () => {
     blockProxy();
