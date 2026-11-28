@@ -409,14 +409,26 @@ function decodeArgumentsText(text: string): DynamicRecord | null {
   return null;
 }
 
+function callArguments(sent: unknown): DynamicRecord | null {
+  if (sent === undefined || sent === null || (typeof sent === "string" && /^(?:null)?$/.test(sent.trim()))) return {};
+  if (typeof sent === "string") return decodeArgumentsText(sent);
+  return isRecord(sent) ? sent : null;
+}
+
+function withoutRepeatedEnvelope(envelope: DynamicRecord, sent: DynamicRecord | null): DynamicRecord | null {
+  if (sent === null) return null;
+  const keys = Object.keys(sent);
+  const outer = bridgedName(envelope);
+  const inner = bridgedName(sent);
+  const repeated = outer !== null && inner !== null && qualifiedToolName(inner) === qualifiedToolName(outer);
+  return repeated && keys.length === 2 && keys.includes("arguments") ? callArguments(sent.arguments) : sent;
+}
+
 function parseCall(params: DynamicToolCallParams) {
   const envelope = params.arguments;
   if (!isRecord(envelope)) return callSchema.safeParse(envelope);
-  const sent = envelope.arguments;
-  if (sent === undefined || sent === null || (typeof sent === "string" && /^(?:null)?$/.test(sent.trim())))
-    return callSchema.safeParse({ ...envelope, arguments: {} });
-  if (typeof sent !== "string") return callSchema.safeParse(envelope);
-  return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(sent) });
+  const sent = callArguments(envelope.arguments);
+  return callSchema.safeParse({ ...envelope, arguments: withoutRepeatedEnvelope(envelope, sent) });
 }
 
 function catalogEntry(catalog: typeof BUILTIN_TOOL_CATALOG, name: string) {
