@@ -603,6 +603,7 @@ export const messages = defineMessages("server", {
   "server.roles.changeInEveryone": "Change in Everyone",
   "server.roles.setAll": "Set all",
   "server.roles.setAllLabel": "Set all: access of {role} to all agents",
+  "server.roles.roleHint": "A role can only give more access than Everyone gives. To give less, change Everyone first.",
   "server.roles.loadFailed": "Could not load the roles of this server.",
   "server.audit.changes": "Changes",
   "server.audit.filter": "Kind of change",

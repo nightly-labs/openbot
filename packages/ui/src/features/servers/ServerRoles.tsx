@@ -197,6 +197,7 @@ function SetAllLevelsMenu(props: {
   levels: AgentAccessLevel[];
   disabled: boolean;
   mount: HTMLElement | undefined;
+  canSet: (level: AgentAccessLevel) => boolean;
   onChange: (level: AgentAccessLevel) => void;
 }) {
   const { t } = useText();
@@ -226,7 +227,7 @@ function SetAllLevelsMenu(props: {
           >
             <For each={[...AGENT_ACCESS_LEVELS]}>
               {(level) => (
-                <DropdownMenu.RadioItem value={level}>
+                <DropdownMenu.RadioItem value={level} disabled={common() !== level && !props.canSet(level)}>
                   <MenuMark on={common() === level} />
                   {t(LEVEL_LABELS[level])}
                 </DropdownMenu.RadioItem>
@@ -296,18 +297,38 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
       const floor = everyone?.(agentId);
       return floor === undefined ? level(agentId) : memberLevel(level(agentId), floor);
     };
-    const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
+    const changes = (agentIds: readonly string[], next: AgentAccessLevel) => {
       const levels = new Map<string, AgentAccessLevel>();
       for (const agentId of agentIds) {
         const floor = everyone?.(agentId);
         const kept = floor !== undefined && agentAccessRank(next) <= agentAccessRank(floor) ? "none" : next;
         if (kept !== level(agentId)) levels.set(agentId, kept);
       }
+      return levels;
+    };
+    const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
+      const levels = changes(agentIds, next);
       if (levels.size > 0) onChange(levels);
     };
+    const allAgentIds = () => props.agents.map((agent) => agent.id);
     return (
       <SettingsSection
         title={t("server.roles.agents")}
+        description={
+          everyone ? (
+            <>
+              {t("server.roles.roleHint")}{" "}
+              <Button
+                type="button"
+                variant="link"
+                class="server-roles-everyone-link"
+                onClick={() => props.onPage({ kind: "everyone" })}
+              >
+                {t("server.roles.changeInEveryone")}
+              </Button>
+            </>
+          ) : undefined
+        }
         actions={
           props.agents.length > 1 ? (
             <SetAllLevelsMenu
@@ -315,12 +336,8 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
               levels={props.agents.map((agent) => shown(agent.id))}
               disabled={props.disabled}
               mount={props.menuMount}
-              onChange={(next) =>
-                give(
-                  props.agents.map((agent) => agent.id),
-                  next,
-                )
-              }
+              canSet={(next) => everyone === undefined || changes(allAgentIds(), next).size > 0}
+              onChange={(next) => give(allAgentIds(), next)}
             />
           ) : undefined
         }

@@ -6303,6 +6303,7 @@
   "server.roles.agents": ["de", "es", "fr", "it", "ja", "pt", "ru", "tr"],
   "server.roles.allMembers": ["de", "es", "fr", "it", "ja", "pt", "ru", "tr"],
   "server.roles.changeInEveryone": ["de", "es", "fr", "it", "ja", "pt", "ru", "tr"],
+  "server.roles.roleHint": ["de", "es", "fr", "it", "ja", "pt", "ru", "tr"],
   "server.roles.create": ["de", "es", "fr", "it", "ja", "pt", "ru", "tr"],
   "server.roles.delete": ["de", "es", "fr", "it", "ja", "pt", "ru", "tr"],
   "server.roles.deleteDescription": ["de", "es", "fr", "it", "ja", "pt", "ru", "tr"],

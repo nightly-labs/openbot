@@ -597,6 +597,7 @@ export const messages = {
   "server.roles.changeInEveryone": "שינוי בכולם",
   "server.roles.setAll": "הגדרת הכול",
   "server.roles.setAllLabel": "הגדרת הכול: גישה של {role} לכל הסוכנים",
+  "server.roles.roleHint": "תפקיד יכול רק לתת יותר גישה ממה שכולם מקבלים. כדי לתת פחות, יש לשנות קודם את כולם.",
   "server.roles.loadFailed": "לא ניתן לטעון את התפקידים של השרת הזה.",
   "server.audit.changes": "שינויים",
   "server.audit.filter": "סוג שינוי",
