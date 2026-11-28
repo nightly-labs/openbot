@@ -1188,6 +1188,22 @@ export class AttentionRegistry {
       }),
   ).bind(this);
 
+  readonly #beginTakeover = Effect.fnUntraced(function* (
+    this: AttentionRegistry,
+    requestId: RequestId,
+    pending: PendingBrowserTakeover,
+  ) {
+    const tabId = pending.request.tabId;
+    const reloaded = yield* this.#browser.beginTakeover(tabId).pipe(toAttentionOperationFailed);
+    if (this.#takeovers.get(requestId) !== pending) {
+      if (![...this.#takeovers.values()].some((candidate) => candidate.request.tabId === tabId))
+        this.#browser.endTakeover(tabId);
+      return false;
+    }
+    if (reloaded) pending.pageReloaded = true;
+    return true;
+  });
+
   readonly respondToBrowserSecret = Effect.fnUntraced(function* (
     this: AttentionRegistry,
     input: LocalBrowserSecretResponse,
@@ -1256,8 +1272,7 @@ export class AttentionRegistry {
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
-    if (yield* this.#browser.beginTakeover(pending.request.tabId).pipe(toAttentionOperationFailed))
-      pending.pageReloaded = true;
+    if (!(yield* this.#beginTakeover(input.requestId, pending))) return;
     this.#emit({ type: "browser-takeover-requested", request: pending.request });
     this.#emitRuntimeSnapshot();
   }, Effect.uninterruptible);
@@ -1601,8 +1616,7 @@ export class AttentionRegistry {
           }
           pending.secret = secret;
           if (websiteUrl(secret.request.origin)?.protocol !== "http:") pending.request.secret = secret.request;
-        } else if (yield* this.#browser.beginTakeover(takeover.tabId).pipe(toAttentionOperationFailed))
-          pending.pageReloaded = true;
+        } else yield* this.#beginTakeover(requestId, pending);
       });
       const prepared = yield* Effect.result(prepare);
       if (Result.isSuccess(prepared)) {

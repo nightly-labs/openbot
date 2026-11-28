@@ -28,6 +28,7 @@ interface AgentAnswer {
   status?: string;
   next?: string;
   secureInput?: string;
+  page?: string;
 }
 
 class RecordingClient extends CodexAppServerClient {
@@ -74,6 +75,8 @@ const tabs: BrowserTab[] = [
 ];
 const events: AgentEvent[] = [];
 const browserLog: string[] = [];
+const takenTabs = new Set<string>();
+let takeoverStart: Promise<boolean> | undefined;
 const submitted: string[] = [];
 let fillFailure: Error | undefined;
 
@@ -116,12 +119,15 @@ const registry = new AttentionRegistry({
       ),
     prepareSecret: () => Effect.sync(preparedSecret),
     beginTakeover: (tabId) =>
-      Effect.sync(() => {
+      Effect.promise(async () => {
         browserLog.push(`begin:${tabId}`);
-        return false;
+        const reloaded = takeoverStart ? await takeoverStart : false;
+        takenTabs.add(tabId);
+        return reloaded;
       }),
     endTakeover: (tabId) => {
       browserLog.push(`end:${tabId}`);
+      takenTabs.delete(tabId);
     },
   },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
@@ -295,6 +301,41 @@ try {
     assert.equal(openCards().length, 1);
     registry.clearForTurn(THREAD, "turn-6", true);
     return other;
+  });
+
+  await step("a turn that ends while the host reloads a stuck page leaves the tab free", async () => {
+    let finishReload: (reloaded: boolean) => void = () => {};
+    takeoverStart = new Promise((done) => {
+      finishReload = done;
+    });
+    const begun = browserLog.length;
+    const shown = count("browser-takeover-requested");
+    const waiting = call("request_takeover", "turn-reload-1");
+    while (!browserLog.slice(begun).includes(`begin:${TAB}`)) await new Promise((done) => setImmediate(done));
+    registry.clearForTurn(THREAD, "turn-reload-1", true);
+    finishReload(true);
+    const answer = answerOf(await waiting);
+    takeoverStart = undefined;
+    assert.equal(answer.status, "cancelled");
+    assert.equal(count("browser-takeover-requested"), shown, "a card was shown for an ended turn");
+    assert(!takenTabs.has(TAB), "the tab stayed under takeover after the turn ended");
+    return answer;
+  });
+
+  await step("the agent hears that the host reloaded a stuck page before the takeover", async () => {
+    takeoverStart = Promise.resolve(true);
+    const shown = count("browser-takeover-requested");
+    const waiting = call("request_takeover", "turn-reload-2");
+    await cardShown(shown);
+    takeoverStart = undefined;
+    const requestId = openCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    await runCauseEffect(registry.respondToBrowserTakeover({ requestId, decision: "complete" }));
+    const answer = answerOf(await waiting);
+    assert.equal(answer.status, "completed");
+    assert.match(answer.page ?? "", /reloaded it before the user took over/u);
+    assert(!takenTabs.has(TAB));
+    return answer;
   });
 
   await step("a question detaches before the deadline", async () => {
