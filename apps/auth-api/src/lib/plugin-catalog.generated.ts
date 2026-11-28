@@ -801,6 +801,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "79bccb2e68d34a7e9b932b651c6e7b4e27e281a5ad36fd7b06e3f190083b0765",
     },
     {
+      slug: "gsc-wizard",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d20b52149500fa2151f535244e13d875967fc5b6cf4eec4d0831f6cae3fc9f2e",
+    },
+    {
       slug: "guru",
       version: "1.0.0",
       featured: false,
@@ -6345,6 +6351,60 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.greenhouse.com",
     privacyPolicyUrl: "https://www.greenhouse.com/privacy-policy",
     termsUrl: "https://www.greenhouse.com/legal",
+    skills: [],
+  },
+  "gsc-wizard": {
+    slug: "gsc-wizard",
+    name: "GSC Wizard",
+    tagline: "Google Search Console data",
+    description:
+      "GSC Wizard lets agents read the Google Search Console data of your own sites: clicks, impressions, queries, pages, rankings, indexing and URL inspection. Agents can also read GA4, Bing Webmaster Tools and Merchant Center data when you connect them in GSC Wizard. Sign in to your GSC Wizard account through the browser, or connect with an API key. Most tools only read. With write access, agents can also submit sitemaps, send URLs to IndexNow and add annotations. A GSC Wizard plan is needed, and each plan starts with a 7-day free trial.",
+    category: "data-analytics",
+    creatorName: "GSC Wizard",
+    iconUrl: "https://www.gscwizard.com/wizard-logo-icon-256_circle-min.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-lost-clicks", text: "Which queries lost the most clicks in the last 28 days?" },
+      { id: "prompt-page-two", text: "Find pages that rank on page two for queries with many impressions." },
+      { id: "prompt-indexing", text: "Is our pricing page indexed? If it is not, tell me why." },
+    ],
+    apps: [
+      {
+        id: "app-gsc-wizard-mcp",
+        name: "GSC Wizard",
+        description:
+          "Search Console, GA4, Bing and Merchant Center reports, over GSC Wizard's MCP server with browser sign-in or an API key.",
+        iconUrl: "https://www.gscwizard.com/wizard-logo-icon-256_circle-min.png",
+        server: {
+          name: "gsc-wizard",
+          transport: "http",
+          url: "https://mcp.gscwizard.com/mcp",
+          auth: [
+            { id: "gsc-wizard-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "gsc-wizard-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "gscw_live_…",
+                  hint: "In GSC Wizard, open Account > MCP API Keys and create a key.",
+                },
+              ],
+              docsUrl: "https://www.gscwizard.com/docs/mcp-and-chatgpt.html",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://www.gscwizard.com",
+    privacyPolicyUrl: "https://www.gscwizard.com/privacy.html",
+    termsUrl: "https://www.gscwizard.com/terms.html",
     skills: [],
   },
   guru: {

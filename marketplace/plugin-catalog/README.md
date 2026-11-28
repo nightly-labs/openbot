@@ -461,3 +461,32 @@ Troubleshooting:
 
 - Connect shows "The server answered 401": the token is wrong or was deleted. Create a
   new token and connect again.
+
+## GSC Wizard
+
+The listing connects to GSC Wizard's own MCP server at `https://mcp.gscwizard.com/mcp`
+(<https://www.gscwizard.com/docs/mcp-and-chatgpt.html>). It answers 401 with a `Bearer`
+challenge. The protected-resource metadata names `https://tool.gscwizard.com`, which has dynamic
+client registration and client ID metadata documents, S256 and the `code` response type, and
+accepts the loopback redirect `http://127.0.0.1:28417/mcp-auth` (checked 2026-11-26). So the user
+signs in through the browser and types no key. The resource metadata lists the scopes `mcp:read`
+and `mcp:write`; on the consent page the user can allow read access only.
+
+The key flow sends a GSC Wizard MCP API key as `Authorization: Bearer gscw_live_…`. The user
+creates it in GSC Wizard under Account > MCP API Keys, with read or read-and-write scope. The key
+is shown once.
+
+The tools read the user's own Google Search Console data, and GA4, Bing Webmaster Tools and
+Merchant Center data that the user connected in GSC Wizard. Write tools (add a property, submit a
+sitemap, send URLs to IndexNow, annotations, content groups, saved filters, shared reports) need
+write access; a read-only sign-in or key refuses them before they run. GSC Wizard needs a plan;
+each plan starts with a 7-day free trial.
+
+Troubleshooting:
+
+- The sign-in page opens the GSC Wizard plans, or a tool answers 402: the account has no running
+  trial or plan. Choose a plan in GSC Wizard, then sign in or test the server again.
+- `list_sites` returns no properties: the GSC Wizard account has no Google account with Search
+  Console access connected yet. Open <https://tool.gscwizard.com> once and connect Google.
+- A write tool is refused: the sign-in or key is read-only. Sign out and sign in again with write
+  access, or create a read-and-write key.
