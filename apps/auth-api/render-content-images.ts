@@ -8,8 +8,10 @@ import { promisify } from "node:util";
 import {
   CONTENT_ART_DIRECTORY,
   CONTENT_ART_MANIFEST,
+  CONTENT_BACKGROUND_DIRECTORY,
   type ContentArtManifest,
   type ContentImageJob,
+  type ContentImageRenderJob,
   contentArtProblems,
   contentImageJobs,
   contentImageKey,
@@ -59,7 +61,7 @@ async function renderInElectron(jobs: ContentImageJob[]): Promise<void> {
 
   try {
     const control = {
-      jobs,
+      jobs: await Promise.all(jobs.map(withBackgroundUrl)),
       outputDirectory: CONTENT_ART_DIRECTORY,
       viewportWidth: Math.max(...jobs.map((job) => job.width)),
       viewportHeight: Math.max(...jobs.map((job) => job.height)),
@@ -74,6 +76,12 @@ async function renderInElectron(jobs: ContentImageJob[]): Promise<void> {
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+}
+
+async function withBackgroundUrl(job: ContentImageJob): Promise<ContentImageRenderJob> {
+  if (!job.background) return job;
+  const image = await readFile(path.join(CONTENT_BACKGROUND_DIRECTORY, job.background), "base64");
+  return { ...job, backgroundUrl: `data:image/jpeg;base64,${image}` };
 }
 
 function resolveElectronBinary(): string {

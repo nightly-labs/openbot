@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -15,6 +16,7 @@ const require = createRequire(import.meta.url);
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export const CONTENT_ART_DIRECTORY = path.join(appRoot, "content-art");
+export const CONTENT_BACKGROUND_DIRECTORY = path.join(appRoot, "content-backgrounds");
 export const CONTENT_ART_MANIFEST = path.join(CONTENT_ART_DIRECTORY, "manifest.json");
 
 const GENERATOR_VERSION = 1;
@@ -32,11 +34,17 @@ export interface ContentImageJob {
   slug: string;
   title: string;
   eyebrow: string;
+  background?: string | undefined;
+  layout?: "centered" | undefined;
   width: number;
   height: number;
   withTitle: boolean;
   lockup?: ContentImageLockup | undefined;
   markRow?: readonly ContentImageMark[] | undefined;
+}
+
+export interface ContentImageRenderJob extends ContentImageJob {
+  backgroundUrl?: string | undefined;
 }
 
 export type ContentImageMark = RivalMarkName | "openbot";
@@ -82,6 +90,8 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       slug: article.slug,
       title: article.title,
       eyebrow: collection.imageEyebrow,
+      background: collection.imageBackgrounds && `${collection.id}/${article.slug}.jpg`,
+      layout: collection.imageLayout,
       width: OG_WIDTH,
       height: OG_HEIGHT,
       withTitle: true,
@@ -129,10 +139,17 @@ export function contentImageKey(job: ContentImageJob): string {
         shaders: shadersVersion(),
         job,
         gradient,
+        background: job.background && backgroundDigest(job.background),
       }),
     )
     .digest("hex");
   return digest.slice(0, 32);
+}
+
+function backgroundDigest(background: string): string {
+  return createHash("sha256")
+    .update(readFileSync(path.join(CONTENT_BACKGROUND_DIRECTORY, background)))
+    .digest("hex");
 }
 
 function shadersVersion(): string {

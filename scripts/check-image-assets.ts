@@ -10,6 +10,7 @@ const ALLOWED_DIRECTORIES = [
   "apps/browser-extension/public/icons/",
   "apps/auth-api/public/",
   "apps/auth-api/content-art/",
+  "apps/auth-api/content-backgrounds/",
   "apps/auth-api/src/content/guides/media/",
   "scripts/hosting/desktop/",
   "docs/store-assets/",

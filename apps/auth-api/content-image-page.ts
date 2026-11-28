@@ -1,31 +1,44 @@
-import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "@openbot/brand/app-logo-shape";
 import { getShaderColorFromString, meshGradientFragmentShader, ShaderMount } from "@paper-design/shaders";
-import type { ContentImageJob, ContentImageLockup, ContentImageMark } from "./content-images";
-import { RIVAL_MARK_SHAPES, type RivalMarkName } from "./src/components/compare/rival-mark-shapes";
+import { drawFeltBackground, drawFeltLockup, drawFeltMarkRow } from "./content-image-felt";
+import { drawMark, FONT_FAMILY, roundedRect } from "./content-image-marks";
+import type { ContentImageJob, ContentImageLockup, ContentImageMark, ContentImageRenderJob } from "./content-images";
 import { articleGradient, articleGradientUniforms } from "./src/lib/article-gradient";
 
 declare global {
   interface Window {
-    openBotContentImage?: { render: (job: ContentImageJob) => Promise<string> };
+    openBotContentImage?: { render: (job: ContentImageRenderJob) => Promise<string> };
   }
 }
 
 const SCRIM_COLOR = "26, 26, 26";
 const TITLE_MAX_LINES = 3;
 const TITLE_MAX_LINES_WITH_LOCKUP = 2;
-const LOGO_BACKGROUND = "#d6adf2";
-const LOGO_EYE = "#040007";
-const FONT_FAMILY = '"Inter Variable", Inter, system-ui, sans-serif';
 
 window.openBotContentImage = { render: renderContentImage };
 
 const WEBP_QUALITY = 0.9;
 
-async function renderContentImage(job: ContentImageJob): Promise<string> {
+async function renderContentImage(job: ContentImageRenderJob): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = job.width;
+  canvas.height = job.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Paper shaders: a 2D canvas context is not available.");
+
+  if (job.backgroundUrl) await drawFeltBackground(context, job, job.backgroundUrl);
+  else await drawGradient(context, job);
+  if (job.title && job.withTitle) {
+    if (job.layout === "centered") drawCentredMarks(context, job);
+    else drawTitledCard(context, job);
+  }
+
+  return job.fileName.endsWith(".webp") ? canvas.toDataURL("image/webp", WEBP_QUALITY) : canvas.toDataURL("image/png");
+}
+
+async function drawGradient(context: CanvasRenderingContext2D, job: ContentImageJob): Promise<void> {
   const host = document.createElement("div");
   host.style.cssText = `position:fixed;left:0;top:0;width:${job.width}px;height:${job.height}px;`;
   document.body.append(host);
-
   const gradient = articleGradient(job.title);
   const mount = new ShaderMount(
     host,
@@ -35,32 +48,26 @@ async function renderContentImage(job: ContentImageJob): Promise<string> {
     0,
     gradient.frame,
   );
-
   try {
     await waitForCanvas(mount.canvasElement);
     mount.setFrame(gradient.frame);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = job.width;
-    canvas.height = job.height;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Paper shaders: a 2D canvas context is not available.");
-
     context.drawImage(mount.canvasElement, 0, 0, job.width, job.height);
-    if (job.title && job.withTitle) {
-      drawScrim(context, job);
-      if (job.lockup) drawLockup(context, job, job.lockup);
-      else if (job.markRow) drawMarkRow(context, job, job.markRow);
-      drawTitle(context, job);
-    }
-
-    return job.fileName.endsWith(".webp")
-      ? canvas.toDataURL("image/webp", WEBP_QUALITY)
-      : canvas.toDataURL("image/png");
   } finally {
     mount.dispose();
     host.remove();
   }
+}
+
+function drawCentredMarks(context: CanvasRenderingContext2D, job: ContentImageJob): void {
+  if (job.lockup) drawFeltLockup(context, job, job.lockup.left?.mark ?? "openbot", job.lockup.rivalMark);
+  else if (job.markRow) drawFeltMarkRow(context, job, job.markRow);
+}
+
+function drawTitledCard(context: CanvasRenderingContext2D, job: ContentImageJob): void {
+  drawScrim(context, job);
+  if (job.lockup) drawLockup(context, job, job.lockup);
+  else if (job.markRow) drawMarkRow(context, job, job.markRow);
+  drawTitle(context, job);
 }
 
 const CANVAS_TIMEOUT_MS = 10_000;
@@ -206,64 +213,6 @@ function drawPlate(
   context.lineWidth = 1.5;
   context.stroke();
   context.restore();
-}
-
-function drawMark(context: CanvasRenderingContext2D, mark: ContentImageMark, x: number, y: number, size: number): void {
-  if (mark === "openbot") drawOpenBotMark(context, x, y, size);
-  else drawRivalMark(context, mark, x, y, size);
-}
-
-function drawOpenBotMark(context: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-  context.save();
-  context.translate(x, y);
-  context.scale(size / APP_LOGO_SIZE, size / APP_LOGO_SIZE);
-  roundedRect(context, 0, 0, APP_LOGO_SIZE, APP_LOGO_SIZE, APP_LOGO_CORNER);
-  context.fillStyle = LOGO_BACKGROUND;
-  context.fill();
-  context.clip();
-  context.strokeStyle = LOGO_EYE;
-  context.lineWidth = 9.5;
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  for (const points of [APP_LOGO_EYE_POINTS.left, APP_LOGO_EYE_POINTS.right]) {
-    const values = points.split(/\s+/u).map(Number);
-    context.beginPath();
-    for (let index = 0; index + 1 < values.length; index += 2) {
-      context.lineTo(values[index] ?? 0, values[index + 1] ?? 0);
-    }
-    context.stroke();
-  }
-  context.restore();
-}
-
-function drawRivalMark(
-  context: CanvasRenderingContext2D,
-  mark: RivalMarkName,
-  x: number,
-  y: number,
-  size: number,
-): void {
-  const shape = RIVAL_MARK_SHAPES[mark];
-  const [minX, minY, boxWidth, boxHeight] = shape.viewBox;
-  context.save();
-  context.translate(x, y);
-  context.scale(size / boxWidth, size / boxHeight);
-  context.translate(-minX, -minY);
-  context.fillStyle = "#ffffff";
-  context.fill(new Path2D(shape.path), shape.fillRule ?? "evenodd");
-  context.restore();
-}
-
-function roundedRect(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-): void {
-  context.beginPath();
-  context.roundRect(x, y, width, height, radius);
 }
 
 function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
