@@ -73,13 +73,18 @@ export function ServerRoleScreen() {
     const base = floor(agentId);
     return base === undefined ? level(agentId) : memberLevel(level(agentId), base);
   };
-  const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
+  const changes = (agentIds: readonly string[], next: AgentAccessLevel) => {
     const levels = new Map<string, AgentAccessLevel>();
     for (const agentId of agentIds) {
       const base = floor(agentId);
       const kept = base !== undefined && agentAccessRank(next) <= agentAccessRank(base) ? "none" : next;
       if (kept !== level(agentId)) levels.set(agentId, kept);
     }
+    return levels;
+  };
+  const allAgentIds = agents.map((agent) => agent.id);
+  const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
+    const levels = changes(agentIds, next);
     if (levels.size === 0) return;
     void save((change) => {
       if (!role) {
@@ -144,17 +149,17 @@ export function ServerRoleScreen() {
             trailing={
               <AccessLevelMenu
                 value={commonLevel}
-                options={AGENT_ACCESS_LEVELS.map((value) => ({ value, label: t(AGENT_ACCESS_LEVEL_KEYS[value]) }))}
+                options={AGENT_ACCESS_LEVELS.map((value) => ({
+                  value,
+                  label: t(AGENT_ACCESS_LEVEL_KEYS[value]),
+                  disabled: Boolean(role) && value !== commonLevel && changes(allAgentIds, value).size === 0,
+                }))}
                 placeholder={t("mobile.server.roles.mixed")}
                 enabled={!action.isPending}
                 dark={theme === "dark"}
                 label={t("mobile.server.roles.setAllLabel", { role: title })}
-                onChange={(next) =>
-                  give(
-                    agents.map((agent) => agent.id),
-                    next,
-                  )
-                }
+                extra={role ? { label: t("mobile.server.roles.changeInEveryone"), onPress: openEveryone } : undefined}
+                onChange={(next) => give(allAgentIds, next)}
               />
             }
           >

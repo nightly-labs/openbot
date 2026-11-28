@@ -546,6 +546,8 @@ export const messages = {
   "server.roles.changeInEveryone": "모든 사용자에서 변경",
   "server.roles.setAll": "모두 설정",
   "server.roles.setAllLabel": "모두 설정: 모든 에이전트에 대한 {role}의 접근 권한",
+  "server.roles.roleHint":
+    "역할은 모든 사용자보다 더 많은 접근 권한만 줄 수 있어요. 더 적게 주려면 먼저 모든 사용자를 변경하세요.",
   "server.roles.loadFailed": "이 서버의 역할을 불러올 수 없었어요.",
   "server.audit.changes": "변경 내역",
   "server.audit.filter": "변경 유형",

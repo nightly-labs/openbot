@@ -535,6 +535,7 @@ export const messages = {
   "server.roles.changeInEveryone": "在所有人中更改",
   "server.roles.setAll": "全部设置",
   "server.roles.setAllLabel": "全部设置：{role} 对所有助手的访问权限",
+  "server.roles.roleHint": "角色只能提供比“所有人”更多的访问权限。要提供更少的权限，请先更改“所有人”。",
   "server.roles.loadFailed": "无法加载该服务器的角色。",
   "server.audit.changes": "变更",
   "server.audit.filter": "变更类型",

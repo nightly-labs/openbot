@@ -580,6 +580,8 @@ export const messages = {
   "server.roles.changeInEveryone": "Zmień w roli Wszyscy",
   "server.roles.setAll": "Ustaw wszystkie",
   "server.roles.setAllLabel": "Ustaw wszystkie: dostęp roli {role} do wszystkich agentów",
+  "server.roles.roleHint":
+    "Rola może dać tylko więcej dostępu niż rola Wszyscy. Aby dać mniej, najpierw zmień rolę Wszyscy.",
   "server.roles.loadFailed": "Nie udało się wczytać ról tego serwera.",
   "server.agentAccess.level.none": "Brak dostępu",
   "server.agentAccess.level.view": "Może wyświetlać",

@@ -51,3 +51,13 @@
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }
+
+.server-roles-everyone-link {
+  display: inline;
+  height: auto;
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+  text-decoration: underline;
+}

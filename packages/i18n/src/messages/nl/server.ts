@@ -567,6 +567,8 @@ export const messages = {
   "server.roles.changeInEveryone": "Wijzigen in Iedereen",
   "server.roles.setAll": "Alles instellen",
   "server.roles.setAllLabel": "Alles instellen: toegang van {role} tot alle agents",
+  "server.roles.roleHint":
+    "Een rol kan alleen meer toegang geven dan Iedereen geeft. Wijzig eerst Iedereen om minder te geven.",
   "server.roles.loadFailed": "Kan de rollen van deze server niet laden.",
   "server.audit.changes": "Wijzigingen",
   "server.audit.filter": "Soort wijziging",

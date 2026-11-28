@@ -656,6 +656,7 @@ export const messages = {
   "server.roles.changeInEveryone": "تغيير في الجميع",
   "server.roles.setAll": "تعيين للكل",
   "server.roles.setAllLabel": "تعيين للكل: وصول {role} إلى كل الوكلاء",
+  "server.roles.roleHint": "يمكن للدور أن يمنح وصولًا أكثر مما يمنحه «الجميع» فقط. لمنح وصول أقل، غيّر «الجميع» أولًا.",
   "server.roles.loadFailed": "تعذّر تحميل أدوار هذا الخادم.",
   "server.audit.changes": "التغييرات",
   "server.audit.filter": "نوع التغيير",
