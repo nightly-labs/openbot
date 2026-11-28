@@ -1,5 +1,6 @@
 import { FONT_FAMILY } from "./content-image-marks";
 import type { ContentImageJob } from "./content-images";
+import type { ContentImageHeadline } from "./src/lib/content-collection";
 
 const TEXT_LEFT = 64;
 const TOPIC = { top: 48, size: 18, spacing: 1, colour: "rgb(194, 176, 204)" };
@@ -21,10 +22,12 @@ export async function drawIllustration(
   context.drawImage(image, 0, 0, job.width, job.height);
 }
 
-export function drawHeadline(context: CanvasRenderingContext2D, job: ContentImageJob): void {
+export function drawHeadline(
+  context: CanvasRenderingContext2D,
+  job: ContentImageJob,
+  { topic, lines }: ContentImageHeadline,
+): void {
   const unit = job.width / 1200;
-  if (!job.headline) throw new Error(`${job.fileName} needs an imageHeadline for its social card.`);
-  const { topic, lines } = job.headline;
   context.save();
   context.textAlign = "start";
   context.textBaseline = "alphabetic";

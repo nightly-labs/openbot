@@ -13,6 +13,7 @@ import { CONTENT_COLLECTIONS } from "./src/lib/content";
 import {
   articleArtPath,
   CONTENT_ART_SHAPES,
+  type CollectionArticle,
   type ContentCollection,
   type ContentImageHeadline,
 } from "./src/lib/content-collection";
@@ -90,7 +91,16 @@ export function contentImageJobs(): ContentImageJob[] {
 }
 
 function collectionJobs(collection: ContentCollection): ContentImageJob[] {
-  return collection.articles.flatMap((article) => [
+  return collection.articles.flatMap((article) => {
+    if (collection.imageLayout === "headline" && !article.imageHeadline) {
+      throw new Error(`${collection.id}/${article.slug} needs an imageHeadline for its social card.`);
+    }
+    return articleJobs(collection, article);
+  });
+}
+
+function articleJobs(collection: ContentCollection, article: CollectionArticle): ContentImageJob[] {
+  return [
     {
       fileName: `${collection.id}/og/${article.slug}.png`,
       slug: article.slug,
@@ -114,7 +124,7 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       height: CARD_SIZES[shape].height,
       withTitle: false,
     })),
-  ]);
+  ];
 }
 
 function comparisonLockup(collection: ContentCollection, slug: string): ContentImageLockup | undefined {

@@ -40,7 +40,7 @@ async function drawBackground(context: CanvasRenderingContext2D, job: ContentIma
 
 function drawForeground(context: CanvasRenderingContext2D, job: ContentImageJob): void {
   if (job.layout === "centered") drawCentredMarks(context, job);
-  else if (job.layout === "headline") drawHeadline(context, job);
+  else if (job.layout === "headline" && job.headline) drawHeadline(context, job, job.headline);
   else drawTitledCard(context, job);
 }
 
