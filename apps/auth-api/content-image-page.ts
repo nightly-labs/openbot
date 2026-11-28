@@ -1,5 +1,6 @@
 import { getShaderColorFromString, meshGradientFragmentShader, ShaderMount } from "@paper-design/shaders";
 import { drawFeltBackground, drawFeltLockup, drawFeltMarkRow } from "./content-image-felt";
+import { drawHeadline, drawIllustration } from "./content-image-headline";
 import { drawMark, FONT_FAMILY, roundedRect } from "./content-image-marks";
 import type { ContentImageJob, ContentImageLockup, ContentImageMark, ContentImageRenderJob } from "./content-images";
 import { articleGradient, articleGradientUniforms } from "./src/lib/article-gradient";
@@ -25,14 +26,22 @@ async function renderContentImage(job: ContentImageRenderJob): Promise<string> {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Paper shaders: a 2D canvas context is not available.");
 
-  if (job.backgroundUrl) await drawFeltBackground(context, job, job.backgroundUrl);
-  else await drawGradient(context, job);
-  if (job.title && job.withTitle) {
-    if (job.layout === "centered") drawCentredMarks(context, job);
-    else drawTitledCard(context, job);
-  }
+  await drawBackground(context, job);
+  if (job.title && job.withTitle) drawForeground(context, job);
 
   return job.fileName.endsWith(".webp") ? canvas.toDataURL("image/webp", WEBP_QUALITY) : canvas.toDataURL("image/png");
+}
+
+async function drawBackground(context: CanvasRenderingContext2D, job: ContentImageRenderJob): Promise<void> {
+  if (!job.backgroundUrl) await drawGradient(context, job);
+  else if (job.layout === "headline") await drawIllustration(context, job, job.backgroundUrl);
+  else await drawFeltBackground(context, job, job.backgroundUrl);
+}
+
+function drawForeground(context: CanvasRenderingContext2D, job: ContentImageJob): void {
+  if (job.layout === "centered") drawCentredMarks(context, job);
+  else if (job.layout === "headline" && job.headline) drawHeadline(context, job, job.headline);
+  else drawTitledCard(context, job);
 }
 
 async function drawGradient(context: CanvasRenderingContext2D, job: ContentImageJob): Promise<void> {

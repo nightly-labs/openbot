@@ -10,7 +10,13 @@ import type { RivalMarkName } from "./src/components/compare/rival-mark-shapes";
 import { COMPARISONS } from "./src/content/compare";
 import { articleGradient } from "./src/lib/article-gradient";
 import { CONTENT_COLLECTIONS } from "./src/lib/content";
-import { articleArtPath, CONTENT_ART_SHAPES, type ContentCollection } from "./src/lib/content-collection";
+import {
+  articleArtPath,
+  CONTENT_ART_SHAPES,
+  type CollectionArticle,
+  type ContentCollection,
+  type ContentImageHeadline,
+} from "./src/lib/content-collection";
 
 const require = createRequire(import.meta.url);
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +41,8 @@ export interface ContentImageJob {
   title: string;
   eyebrow: string;
   background?: string | undefined;
-  layout?: "centered" | undefined;
+  layout?: "centered" | "headline" | undefined;
+  headline?: ContentImageHeadline | undefined;
   width: number;
   height: number;
   withTitle: boolean;
@@ -84,7 +91,16 @@ export function contentImageJobs(): ContentImageJob[] {
 }
 
 function collectionJobs(collection: ContentCollection): ContentImageJob[] {
-  return collection.articles.flatMap((article) => [
+  return collection.articles.flatMap((article) => {
+    if (collection.imageLayout === "headline" && !article.imageHeadline) {
+      throw new Error(`${collection.id}/${article.slug} needs an imageHeadline for its social card.`);
+    }
+    return articleJobs(collection, article);
+  });
+}
+
+function articleJobs(collection: ContentCollection, article: CollectionArticle): ContentImageJob[] {
+  return [
     {
       fileName: `${collection.id}/og/${article.slug}.png`,
       slug: article.slug,
@@ -92,6 +108,7 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       eyebrow: collection.imageEyebrow,
       background: collection.imageBackgrounds && `${collection.id}/${article.slug}.jpg`,
       layout: collection.imageLayout,
+      headline: article.imageHeadline,
       width: OG_WIDTH,
       height: OG_HEIGHT,
       withTitle: true,
@@ -107,7 +124,7 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       height: CARD_SIZES[shape].height,
       withTitle: false,
     })),
-  ]);
+  ];
 }
 
 function comparisonLockup(collection: ContentCollection, slug: string): ContentImageLockup | undefined {
