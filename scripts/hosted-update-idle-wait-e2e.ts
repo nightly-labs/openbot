@@ -43,6 +43,7 @@ class StagedReleaseUpdater extends EventEmitter {
       this.installs += 1;
       this.#set({ phase: "installing" });
     });
+  assertUnattendedInstall = () => Effect.void;
   setScheduledRestart = (restart: ScheduledUpdateRestart | null) => {
     if (restart) this.#set({ scheduledRestart: restart });
     else {

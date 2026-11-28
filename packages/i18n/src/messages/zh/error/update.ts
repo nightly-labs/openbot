@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "更新下载停止响应，请重试。",
   "error.update.installFailed": "无法安装更新。请退出并重新打开 OpenBot 后重试。",
   "error.update.notInstalled": "上次重启未能安装更新。请重启以重试。",
+  "error.update.needsAdministrator":
+    "OpenBot 无法自行安装更新，因为 macOS 需要管理员密码才能替换 OpenBot。请在这台电脑上点击“重启”，然后输入密码。",
   "error.update.downloadFailed": "无法下载更新，请重试。",
   "error.update.signatureNotConfirmed":
     "OpenBot 无法验证此更新，请重试。如果仍然出错，请从 openbot.run/download 下载 OpenBot。",

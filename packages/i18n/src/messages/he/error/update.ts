@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "הורדת העדכון הפסיקה להגיב. יש לנסות שוב.",
   "error.update.installFailed": "לא ניתן להתקין את העדכון. יש לצאת מ-OpenBot, לפתוח אותו מחדש ולנסות שוב.",
   "error.update.notInstalled": "ההפעלה מחדש האחרונה לא התקינה את העדכון. יש להפעיל מחדש כדי לנסות שוב.",
+  "error.update.needsAdministrator":
+    "OpenBot לא הצליח להתקין את העדכון בעצמו, כי macOS מבקש סיסמת מנהל כדי להחליף את OpenBot. יש ללחוץ על „הפעלה מחדש” במחשב הזה ואז להזין את הסיסמה.",
   "error.update.downloadFailed": "לא ניתן להוריד את העדכון. יש לנסות שוב.",
   "error.update.signatureNotConfirmed":
     "OpenBot לא הצליח לאמת את העדכון. יש לנסות שוב. אם השגיאה נמשכת, יש להוריד את OpenBot מ-openbot.run/download.",

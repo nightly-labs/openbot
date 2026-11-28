@@ -63,6 +63,12 @@ export const NotInstalled: Story = {
   },
 };
 
+export const NeedsAdministrator: Story = {
+  args: {
+    updateStatus: status({ phase: "ready", progress: 100, message: sourceText("error.update.needsAdministrator") }),
+  },
+};
+
 export const Installing: Story = {
   args: { updateStatus: status({ phase: "installing", progress: 100 }) },
 };

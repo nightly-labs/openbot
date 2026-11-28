@@ -9,6 +9,8 @@ export const messages = {
   "error.update.installFailed":
     "Не удалось установить обновление. Закройте и снова откройте OpenBot, затем повторите попытку.",
   "error.update.notInstalled": "Последний перезапуск не установил обновление. Перезапустите, чтобы повторить попытку.",
+  "error.update.needsAdministrator":
+    "OpenBot не смог сам установить обновление, потому что macOS запрашивает пароль администратора для замены OpenBot. Нажмите «Перезапустить» на этом компьютере, затем введите пароль.",
   "error.update.downloadFailed": "Не удалось загрузить обновление. Повторите попытку.",
   "error.update.signatureNotConfirmed":
     "OpenBot не удалось проверить обновление. Повторите попытку. Если ошибка повторяется, скачайте OpenBot на openbot.run/download.",

@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "업데이트 다운로드가 응답하지 않아요. 다시 시도해 주세요.",
   "error.update.installFailed": "업데이트를 설치할 수 없었어요. OpenBot을 종료한 후 다시 열고 다시 시도해 주세요.",
   "error.update.notInstalled": "마지막 재시작에서 업데이트가 설치되지 않았어요. 다시 시작해서 다시 시도해 주세요.",
+  "error.update.needsAdministrator":
+    "macOS가 OpenBot을 교체하려면 관리자 암호를 요구해서 OpenBot이 업데이트를 스스로 설치하지 못했어요. 이 컴퓨터에서 다시 시작을 클릭한 다음 암호를 입력해 주세요.",
   "error.update.downloadFailed": "업데이트를 다운로드할 수 없었어요. 다시 시도해 주세요.",
   "error.update.signatureNotConfirmed":
     "OpenBot이 업데이트를 확인할 수 없었어요. 다시 시도해 주세요. 이 오류가 계속되면 openbot.run/download에서 OpenBot을 다운로드하세요.",

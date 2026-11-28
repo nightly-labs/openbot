@@ -10,6 +10,8 @@ export const messages = {
     "Kan de update niet installeren. Stop OpenBot, open het opnieuw en probeer het nog eens.",
   "error.update.notInstalled":
     "Bij de laatste herstart is de update niet geïnstalleerd. Start opnieuw om het nog eens te proberen.",
+  "error.update.needsAdministrator":
+    "OpenBot kon de update niet zelf installeren, omdat macOS om een beheerderswachtwoord vraagt om OpenBot te vervangen. Klik op deze computer op Herstarten en voer dan het wachtwoord in.",
   "error.update.downloadFailed": "Kan de update niet downloaden. Probeer het opnieuw.",
   "error.update.signatureNotConfirmed":
     "OpenBot kan de update niet verifiëren. Probeer het opnieuw. Blijft deze fout terugkomen, download OpenBot dan via openbot.run/download.",

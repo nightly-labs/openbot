@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "Güncelleme indirmesi yanıt vermeyi durdurdu. Tekrar deneyin.",
   "error.update.installFailed": "Güncelleme yüklenemedi. OpenBot'tan çıkıp yeniden açın, ardından tekrar deneyin.",
   "error.update.notInstalled": "Son yeniden başlatma güncellemeyi yüklemedi. Tekrar denemek için yeniden başlatın.",
+  "error.update.needsAdministrator":
+    "macOS, OpenBot'u değiştirmek için yönetici parolası istediğinden OpenBot güncellemeyi kendisi yükleyemedi. Bu bilgisayarda Yeniden başlat'a tıklayın, ardından parolayı girin.",
   "error.update.downloadFailed": "Güncelleme indirilemedi. Tekrar deneyin.",
   "error.update.signatureNotConfirmed":
     "OpenBot güncellemeyi doğrulayamadı. Tekrar deneyin. Bu hata sürerse OpenBot'u openbot.run/download adresinden indirin.",
