@@ -3,7 +3,7 @@ import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCode
 import type { ProviderConnection } from "@openbot/ui/components/ProviderPicker";
 import type { ProviderRegion } from "@openbot/ui/components/ProviderRegionDialog";
 
-export type ProviderCodeLoginOpener = "composer";
+export type ProviderCodeLoginOpener = "composer" | "transfer";
 
 export interface ProviderUseApp {
   provider: AgentProviderId;
