@@ -1,7 +1,8 @@
 # Host state Durable Object
 
-Status: slices 1 to 3 are in the code behind `HOST_STATE_MODE`, and the mode is `off`. Production has
-no `HOST_STATE` binding yet. Decided by the developer on 2026-11-28: a Durable Object for each host,
+Status: slices 1 to 3 are in the code behind `HOST_STATE_MODE`, and the mode is `off`. Production and
+preview have the `HOST_STATE` binding and the migration tag `host-state-v1` since 2026-11-28 (step 2
+of the production deploy, approved by the developer). Decided by the developer on 2026-11-28: a Durable Object for each host,
 for a target of 100 times the current users. A revoked sign-in, a removed member or a rotated host
 key may work for up to 60 s. The sign-in check of a remote session is a cache.
 
@@ -204,7 +205,7 @@ the recheck at 10 min or longer, and fill only the keys that a request needs (th
 4. **One flag for all hosts.** `HOST_STATE_MODE` has no percentage. The D1 fallback and the outbox
    retry make a global switch safe enough, because the object keeps only copies.
 
-## Production deploy (not done in this change)
+## Production deploy
 
 | Step | Change | Approval |
 | --- | --- | --- |
