@@ -313,7 +313,10 @@ async function runSide(side: SideName, authRoot: string) {
   const epochAfter = await d1
     .prepare("SELECT auth_epoch FROM remote_hosts WHERE host_id = 'host-1'")
     .first<number>("auth_epoch");
-  const outbox = await d1.prepare("SELECT COUNT(*) AS count FROM remote_auth_events").first<number>("count");
+  const outbox = await d1
+    .prepare("SELECT COUNT(*) AS count FROM remote_auth_events WHERE next_attempt_at < ?")
+    .bind(Number.MAX_SAFE_INTEGER)
+    .first<number>("count");
   const host = await d1
     .prepare("SELECT name, device_public_key FROM remote_hosts WHERE host_id = 'host-1'")
     .first<{ name: string; device_public_key: string }>();
@@ -341,7 +344,7 @@ async function runSide(side: SideName, authRoot: string) {
       writesTo(rotate, "remote_memberships"),
     );
     check(
-      "after: each auth epoch event takes 2 outbox writes (insert, delete)",
+      "after: each auth epoch event takes 2 outbox writes (insert, delivered mark)",
       writesTo(rotate, "remote_auth_events").length === 2 && writesTo(rotateAgain, "remote_auth_events").length === 2,
       { rotate: writesTo(rotate, "remote_auth_events"), again: writesTo(rotateAgain, "remote_auth_events") },
     );
@@ -360,7 +363,7 @@ async function runSide(side: SideName, authRoot: string) {
     epochBefore,
     epochAfter,
   });
-  check(`${side}: the outbox is empty after delivery`, Number(outbox) === 0, { outbox });
+  check(`${side}: no event waits for delivery after delivery`, Number(outbox) === 0, { outbox });
   check(
     `${side}: the host keeps the new name and key, and the owner stays active`,
     host?.name === "Office 2" &&

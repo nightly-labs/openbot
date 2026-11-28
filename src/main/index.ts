@@ -161,6 +161,7 @@ import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-windo
 import { MessageLinkRelay, openMessageLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { removeOrcaPaneEnvironment } from "./orca-pane-environment";
+import { forwardOwnerTransferReloads } from "./owner-transfer-reloads";
 import { flushMainLog, startMainLog } from "./provider-log";
 import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
@@ -1697,7 +1698,7 @@ if (!hasSingleInstanceLock) {
       built.passwordManagers.onChanged(forwardPasswordManagerStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
-      remoteServers.on("directoryInvalidated", forwardOwnerTransfersChanged);
+      forwardOwnerTransferReloads(remoteServers, built.centralAuth, forwardOwnerTransfersChanged);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
       });

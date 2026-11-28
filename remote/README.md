@@ -233,6 +233,21 @@ into drain and waits for the allocations to finish. Forcing a coturn restart end
 active relay sessions. The client performs an ICE restart and resumes a file transfer from the last
 acknowledged offset once the service is back.
 
+## Signal restart without a gap
+
+A home can run Signal in two slots (`remote-api-blue`, `remote-api-green`, profile `slots`) and
+restart with `remote/scripts/signal-handoff.sh`. The new process takes the state of the old one, and
+the old one closes its sockets in waves. See [Signal restart](../docs/architecture/signal-restart.md).
+These settings are optional:
+
+| Setting | Default | Use |
+| --- | --- | --- |
+| `REMOTE_HANDOFF_TOKEN` | `REMOTE_METRICS_TOKEN` when it has at least 32 bytes | Token of the `/handoff/*` routes on the health port |
+| `REMOTE_HANDOFF_PEER_PORT` | none | Health port of the other slot. Without it, the process runs alone. |
+| `REMOTE_DRAIN_SECONDS` | 90 | Time in which the old process closes its sockets in waves |
+| `REMOTE_STATE_DIR` | none | Directory of the sealed state snapshot. Without it, no snapshot is written. |
+| `REMOTE_STATE_SNAPSHOT_SECONDS` | 30 | Time between two snapshot writes |
+
 ## Two Signal machines
 
 Two Signal machines can run at the same time. Each machine has its own name, and one more name, the

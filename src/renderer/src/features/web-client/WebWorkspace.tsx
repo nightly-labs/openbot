@@ -111,6 +111,7 @@ import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
+import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client/remote-directory";
 import {
   cancelHostUpdate,
   checkHostForUpdate,
@@ -611,6 +612,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
   );
   const [joinOpen, setJoinOpen] = createSignal(false);
+  const [ownerTransferFocusReloads, setOwnerTransferFocusReloads] = createSignal(0);
+  let ownerTransfersLoadedAt = Date.now();
+  const reloadOwnerTransfersOnFocus = () => {
+    if (Date.now() - ownerTransfersLoadedAt >= REMOTE_ACCOUNT_CHECK_INTERVAL_MS)
+      setOwnerTransferFocusReloads((count) => count + 1);
+  };
+  window.addEventListener("focus", reloadOwnerTransfersOnFocus);
+  onCleanup(() => window.removeEventListener("focus", reloadOwnerTransfersOnFocus));
+  let unlistedHostLoads = 0;
+  const ownerTransfersReloadKey = createMemo<string | undefined>((previous) => {
+    if (workspace.state.hostsLoading) return previous;
+    const hostIds = workspace.state.hosts.map((host) => host.hostId).sort();
+    const listed = workspace.runtime.ownerTransfers?.listedKey?.() ?? null;
+    if (listed === null) unlistedHostLoads += 1;
+    return JSON.stringify([hostIds, listed ?? unlistedHostLoads, ownerTransferFocusReloads()]);
+  });
   const hostedServers = createWebHostedServers({
     accountFetch: props.accountFetch,
     hosts: () => workspace.state.hosts,
@@ -3663,11 +3680,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     {(transfers) => (
                       <OwnerTransferPrompt
                         calls={{
-                          list: () => transfers().incoming(),
+                          list: () => {
+                            ownerTransfersLoadedAt = Date.now();
+                            return transfers().incoming();
+                          },
                           accept: (transferId) => transfers().accept(transferId),
                           decline: (transferId) => transfers().decline(transferId),
                         }}
-                        reloadKey={workspace.state.hosts}
+                        reloadKey={ownerTransfersReloadKey()}
                         onAccepted={() => void workspace.refreshHosts().catch(() => undefined)}
                       />
                     )}

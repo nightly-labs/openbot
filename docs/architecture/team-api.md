@@ -54,7 +54,9 @@ is also a move. A change that involves a VPN, such as a VPN or Tailscale that tu
 reports the type as unknown, Android as VPN), keeps the connection: the peer renews its Signal socket
 and restarts ICE, which gathers the candidates of the new interface and keeps the old path until a
 new one answers, and it checks the path with the compatibility read (`networkChanged`,
-`apps/mobile/src/shared/lib/network-change.ts`). A dead path then makes a new connection. Such a
+`apps/mobile/src/shared/lib/network-change.ts`). While a VPN is on, iOS reports the type as unknown on
+Wi-Fi and on mobile data, and `getIpAddressAsync` gives the Wi-Fi address or no address. Thus a new,
+lost or returned address with a VPN type is also such a change. A dead path then makes a new connection. Such a
 change waits 1 s, so that a short series of changes sends one restart; a move goes at once. In other cases, a probe of the path waits up
 to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
 at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
@@ -67,7 +69,10 @@ of the 10 restarts are left. A failed attempt is retried after 0.5, 1.2, 2.7 and
 up to 20 % more, then the recovery waits 15 s before the next 5 attempts (`REMOTE_RETRY_DELAYS_MS`,
 `REMOTE_RETRY_COOLDOWN_MS`). Each next wait is two times longer, up to 5 minutes
 (`REMOTE_RETRY_COOLDOWN_MAX_MS`). A connection, a refresh, a return to the app and a network change
-start the waits again at 15 s. A new connection to a known host opens its Signal socket while the ticket request runs,
+start the waits again at 15 s. When Signal answers `host_unavailable`, the host is off: the quick
+retries stop, and each attempt waits 15 s, then two times longer, up to 5 minutes. A return to the
+app keeps this wait, but tries again no later than 15 s after the last attempt; a refresh and a
+network change try at once. A new connection to a known host opens its Signal socket while the ticket request runs,
 and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
 holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
@@ -321,8 +326,9 @@ without losing revocations when Signal is temporarily unavailable.
 A host does not need its Signal socket to keep a WebRTC connection, so Signal must tell it about a
 session that ended while the host socket was away. Signal keeps the ended session IDs of each host for
 24 hours and sends them in a `sessions-ended` frame each time a host socket authenticates, and at once
-to a host socket that is connected. The host closes the child peer of each listed session. Signal
-forgets these IDs when it restarts, so the host also fails closed: after each new host Signal socket,
+to a host socket that is connected. The host closes the child peer of each listed session. A
+[Signal handoff](signal-restart.md) keeps these IDs, and a crash restart keeps them from the last
+snapshot; a restart with no snapshot forgets them. So the host also fails closed: after each new host Signal socket,
 every child peer must be confirmed again by a `peer-ready` for its session, or the host closes it.
 Each child peer has 11 minutes for this (`CLIENT_RECONFIRM_MS` in `team-webrtc.ts`): the 10-minute
 client reconnect grace of Signal and 1 minute more. The time counts only while the host has a ready
