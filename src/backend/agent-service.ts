@@ -3666,12 +3666,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints
       .runExclusive(() =>
         Effect.gen({ self: this }, function* () {
-          const requested = yield* lifecycleStep("select requested model", () =>
-            creationModel(input, this.#endpoints.available(), this.#providers.status().providers),
-          );
+          const account = agentProviderAccount(input);
+          const requested = yield* lifecycleStep("select requested model", () => {
+            const models =
+              account && input.provider !== undefined && input.model !== undefined
+                ? this.#agentModels({ provider: input.provider, providerAccountId: account })
+                : this.#endpoints.available();
+            return creationModel(input, models, this.#providers.status().providers);
+          });
           if (requested) {
             yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requested.provider));
-            const account = agentProviderAccount(input);
             if (account)
               yield* lifecycleStep("check provider account", () => {
                 if (!this.#providers.hasProviderAccount(requested.provider, account))

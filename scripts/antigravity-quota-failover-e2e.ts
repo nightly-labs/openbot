@@ -16,6 +16,8 @@ const install = join(root, "antigravity");
 const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 const BACKUP = "gemini-flash";
+const ACCOUNT_MODEL = "gemini-account-pro";
+const ACCOUNT_PROMPT = "Hello from the named account.";
 const CONTINUATION =
   "The previous provider stopped after starting this task: it reached its usage limit or failed with an error.";
 
@@ -27,6 +29,7 @@ mkdirSync(home, { recursive: true });
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
+const { ProviderAccountStore } = await import("../src/backend/agent/provider-account-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
@@ -42,7 +45,9 @@ if (process.argv[2] === "--version") {
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-license", "gemini-credits-a", "gemini-credits-b", "gemini-lost", "gemini-reset", "gemini-flash"];
-const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
+const ownAccount = process.argv.includes("--gemini-dir=" + process.env.FAKE_AGY_ACCOUNT_HOME);
+const modelIds = ownAccount ? [...MODELS, "${ACCOUNT_MODEL}"] : MODELS;
+const models = { availableModels: modelIds.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
 const update = (sessionId, value) => write({ method: "session/update", params: { sessionId, update: value } });
@@ -69,7 +74,7 @@ function handle(message) {
     const credits = model.startsWith("gemini-credits-") && text.includes("CREDITS-NOW");
     const lost = model === "gemini-lost" && text.includes("LOST-NOW");
     const reset = model === "gemini-reset" && text.includes("RESET-NOW");
-    log({ model, quota: quota || credits || reset, rate: rate || net || gone || license || lost, text });
+    log({ model, account: ownAccount, quota: quota || credits || reset, rate: rate || net || gone || license || lost, text });
     if (lost || reset) {
       if (text.includes("ACT-FIRST"))
         update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
@@ -133,6 +138,7 @@ setInterval(() => {}, 1000);
 
 interface Prompt {
   model: string;
+  account: boolean;
   quota: boolean;
   rate: boolean;
   text: string;
@@ -147,7 +153,14 @@ interface CaseReport {
   passed: boolean;
 }
 
-const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases: [], passed: false };
+const report: {
+  cases: CaseReport[];
+  accountFixture?: { accountId: string; defaultListsModel: boolean };
+  accountCreation?: { provider: string; accountId: string | null; model: string };
+  accountTurn?: { status: string; prompts: { model: string; account: boolean }[] };
+  passed: boolean;
+  error?: string;
+} = { cases: [], passed: false };
 
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
@@ -199,11 +212,13 @@ await writeFile(fakeAgy, FAKE_AGY, { mode: 0o755 });
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
+const accounts = new ProviderAccountStore(join(userData, "provider-accounts.json"), join(root, "accounts"));
 const agents = new AgentService({
   store,
   mailbox,
   browser,
   preferredProvider: "antigravity",
+  providerAccounts: accounts,
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "antigravity"),
 });
 const events: AgentEvent[] = [];
@@ -272,7 +287,70 @@ async function runCase(
 }
 
 try {
+  await runCauseEffect(accounts.load());
+  const account = await runCauseEffect(accounts.create("antigravity"));
+  assert.ok(account);
+  process.env.FAKE_AGY_ACCOUNT_HOME = accounts.home(account);
   await runCauseEffect(agents.initialize());
+  await waitFor("the named Gemini account to list its model", () =>
+    agents
+      .getStatus()
+      .providers?.some(
+        (provider) =>
+          provider.id === "antigravity" &&
+          provider.accounts?.some(
+            (row) =>
+              row.id === account.id &&
+              row.state === "connected" &&
+              row.models?.some((model) => model.id === ACCOUNT_MODEL),
+          ),
+      ),
+  );
+  const defaultListsModel = agents.listModels().some((model) => model.id === ACCOUNT_MODEL);
+  report.accountFixture = { accountId: account.id, defaultListsModel };
+  assert.equal(defaultListsModel, false, "The default catalog omits the model.");
+  const accountAgent = await runCauseEffect(
+    agents.createAgent({
+      name: "Gemini account model",
+      description: "Checks a model on a named Gemini account.",
+      avatarSeed: "gemini-account",
+      avatarHue: null,
+      provider: "antigravity",
+      providerAccountId: account.id,
+      model: ACCOUNT_MODEL,
+      initialMessage: ACCOUNT_PROMPT,
+    }),
+  );
+  report.accountCreation = {
+    provider: accountAgent.provider,
+    accountId: accountAgent.providerAccountId ?? null,
+    model: accountAgent.model,
+  };
+  assert.deepEqual(report.accountCreation, {
+    provider: "antigravity",
+    accountId: account.id,
+    model: ACCOUNT_MODEL,
+  });
+  const firstDelivery = await waitFor("the named account's first turn to end", () =>
+    agents
+      .listQueue(accountAgent.id)
+      .deliveries.find(
+        ({ sender, text, status }) =>
+          sender.kind === "user" &&
+          text === ACCOUNT_PROMPT &&
+          status !== "queued" &&
+          status !== "starting" &&
+          status !== "running",
+      ),
+  );
+  report.accountTurn = { status: firstDelivery.status, prompts: [] };
+  report.accountTurn.prompts = prompts()
+    .filter((prompt) => prompt.text.includes(ACCOUNT_PROMPT))
+    .map((prompt) => ({ model: prompt.model, account: prompt.account }));
+  assert.deepEqual(report.accountTurn, {
+    status: "completed",
+    prompts: [{ model: ACCOUNT_MODEL, account: true }],
+  });
 
   const before = await runCase("quota before work", "gemini-quota-a", true, "QUOTA-NOW");
   assert.deepEqual(
