@@ -420,6 +420,16 @@ describe("agent dock decoding", () => {
     expect(decodeAgentDockAction(channelChat)).toEqual(channelChat);
     const openChannel = { type: "open-channel", serverId: "local", channelId: "channel-1" };
     expect(decodeAgentDockAction(openChannel)).toEqual(openChannel);
+    const openChannelWithDraft = { ...openChannel, draft: "hello channel" };
+    expect(decodeAgentDockAction(openChannelWithDraft)).toEqual(openChannelWithDraft);
+    const openAgentWithDraft = { type: "open-agent", serverId: "local", agentId: "agent-1", draft: "hello agent" };
+    expect(decodeAgentDockAction(openAgentWithDraft)).toEqual(openAgentWithDraft);
+    expect(() =>
+      decodeAgentDockAction({ ...openAgentWithDraft, draft: "x".repeat(INPUT_LIMITS.messageText + 1) }),
+    ).toThrow("Invalid agent dock action.");
+    expect(() =>
+      decodeAgentDockAction({ ...openChannelWithDraft, draft: "x".repeat(INPUT_LIMITS.messageText + 1) }),
+    ).toThrow("Invalid agent dock action.");
     expect(decodeAgentDockAction({ type: "open-link", url: "https://example.com" })).toEqual({
       type: "open-link",
       url: "https://example.com",

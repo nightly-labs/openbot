@@ -552,11 +552,11 @@ export function AgentDockSurface() {
                 };
               }
             }}
-            onOpenInMain={(seat) =>
+            onOpenInMain={(seat, draft) =>
               void perform(
                 seat.kind === "channel"
-                  ? { type: "open-channel", serverId: server, channelId: seat.id }
-                  : { type: "open-agent", serverId: server, agentId: seat.id },
+                  ? { type: "open-channel", serverId: server, channelId: seat.id, ...(draft ? { draft } : {}) }
+                  : { type: "open-agent", serverId: server, agentId: seat.id, ...(draft ? { draft } : {}) },
               ).catch(() => undefined)
             }
             onOpenWindow={(agentId) =>
