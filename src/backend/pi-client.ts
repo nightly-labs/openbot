@@ -63,7 +63,7 @@ import {
   type ThreadItem,
 } from "./protocol";
 import {
-  type ProviderClientOperationError,
+  ProviderClientOperationError,
   providerCall,
   providerFailure,
   providerSync,
@@ -1207,7 +1207,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         logger.warn("Pi could not save a finished turn to its history.", {
           provider: this.provider,
           status,
-          error: this.#redact(String(failure instanceof Error ? (failure.cause ?? failure) : failure)),
+          error: this.#redact(String(failure instanceof ProviderClientOperationError ? failure.cause : failure)),
         });
       }
     }
