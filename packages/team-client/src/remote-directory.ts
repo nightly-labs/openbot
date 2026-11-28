@@ -29,6 +29,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
+import { accountAccessTokens } from "./account-access-token";
 import { accountBookmarkHeaders, rememberAccountBookmark } from "./account-bookmark";
 import { runTeamEffect } from "./effect-boundary";
 import {
@@ -635,34 +636,48 @@ export class RemoteTeamDirectoryClient {
       }),
       ({ controller }) =>
         Effect.gen({ self: this }, function* () {
-          const browser = this.#authentication.kind === "browser";
+          const authentication = this.#authentication;
+          const browser = authentication.kind === "browser";
           const url = new URL(browser ? `/api/browser${path}` : path, this.#apiUrl);
-          const response = yield* Effect.tryPromise({
-            try: () =>
-              this.#fetch(url, {
-                ...(browser ? { credentials: "same-origin" as const } : {}),
-                method: options.method ?? "GET",
-                headers: {
-                  ...accountBookmarkHeaders(url),
-                  ...(this.#authentication.kind === "bearer" && options.authenticated !== false
-                    ? { Authorization: `Bearer ${this.#authentication.token}` }
+          const method = options.method ?? "GET";
+          const send = (bearer: string | null) =>
+            Effect.tryPromise({
+              try: () =>
+                this.#fetch(url, {
+                  ...(browser ? { credentials: "same-origin" as const } : {}),
+                  method,
+                  headers: {
+                    ...accountBookmarkHeaders(url),
+                    ...(bearer === null ? {} : { Authorization: `Bearer ${bearer}` }),
+                    ...(browser
+                      ? { "X-OpenBot-Browser": "1", "Content-Type": "application/json" }
+                      : options.body
+                        ? { "Content-Type": "application/json" }
+                        : {}),
+                  },
+                  ...(options.body || (browser && options.method === "POST")
+                    ? { body: JSON.stringify(options.body ?? {}) }
                     : {}),
-                  ...(browser
-                    ? { "X-OpenBot-Browser": "1", "Content-Type": "application/json" }
-                    : options.body
-                      ? { "Content-Type": "application/json" }
-                      : {}),
-                },
-                ...(options.body || (browser && options.method === "POST")
-                  ? { body: JSON.stringify(options.body ?? {}) }
-                  : {}),
-                signal: controller.signal,
-              }),
-            catch: () =>
-              controller.signal.aborted
-                ? directoryFailure(sourceText("error.remote.directoryTimeout"), "timeout/directory")
-                : directoryFailure(sourceText("error.remote.directoryUnreachable"), "network/directory"),
-          });
+                  signal: controller.signal,
+                }),
+              catch: () =>
+                controller.signal.aborted
+                  ? directoryFailure(sourceText("error.remote.directoryTimeout"), "timeout/directory")
+                  : directoryFailure(sourceText("error.remote.directoryUnreachable"), "network/directory"),
+            });
+          const response =
+            authentication.kind === "bearer" && options.authenticated !== false
+              ? yield* accountAccessTokens.send(
+                  {
+                    apiUrl: this.#apiUrl,
+                    sessionToken: authentication.token,
+                    path,
+                    method,
+                    fetch: (input, init) => this.#fetch(input, init),
+                  },
+                  send,
+                )
+              : yield* send(null);
           rememberAccountBookmark(url, response);
           const value = yield* directoryIO(() => response.json()).pipe(Effect.catch(() => Effect.succeed(null)));
           if (!response.ok) return yield* directoryError(response.status, value);

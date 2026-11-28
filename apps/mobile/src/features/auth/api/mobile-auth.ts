@@ -24,6 +24,7 @@ import { currentText } from "@/shared/lib/text";
 import * as LockedKeychain from "../../../shared/lib/locked-keychain";
 import { fetch } from "../../support/model/logged-fetch";
 import { companySignInReturnParams } from "../model/company-sign-in-return";
+import { fetchMobileAccount, forgetMobileAccountAccess } from "./account-fetch";
 
 const MOBILE_SESSION_KEY = "openbot.mobile.session.v1";
 const MOBILE_REVOCATIONS_KEY = "openbot.mobile.pending-revocations.v1";
@@ -453,9 +454,9 @@ export function updateMobileProfile(
 
 async function writeMobileAnalytics(session: MobileSession, enabled: boolean, ageMs: number): Promise<MobileSession> {
   const { response, body } = await withMobileAuthRequestTimeout(async (signal) => {
-    const request = await fetch(new URL("/v1/me/analytics", session.apiUrl).toString(), {
+    const request = await fetchMobileAccount(session, "/v1/me/analytics", {
       method: "PUT",
-      headers: { Authorization: `Bearer ${session.sessionToken}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled, ageMs }),
       signal,
     });
@@ -482,10 +483,9 @@ async function writeMobileProfile(session: MobileSession, change: MobileProfileF
   }
   const isName = "name" in change;
   const { response, body } = await withMobileAuthRequestTimeout(async (signal) => {
-    const request = await fetch(new URL(isName ? "/v1/me/profile" : "/v1/me/avatar", session.apiUrl).toString(), {
+    const request = await fetchMobileAccount(session, isName ? "/v1/me/profile" : "/v1/me/avatar", {
       method: isName ? "PATCH" : change.avatar ? "PUT" : "DELETE",
       headers: {
-        Authorization: `Bearer ${session.sessionToken}`,
         ...(isName
           ? { "Content-Type": "application/json" }
           : change.avatar
@@ -511,6 +511,7 @@ async function writeMobileProfile(session: MobileSession, change: MobileProfileF
 }
 
 export async function logoutMobileSession(session: MobileSession): Promise<void> {
+  forgetMobileAccountAccess(session.sessionToken);
   await serializeMobileSessionStorage(async () => {
     const pending = await readPendingRevocations();
     if (!pending.some((item) => sameCredential(item, session))) {
@@ -634,10 +635,9 @@ export async function requestMobileAccount<T>(
     async (signal) => {
       let response: Response;
       try {
-        response = await fetch(new URL(path, session.apiUrl).toString(), {
+        response = await fetchMobileAccount(session, path, {
           method: init.method ?? "GET",
           headers: {
-            Authorization: `Bearer ${session.sessionToken}`,
             ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
             ...init.headers,
           },
@@ -661,6 +661,7 @@ export async function requestMobileAccount<T>(
 
 async function checkMobileAuthorization(response: Response, session: MobileSession): Promise<void> {
   if (response.status !== 401) return;
+  forgetMobileAccountAccess(session.sessionToken);
   await deleteMobileSessionIfCurrent(session.sessionToken);
   throw new MobileSessionExpiredError();
 }

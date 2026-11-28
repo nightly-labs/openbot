@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { ACCOUNT_BOOKMARK_HEADER } from "@openbot/contracts/account-bookmark";
+import { ACCOUNT_ACCESS_TOKEN_PATH } from "@openbot/team-client/account-access-token";
 import { accountBookmarkHeaders, rememberAccountBookmark } from "@openbot/team-client/account-bookmark";
 import { RemoteTeamDirectoryClient } from "@openbot/team-client/remote-directory";
 import { Effect, Schema } from "effect";
@@ -172,6 +173,7 @@ const accountApp = (request: Request): Promise<Response> =>
   runApiEffect(
     Effect.gen(function* () {
       const url = new URL(request.url);
+      if (url.pathname === ACCOUNT_ACCESS_TOKEN_PATH) return Response.json({ error: "not_found" }, { status: 404 });
       const token = request.headers.get("Authorization")?.replace(/^Bearer /u, "") ?? "";
       const reads: SessionReads = url.searchParams.has("primary-session") ? "primary" : sessionReadsFor(request);
       const user = yield* repository.authenticate(token, NOW, reads);
@@ -364,10 +366,12 @@ async function main() {
   );
 
   const sent: (string | null)[] = [];
+  let tokenIssues = 0;
   const throughWorker = Object.assign(
     (input: string | URL | Request, init?: RequestInit) => {
       const request = new Request(input, init);
-      sent.push(request.headers.get(ACCOUNT_BOOKMARK_HEADER));
+      if (new URL(request.url).pathname === ACCOUNT_ACCESS_TOKEN_PATH) tokenIssues += 1;
+      else sent.push(request.headers.get(ACCOUNT_BOOKMARK_HEADER));
       replicated.forRequest(`client-${sent.length}`);
       return handler.fetch(request, bindings);
     },
@@ -393,8 +397,9 @@ async function main() {
     sent[0] === null &&
       sent[1] !== null &&
       sent[2] === desktopWrite.headers.get(ACCOUNT_BOOKMARK_HEADER) &&
-      clientRoutes.some((route) => route.instance === "primary"),
-    { sent, clientRoutes },
+      clientRoutes.some((route) => route.instance === "primary") &&
+      tokenIssues === 1,
+    { sent, tokenIssues, clientRoutes },
   );
 
   const passed = checks.every((entry) => entry.passed);

@@ -11,6 +11,7 @@
     "./remote-directory": "./src/remote-directory.ts",
     "./listed-owner-transfers": "./src/listed-owner-transfers.ts",
     "./account-bookmark": "./src/account-bookmark.ts",
+    "./account-access-token": "./src/account-access-token.ts",
     "./ice-diagnostics": "./src/ice-diagnostics.ts",
     "./remote-peer": "./src/remote-peer.ts",
     "./remote-recovery": "./src/remote-recovery.ts",
