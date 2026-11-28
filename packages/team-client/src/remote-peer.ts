@@ -438,7 +438,7 @@ const TYPING_REFRESH_MILLISECONDS = 2_000;
 const SIGNAL_RENEW_DELAY_MS = 8_000;
 const HOST_WAIT_RENEW_MS = 60_000;
 const FAILED_OPENS_BEFORE_NEW_TICKET = 2;
-const HOST_WAIT_TICKET_MS = 15_000;
+const HOST_WAIT_TICKET_MS = 10_000;
 const HOST_WAIT_TICKET_MAX_MS = 5 * 60_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 function signalRetryDelay(attempt: number): number {
@@ -2128,7 +2128,7 @@ export function createRemoteTeamPeer(
             else if (step.upgradeDue && canUpgradeRelay(state)) {
               state.pathWatch.upgradeStarted(now);
               diagnose(state, "ice-recovery", "upgrade from relay");
-              void runPeerEffect(restartIce(state)).catch(() => undefined);
+              void runPeerEffect(restartIce(state, "all")).catch(() => undefined);
             }
             watchPath(state);
           },
@@ -2277,13 +2277,17 @@ export function createRemoteTeamPeer(
     })();
   }
 
-  function restartIce(state: PeerState) {
+  function restartIce(state: PeerState, iceTransportPolicy = state.iceTransportPolicy) {
     return Effect.fn("RemotePeer.restartIce")(function* () {
       const connection = state.connection;
       if (!connection || !state.connectionId || state.offerPending) return;
       if (state.iceRestarts >= HOST_ICE_RESTART_LIMIT) {
         failPeer(state, referenced(sourceText("error.remote.connectionDropped"), "webrtc/ice/restart_limit"), actions);
         return;
+      }
+      if (iceTransportPolicy !== state.iceTransportPolicy) {
+        yield* peerDecode(() => connection.setConfiguration({ ...connection.getConfiguration(), iceTransportPolicy }));
+        state.iceTransportPolicy = iceTransportPolicy;
       }
       state.iceRestarts += 1;
       state.iceRestartSentAt = Date.now();

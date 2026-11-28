@@ -154,12 +154,12 @@ export const ServerConnection = memo(function ServerConnection({
       );
       if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
       const last = lastStatus.current;
-      if (update.state === "connecting" && last && (update.hostOffline || last.status.phase === "host-waiting")) {
+      if (update.state === "connecting" && (update.hostOffline || last?.status.phase === "host-waiting")) {
         clearTimeout(resumeTimer.current);
         resumeTimer.current = undefined;
         resuming.current = false;
         const phase = update.hostOffline ? "host-waiting" : "connecting";
-        const status = { phase, attempt: last.status.attempt, remainingSeconds: 0 } as const;
+        const status = { phase, attempt: last?.status.attempt ?? 1, remainingSeconds: 0 } as const;
         lastStatus.current = { status, failure: null };
         onStatusRef.current(hostId, status, null, false);
       }

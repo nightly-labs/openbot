@@ -19,11 +19,14 @@ function ConnectionStatusText({ server: shown, note }: { server: MobileServer; n
   const { t, sourceText } = useText();
   const server = useLiveServerRecovery(shown);
   const recovery = server.recoveryStatus;
-  const reconnecting = recovery && recovery.phase !== "online" && recovery.phase !== "suspended";
+  const hostWaiting = recovery?.phase === "host-waiting";
+  const reconnecting = recovery && !hostWaiting && recovery.phase !== "online" && recovery.phase !== "suspended";
   const title = reconnecting ? t("mobile.workspace.status.reconnecting") : serverStatusLabel(server, t);
-  const detail = reconnecting
-    ? t("mobile.workspace.status.attempt", { attempt: recoveryAttempt(recovery), limit: REMOTE_RETRY_LIMIT })
-    : server.connectionMessage && sourceText(server.connectionMessage);
+  const detail = hostWaiting
+    ? null
+    : reconnecting
+      ? t("mobile.workspace.status.attempt", { attempt: recoveryAttempt(recovery), limit: REMOTE_RETRY_LIMIT })
+      : server.connectionMessage && sourceText(server.connectionMessage);
   const remainingSeconds = reconnecting ? recoveryCountdown(recovery) : null;
 
   return (

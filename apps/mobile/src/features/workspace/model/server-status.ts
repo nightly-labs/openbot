@@ -21,10 +21,11 @@ export function showsOnline(server: Pick<MobileServer, "state" | "resuming"> | u
 }
 
 export function serverStatusLabel(
-  server: Pick<MobileServer, "state" | "initialConnectionPending" | "resuming">,
+  server: Pick<MobileServer, "state" | "initialConnectionPending" | "resuming" | "recoveryStatus">,
   t: MobileTranslate,
 ): string {
   if (showsOnline(server)) return t(LABELS.online);
+  if (server.recoveryStatus?.phase === "host-waiting") return t("error.remote.hostOffline");
   if (server.state === "connecting" && !server.initialConnectionPending) return t(LABELS.offline);
   return t(LABELS[server.state]);
 }
