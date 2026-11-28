@@ -118,7 +118,8 @@
 }
 
 .chat-visual-box:hover > .chat-visual-actions,
-.chat-visual-box:focus-within > .chat-visual-actions {
+.chat-visual-box:focus-within > .chat-visual-actions,
+.chat-visual-actions:has([data-expanded]) {
   opacity: 1;
 }
 
