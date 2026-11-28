@@ -1876,7 +1876,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider, configRevision) => this.#endpoints.servesClient(model, provider, configRevision),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
-        mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         staleTurnSettlement: (agentId, threadId, turnId, channelLaneId) =>
@@ -7038,6 +7037,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       for (const deliveryId of this.#mailbox.queuedDeliveryIds(agentId)) {
         if (
           !this.channels.store.assignmentForDelivery(deliveryId) ||
+          this.#mailbox.getDelivery(deliveryId)?.resumeAfterUsageLimit ||
           !(yield* this.#requeueChannelDelivery(deliveryId))
         )
           continue;

@@ -104,7 +104,6 @@ export interface DrainHooks {
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
   fromChrome(deliveryId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
-  mayContinueOnBackup(agentId: string): boolean;
   mayFailOver(agentId: string): boolean;
   followUsageLimit(agentId: string): boolean;
   followPendingRuntime(agentId: string): boolean;
@@ -1333,11 +1332,7 @@ export class DrainScheduler {
               return;
             }
             yield* this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
-            if (
-              context.resumeAfterUsageLimit &&
-              this.#hooks.mayContinueOnBackup(delivery.recipientAgentId) &&
-              (yield* this.#hooks.requeueChannelDelivery(delivery.id, true))
-            ) {
+            if (context.resumeAfterUsageLimit && (yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {
               yield* this.#mailbox.restoreQueued(delivery.id).pipe(toDeliveryStartFailed);
               this.#mailboxSync.emitQueue(delivery.recipientAgentId);
               this.#requeuedAtLimit.add(delivery.recipientAgentId);
