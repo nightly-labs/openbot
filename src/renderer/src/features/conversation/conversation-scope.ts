@@ -2580,13 +2580,28 @@ export function createConversationViewScope(props: ConversationProps) {
       previousMaxScrollTop - element.scrollTop > 80
     );
   }
+  function frameHasReaderInput(element: HTMLElement): boolean {
+    const focused = element.ownerDocument.activeElement;
+    return (
+      element.querySelector("iframe:hover") !== null ||
+      (focused instanceof HTMLIFrameElement && element.contains(focused))
+    );
+  }
+  function readerScrolledUpInFrame(element: HTMLElement): boolean {
+    const aboveEnd = element.scrollHeight - element.scrollTop - element.clientHeight > 1;
+    return stickToLatest && aboveEnd && frameHasReaderInput(element);
+  }
+  function readerReachedEndInFrame(element: HTMLElement): boolean {
+    const atEnd = element.scrollHeight - element.scrollTop - element.clientHeight <= 1;
+    return readerLeftLatest && atEnd && frameHasReaderInput(element);
+  }
   const followReaderScroll = (element: HTMLElement) => {
     const moved = element.scrollTop - lastScrollTop;
     lastScrollTop = element.scrollTop;
     lastMaxScrollTop = element.scrollHeight - element.clientHeight;
     const intent = readerIntent && performance.now() - readerIntent.at < READER_INPUT_WINDOW_MS ? readerIntent : null;
-    if (moved < 0 && (readerDragging || intent?.up === true)) leaveLatest();
-    else if (moved > 0 && (readerDragging || intent?.up === false)) {
+    if (moved < 0 && (readerDragging || intent?.up === true || readerScrolledUpInFrame(element))) leaveLatest();
+    else if (moved > 0 && (readerDragging || intent?.up === false || readerReachedEndInFrame(element))) {
       readerLeftLatest = false;
       unreadOpening.holding = false;
     }
