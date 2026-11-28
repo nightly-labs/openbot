@@ -17,7 +17,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  catalogSha256: "08afd754a53fa7c0d44f155b4b7ddb8e6d9677c80d44ce07664e3eabeddd51f4",
+  catalogSha256: "c57ed43386c9c9f7cbe2bb7d7247b0cab9e590acc44494b406c14b40bd7b3b2a",
   updatedAt: "2026-11-10T00:00:00.000Z",
   plugins: [
     {
@@ -661,6 +661,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "f77d58b834b80eae4d1763bb34602425348d36b9cf5848ed78f9964a6182c5a8",
+    },
+    {
+      slug: "entropicmem",
+      version: "3.0.3",
+      featured: false,
+      detailSha256: "a919eeb07f5619655e3885bfbe7134ba0e6f1bcf56c1aa13ca8e0b09ce4df2b1",
     },
     {
       slug: "era",
@@ -5543,6 +5549,36 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://eden.so",
     privacyPolicyUrl: "https://eden.so/privacy/",
     termsUrl: "https://eden.so/terms/",
+    skills: [],
+  },
+  entropicmem: {
+    slug: "entropicmem",
+    name: "EntropicMem",
+    tagline: "Local long-term memory for agents",
+    description:
+      "EntropicMem gives agents durable memory on this computer: SQLite facts with full-text search, a Markdown vault, entities and relations, a timeline, and review tools. The MCP server runs locally over stdio and makes no network calls. Install the command first: `pipx install https://github.com/Ufonik88/EntropicMem/releases/download/v3.0.3/entropicmem-3.0.3-py3-none-any.whl`, then run `pipx ensurepath` once (pipx and Python 3.10+; the server is standard-library only, so no extra is needed). On first use the server creates a new v3 store under ~/.entropicmem. An existing store is served as it is and is never migrated automatically.",
+    category: "productivity",
+    creatorName: "Ufonik88",
+    iconUrl: "https://raw.githubusercontent.com/Ufonik88/EntropicMem/v3.0.3/docs/assets/logo.png",
+    version: "3.0.3",
+    prompts: [
+      { id: "prompt-recall", text: "What do you remember about the decisions we made on this project?" },
+      { id: "prompt-save", text: "Remember that this project deploys from the release branch, never from main." },
+      { id: "prompt-timeline", text: "Show me what happened in this project over the last two weeks." },
+    ],
+    apps: [
+      {
+        id: "app-entropicmem-mcp",
+        name: "EntropicMem",
+        description:
+          "Local memory search, writes, corrections and history over the EntropicMem MCP stdio server. No key and no network call.",
+        iconUrl: "https://raw.githubusercontent.com/Ufonik88/EntropicMem/v3.0.3/docs/assets/logo.png",
+        server: { name: "entropicmem", transport: "stdio", command: "entropicmem-mcp", args: [] },
+      },
+    ],
+    websiteUrl: "https://github.com/Ufonik88/EntropicMem",
+    privacyPolicyUrl: null,
+    termsUrl: null,
     skills: [],
   },
   era: {
