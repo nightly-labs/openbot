@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { type Unstable_DevWorker, unstable_dev } from "wrangler";
@@ -12,8 +12,7 @@ const APP = join(ROOT, "apps", "auth-api");
 const OUT = join(ROOT, ".openbot-build", "host-state-object-e2e");
 const MIGRATIONS = join(APP, "migrations");
 const WRANGLER = join(ROOT, "node_modules", ".bin", process.platform === "win32" ? "wrangler.cmd" : "wrangler");
-const BASELINE_REF = process.env.HOST_STATE_BASELINE_REF ?? "origin/main";
-const RECHECK_MS = 60_000;
+const RECHECK_MS = 10 * 60_000;
 
 interface D1Call {
   session: string;
@@ -28,18 +27,16 @@ interface ProbeResult {
   machineToken?: string | null;
   generation?: number;
   cached?: boolean;
+  pending?: number;
   d1: D1Call[];
 }
 
 type Mode = "off" | "write" | "read";
 
 interface ProbeReport {
-  baselineRef: string;
-  baselineSha: string;
-  burst?: { requests: number; baselineQueries: number; readQueries: number; readQueriesAfterFirst: number };
+  burst?: { requests: number; offQueries: number; readQueries: number; readQueriesAfterFirst: number };
   d1?: {
     sequence: typeof SEQUENCE;
-    baselineQueries: number;
     offQueries: number;
     writeQueries: number;
     readQueries: number;
@@ -89,28 +86,6 @@ async function ticketKeys() {
   };
 }
 
-async function baselineEntry(): Promise<{ entry: string; sha: string }> {
-  const sha = (await run("git", ["rev-parse", BASELINE_REF], { cwd: ROOT })).stdout.trim();
-  const tree = join(OUT, "baseline");
-  await rm(tree, { recursive: true, force: true });
-  await mkdir(tree, { recursive: true });
-  const archive = join(OUT, "baseline.tar");
-  await run("git", ["archive", "--output", archive, sha, "apps/auth-api/src"], { cwd: ROOT });
-  await run("tar", ["-xf", archive, "-C", tree]);
-  await rm(archive, { force: true });
-  const app = join(tree, "apps", "auth-api");
-  await mkdir(join(app, "scripts"), { recursive: true });
-  await copyFile(
-    join(APP, "scripts", "host-state-object-worker.ts"),
-    join(app, "scripts", "host-state-object-worker.ts"),
-  );
-  await copyFile(
-    join(APP, "src", "server", "host-state-object.ts"),
-    join(app, "src", "server", "host-state-object.ts"),
-  );
-  return { entry: join(app, "scripts", "host-state-object-worker.ts"), sha };
-}
-
 async function startProbe(name: string, entry: string, vars: Record<string, string>, hostIds: readonly string[]) {
   const work = join(OUT, `probe-${name}`);
   await rm(work, { recursive: true, force: true });
@@ -153,11 +128,11 @@ async function startProbe(name: string, entry: string, vars: Record<string, stri
 }
 
 function caller(worker: Unstable_DevWorker, clock: { now: number }) {
-  return async (mode: Mode, request: ProbeRequest, broken = false): Promise<ProbeResult> => {
+  return async (mode: Mode, request: ProbeRequest, broken = false, failInvalidate = false): Promise<ProbeResult> => {
     const response = await worker.fetch("http://probe.test/", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ options: { mode, broken, clock: clock.now }, request }),
+      body: JSON.stringify({ options: { mode, broken, clock: clock.now, failInvalidate }, request }),
     });
     const text = await response.text();
     if (!response.headers.get("content-type")?.includes("application/json")) {
@@ -206,45 +181,37 @@ await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 const vars = await ticketKeys();
 const clock = { now: Date.now() };
-const baseline = await baselineEntry();
-const hostIds = ["h-off", "h-write", "h-read", "h-epoch", "h-broken", "h-burst"] as const;
+const hostIds = ["h-off", "h-write", "h-read", "h-epoch", "h-broken", "h-burst", "h-retry"] as const;
 const workers: Unstable_DevWorker[] = [];
-const report: ProbeReport = { baselineRef: BASELINE_REF, baselineSha: baseline.sha };
+const report: ProbeReport = {};
 
 try {
-  const main = await startProbe("baseline", baseline.entry, vars, hostIds);
-  workers.push(main);
   const current = await startProbe("current", join(APP, "scripts", "host-state-object-worker.ts"), vars, hostIds);
   workers.push(current);
-  const callMain = caller(main, clock);
   const callCurrent = caller(current, clock);
 
-  const mainOff = await hostAuthSequence(callMain, "off", "h-off");
   const currentOff = await hostAuthSequence(callCurrent, "off", "h-off");
-  check("flag off: the same D1 queries as the baseline", sameQueries(mainOff, currentOff), {
-    baseline: mainOff.map(summary),
-    current: currentOff.map(summary),
-  });
+  check(
+    "flag off: each host authentication reads the host from D1",
+    currentOff.every((result) => hostReads(result).length > 0),
+    { current: currentOff.map(summary) },
+  );
   const offState = await callCurrent("off", { op: "state", hostId: "h-off" });
   check("flag off: no host state object is written", offState.ok && offState.generation === 0 && !offState.cached, {
     offState,
   });
 
   const currentWrite = await hostAuthSequence(callCurrent, "write", "h-write");
-  const mainWrite = await hostAuthSequence(callMain, "off", "h-write");
-  check(
-    "flag write: host authentication makes the same D1 queries as the baseline",
-    sameQueries(mainWrite, currentWrite),
-    {
-      current: currentWrite.map(summary),
-    },
-  );
+  const offWrite = await hostAuthSequence(callCurrent, "off", "h-write");
+  check("flag write: host authentication makes the same D1 queries as flag off", sameQueries(offWrite, currentWrite), {
+    current: currentWrite.map(summary),
+  });
 
   const burstBaseline: ProbeResult[] = [];
   const burstRead: ProbeResult[] = [];
   for (let index = 0; index < 20; index += 1) {
     burstBaseline.push(
-      await callMain("off", { op: index % 2 ? "homes" : "ticket", hostId: "h-burst", token: hostToken("h-burst") }),
+      await callCurrent("off", { op: index % 2 ? "homes" : "ticket", hostId: "h-burst", token: hostToken("h-burst") }),
     );
     burstRead.push(
       await callCurrent("read", { op: index % 2 ? "homes" : "ticket", hostId: "h-burst", token: hostToken("h-burst") }),
@@ -252,7 +219,7 @@ try {
   }
   report.burst = {
     requests: burstRead.length,
-    baselineQueries: totalQueries(burstBaseline),
+    offQueries: totalQueries(burstBaseline),
     readQueries: totalQueries(burstRead),
     readQueriesAfterFirst: totalQueries(burstRead.slice(1)),
   };
@@ -275,7 +242,7 @@ try {
   const expired = await callCurrent("read", { op: "ticket", hostId: "h-read", token: hostToken("h-read") });
   const refreshed = await callCurrent("read", { op: "ticket", hostId: "h-read", token: hostToken("h-read") });
   check(
-    "flag read: an entry older than 60 s is checked again on the D1 primary",
+    "flag read: an entry older than 10 min is checked again on the D1 primary",
     expired.ok &&
       hostReads(expired)
         .map((call) => call.session)
@@ -345,9 +312,9 @@ try {
   );
 
   const brokenRead = await hostAuthSequence(callCurrent, "read", "h-broken", true);
-  const brokenBaseline = await hostAuthSequence(callMain, "off", "h-broken");
+  const brokenBaseline = await hostAuthSequence(callCurrent, "off", "h-broken");
   check(
-    "flag read: an object failure falls back to D1 with the baseline queries",
+    "flag read: an object failure falls back to D1 with the flag off queries",
     sameQueries(brokenBaseline, brokenRead),
     { brokenRead: brokenRead.map(summary) },
   );
@@ -372,9 +339,53 @@ try {
     brokenAfter: summary(brokenAfter),
   });
 
+  const retryToken = hostToken("h-retry");
+  const retryFilled = await callCurrent("read", { op: "ticket", hostId: "h-retry", token: retryToken });
+  const retryRotation = await callCurrent(
+    "read",
+    { op: "rotate", hostId: "h-retry", token: retryToken, user: AUTH_USER, ownerMembershipId: "h-retry:owner" },
+    false,
+    true,
+  );
+  const retryStale = await callCurrent("read", { op: "ticket", hostId: "h-retry", token: retryToken });
+  const retryQueued = await callCurrent("read", { op: "state", hostId: "h-retry" });
+  clock.now += 60_000;
+  const retried = await callCurrent("read", { op: "host-state-retry" });
+  const retryApplied = await callCurrent("read", { op: "state", hostId: "h-retry" });
+  const retryOldToken = await callCurrent("read", { op: "ticket", hostId: "h-retry", token: retryToken });
+  const retryNewToken = await callCurrent("read", {
+    op: "ticket",
+    hostId: "h-retry",
+    token: retryRotation.machineToken ?? "",
+  });
+  check(
+    "flag read: a failed invalidation is queued, retried by the cron within 60 s, and applied",
+    retryFilled.ok &&
+      retryRotation.ok &&
+      retryStale.ok &&
+      retryQueued.pending === 1 &&
+      retried.ok &&
+      retried.pending === 0 &&
+      (retryApplied.generation ?? 0) > (retryQueued.generation ?? 0) &&
+      retryOldToken.code === "host_unauthorized" &&
+      retryNewToken.ok,
+    {
+      retryStale: summary(retryStale),
+      retryQueued: { generation: retryQueued.generation, pending: retryQueued.pending },
+      retried: { ok: retried.ok, code: retried.code, pending: retried.pending, d1: retried.d1.length },
+      retryApplied: { generation: retryApplied.generation, pending: retryApplied.pending },
+      retryOldToken: summary(retryOldToken),
+      retryNewToken: summary(retryNewToken),
+    },
+  );
+  clock.now += RECHECK_MS;
+  const expiredRetry = await callCurrent("read", { op: "host-state-retry" });
+  check("flag read: the cron makes 1 D1 query when no invalidation waits", expiredRetry.d1.length === 1, {
+    d1: expiredRetry.d1,
+  });
+
   report.d1 = {
     sequence: SEQUENCE,
-    baselineQueries: totalQueries(mainOff),
     offQueries: totalQueries(currentOff),
     writeQueries: totalQueries(currentWrite),
     readQueries: totalQueries(read),

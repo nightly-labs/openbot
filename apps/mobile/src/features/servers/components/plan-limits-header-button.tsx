@@ -4,6 +4,7 @@ import { Typography } from "heroui-native";
 import { Pressable, View, type ViewStyle } from "react-native";
 import {
   lowestPlanLimitsFirst,
+  mostLeftAccountPerProvider,
   planLimitListedWindowLabel,
   planLimitName,
   planLimitWindowLabel,
@@ -41,8 +42,8 @@ export function PlanLimitsHeaderButton({
 }) {
   const { t } = useText();
   const lowest = lowestPlanLimitsFirst(rows);
-  const shown = lowest.slice(0, 2);
-  const more = lowest.length - shown.length;
+  const shown = mostLeftAccountPerProvider(rows).slice(0, 2);
+  const more = rows.length - shown.length;
   const summary = lowest
     .map((row) => {
       const window = lowestListedWindow(row);
