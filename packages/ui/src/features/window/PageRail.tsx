@@ -279,22 +279,18 @@ function ringLeft(ring: UsageRing): number {
   return Math.min(...[ring.row, ...ring.shared].map((row) => row.remainingPercent ?? 100));
 }
 
-function mostLeftRing(rings: readonly UsageRing[]): UsageRing | undefined {
+function mostLeftRing(rings: readonly UsageRing[]): UsageRing {
   const read = rings.filter((ring) => !ring.row.readFailed);
-  return (read.length > 0 ? read : rings).reduce<UsageRing | undefined>(
-    (best, ring) => (best === undefined || ringLeft(ring) > ringLeft(best) ? ring : best),
-    undefined,
-  );
+  return (read.length > 0 ? read : rings).reduce((best, ring) => (ringLeft(ring) > ringLeft(best) ? ring : best));
 }
 
 function providerRings(rings: readonly UsageRing[]): UsageRing[] {
   const byProvider = new Map<AccountUsageProviderRow["provider"], UsageRing[]>();
   for (const ring of rings) byProvider.set(ring.row.provider, [...(byProvider.get(ring.row.provider) ?? []), ring]);
-  return [...byProvider.values()].flatMap((group) => {
+  return [...byProvider.values()].map((group) => {
     const best = mostLeftRing(group);
-    if (!best) return [];
     const others = group.filter((ring) => ring !== best);
-    return [{ ...best, accounts: others.flatMap((ring) => [ring.row, ...ring.shared, ...ring.accounts]) }];
+    return { ...best, accounts: others.flatMap((ring) => [ring.row, ...ring.shared, ...ring.accounts]) };
   });
 }
 
