@@ -8,6 +8,7 @@ import {
   isIngressQueueKey,
   type QueuedSignalMessage,
 } from "@openbot/contracts/signal-protocol/ingress-queue";
+import { INGRESS_ROUTES_CAPABILITY } from "@openbot/contracts/signal-protocol/messages";
 import type { SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   TELEGRAM_CAPABILITY,
@@ -767,6 +768,14 @@ export class SignalService {
           return;
         }
         this.#settleWatch(message.requestId, message);
+        return;
+      }
+      if (message.type === "ingress-routes") {
+        if (peer.peer !== "ingress") {
+          this.#fail(socket, "permission_denied", "Only an ingress socket can add routes.");
+          return;
+        }
+        yield* this.#addIngressRoutes(peer, message);
         return;
       }
       if (message.type === "telegram-call") {
@@ -1546,6 +1555,7 @@ export class SignalService {
       ...(this.#telegram ? [TELEGRAM_CAPABILITY] : []),
       ...(this.#queue.enabled ? [INGRESS_QUEUE_CAPABILITY] : []),
       WATCH_RELAY_CAPABILITY,
+      INGRESS_ROUTES_CAPABILITY,
     ];
     return capabilities.length > 0 ? { capabilities } : {};
   }
@@ -1962,6 +1972,100 @@ export class SignalService {
           sessionExpiresAt: claims.sessionExpiresAt,
           resumed: peer.resumed,
         });
+      }),
+  );
+
+  readonly #addIngressRoutes = Effect.fn("Signal.addIngressRoutes")(
+    (peer: AuthenticatedPeer, message: Extract<SignalClientMessage, { type: "ingress-routes" }>) =>
+      Effect.gen({ self: this }, function* () {
+        const tokens = yield* SignalTokens;
+        const hostId = peer.claims.hostId;
+        const verified = yield* Effect.gen({ self: this }, function* () {
+          let webhookRoute: WebhookRouteTicket = { routes: [] };
+          let githubRoute: GitHubRoute = { repositories: [] };
+          let telegramRoute: TelegramRoute = { chats: [] };
+          if (message.webhookRoute) {
+            if (!tokens.verifyWebhookRoute)
+              return yield* new RemoteTokenError({ message: "Webhook route verification required." });
+            webhookRoute = yield* tokens.verifyWebhookRoute(message.webhookRoute, hostId);
+            if (this.#issuedBeforeStart(webhookRoute.issuedAt)) {
+              if (!tokens.validateWebhookRoute)
+                return yield* new RemoteTokenError({ message: "Webhook route validation required." });
+              const linked = new Set(yield* tokens.validateWebhookRoute(hostId, webhookRoute.routes));
+              webhookRoute = { routes: webhookRoute.routes.filter((route) => linked.has(route.id)) };
+            }
+          }
+          if (message.githubRoute) {
+            if (!tokens.verifyGitHubRoute)
+              return yield* new RemoteTokenError({ message: "GitHub route verification required." });
+            githubRoute = yield* tokens.verifyGitHubRoute(message.githubRoute, hostId);
+          }
+          const telegram = this.#telegram;
+          if (message.telegramRoute && telegram) {
+            if (!tokens.verifyTelegramRoute)
+              return yield* new RemoteTokenError({ message: "Telegram route verification required." });
+            const ticket = yield* tokens.verifyTelegramRoute(message.telegramRoute, hostId);
+            telegramRoute = { chats: ticket.chats.filter((chat) => telegram.bot.hasBot(chat.botId)) };
+            if (this.#issuedBeforeStart(ticket.issuedAt) && telegramRoute.chats.length > 0) {
+              if (!tokens.validateTelegramRoute)
+                return yield* new RemoteTokenError({ message: "Telegram route validation required." });
+              const linked = new Set(
+                (yield* tokens.validateTelegramRoute(hostId, telegramRoute.chats)).map(telegramRouteChatKey),
+              );
+              telegramRoute = { chats: telegramRoute.chats.filter((chat) => linked.has(telegramRouteChatKey(chat))) };
+            }
+          }
+          return { webhookRoute, githubRoute, telegramRoute };
+        }).pipe(Effect.result);
+        const socket = peer.socket;
+        if (this.#peers.get(socket.id) !== peer) return;
+        if (Result.isFailure(verified)) {
+          this.#send(socket, {
+            type: "ingress-routes-result",
+            version: 1,
+            requestId: message.requestId,
+            status: "refused",
+          });
+          return;
+        }
+        const { webhookRoute, githubRoute, telegramRoute } = verified.success;
+        for (const route of webhookRoute.routes) {
+          if (route.linkedAt < (this.#webhookRouteFloor.get(route.id) ?? 0)) continue;
+          this.#webhookRouteFloor.set(route.id, route.linkedAt);
+          this.#webhookRoutes.set(route.id, socket.id);
+          if (!peer.webhookRoutes.includes(route.id)) peer.webhookRoutes.push(route.id);
+        }
+        for (const repository of githubRoute.repositories) {
+          const route = githubRepositoryKey(repository.installationId, repository.id);
+          const hosts = this.#githubRepositories.get(route) ?? new Map<string, string>();
+          hosts.set(hostId, socket.id);
+          this.#githubRepositories.set(route, hosts);
+          if (!peer.githubRepositories.includes(route)) peer.githubRepositories.push(route);
+        }
+        for (const chat of telegramRoute.chats) {
+          const route = telegramRouteKey(chat.botId, chat.id);
+          if (chat.linkedAt < (this.#telegramRouteFloor.get(route) ?? 0)) continue;
+          this.#telegramRouteFloor.set(route, chat.linkedAt);
+          this.#telegramChats.set(route, socket.id);
+          if (!peer.telegramChats.includes(route)) peer.telegramChats.push(route);
+        }
+        if (message.telegramRoute && this.#telegram) {
+          const now = Date.now();
+          for (const [route, link] of this.#telegramLinks) {
+            if (link.hostId !== hostId || link.expiresAt <= now || peer.telegramChats.includes(route)) continue;
+            if (link.linkedAt < (this.#telegramRouteFloor.get(route) ?? 0)) continue;
+            this.#telegramChats.set(route, socket.id);
+            peer.telegramChats.push(route);
+          }
+        }
+        this.#send(socket, {
+          type: "ingress-routes-result",
+          version: 1,
+          requestId: message.requestId,
+          status: "accepted",
+        });
+        if (webhookRoute.routes.length > 0) this.#send(socket, { type: "webhook-ready", version: 1 });
+        if (message.githubRoute) this.#send(socket, { type: "github-ready", version: 1 });
       }),
   );
 

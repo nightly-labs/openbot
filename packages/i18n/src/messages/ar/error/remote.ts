@@ -16,6 +16,8 @@ export const messages = {
   "error.remote.testPanelFailed": "تعذّر على المضيف فتح لوحة الاختبار.",
   "error.remote.sessionCapacity": "لدى المضيف بالفعل أربع جلسات نشطة.",
   "error.remote.linuxNeedsX11": "يحتاج سطح المكتب البعيد على Linux إلى جلسة X11. Wayland غير مدعوم.",
+  "error.remote.macosUpdateRequired":
+    "يحتاج سطح المكتب البعيد إلى macOS {version} أو أحدث على المضيف. حدّث macOS على المضيف، ثم حاول مرة أخرى.",
   "error.remote.runtimeMissing":
     "بيئة تشغيل Sunshine وMoonlight Web مفقودة أو غير مدعومة على هذا المضيف. ثبّت إصدار OpenBot الكامل على Mac أو مضيف Windows x64 أو مضيف Linux x64، ثم أعد تشغيل OpenBot.",
   "error.remote.testActive": "يوجد اختبار نشط لسطح المكتب البعيد. أعد المحاولة عند انتهائه.",

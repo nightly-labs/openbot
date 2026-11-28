@@ -4,6 +4,8 @@ import { DISCORD_ROUTE_GUILDS_LIMIT } from "./discord-route";
 import { GITHUB_DELIVERY_BODY_BYTES_LIMIT, GITHUB_DELIVERY_ID_PATTERN, GITHUB_EVENT_PATTERN } from "./github-route";
 import {
   type IceServer,
+  INGRESS_ROUTES_STATUSES,
+  type IngressRoutesStatus,
   QUEUED_DELIVERY_SEALED_LIMIT,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_SESSIONS_ENDED_LIMIT,
@@ -131,6 +133,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
     case "webhook-ready":
     case "github-ready":
       return { type: kind, version };
+    case "ingress-routes-result":
+      return { type: kind, version, requestId: identifier(value.requestId), status: ingressRoutesStatus(value.status) };
     case "github-delivery":
       return {
         type: kind,
@@ -321,4 +325,10 @@ function iceServer(value: unknown): IceServer {
 function urlList(value: unknown): string[] {
   if (!Array.isArray(value)) invalid();
   return value.map(text);
+}
+
+function ingressRoutesStatus(value: unknown): IngressRoutesStatus {
+  const status = INGRESS_ROUTES_STATUSES.find((entry) => entry === value);
+  if (!status) invalid();
+  return status;
 }

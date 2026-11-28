@@ -73,7 +73,7 @@ export interface BrowserApiServices {
   >;
   remote: Pick<
     RemoteControlPlane,
-    | "listHosts"
+    | "listHostsWithTransfers"
     | "removeOwnedHost"
     | "setHostHidden"
     | "startSession"
@@ -358,7 +358,7 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       .pipe(Effect.map(json), refuseWith(CompanySignInError));
   }
   if (path === "v2/remote/hosts" && request.method === "GET")
-    return json({ hosts: yield* services.remote.listHosts(user.id) });
+    return json(yield* services.remote.listHostsWithTransfers(user));
   const [, removedHostId] = /^v2\/remote\/hosts\/([^/]+)$/u.exec(path) ?? [];
   if (removedHostId !== undefined && request.method === "DELETE") {
     yield* services.remote.removeOwnedHost(user.id, decodeURIComponent(removedHostId));

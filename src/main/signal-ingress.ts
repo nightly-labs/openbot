@@ -1,5 +1,12 @@
 import type { MessagingPlatform } from "@openbot/contracts/ipc";
-import { isNumber } from "@openbot/contracts/runtime-values";
+import {
+  INGRESS_TICKET_ROUTES,
+  type IngressRouteResult,
+  type IngressRouteTicket,
+  type IngressTicketRoute,
+  type IngressTickets,
+} from "@openbot/contracts/remote-control-plane";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import { type DiscordApiRequest, decodeDiscordApiError } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
@@ -10,6 +17,7 @@ import {
   type QueuedSignalMessage,
 } from "@openbot/contracts/signal-protocol/ingress-queue";
 import {
+  INGRESS_ROUTES_CAPABILITY,
   SIGNAL_PROTOCOL_VERSION,
   type SignalClientMessage,
   type SignalServerMessage,
@@ -46,7 +54,7 @@ import {
   type TelegramGateway,
 } from "../backend/messaging/messaging-types";
 import type { IngressQueueKey } from "./ingress-queue-key";
-import { type RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { downloadTelegramFile, signalHttpOrigin, uploadTelegramFile } from "./telegram-files";
 
 const logger = createOpenBotLogger("signal-ingress");
@@ -75,9 +83,51 @@ function queuedRoute(message: QueuedSignalMessage): string {
   return `telegram:${message.chatId}`;
 }
 
-interface LinkedRouteTicket {
+type LinkedRouteTicket = IngressRouteTicket;
+
+interface RouteFailure {
+  error: string;
+  cause: unknown;
+}
+
+type RouteIssue = IngressRouteTicket | RouteFailure;
+
+type IssuedRoutes = Partial<Record<IngressTicketRoute, RouteIssue>>;
+
+interface IngressBootstrap {
   ticket: string;
-  ids: readonly string[] | null;
+  signalUrl: string;
+}
+
+interface RouteRequest {
+  requestId: string;
+  socket: WebSocket;
+  webhook: boolean;
+  github: boolean;
+  telegram: LinkedRouteTicket | null;
+}
+
+const TELEGRAM_NOT_CONFIGURED = "telegram_not_configured";
+
+function routeFailure(cause: unknown): RouteFailure {
+  return { error: isDynamicRecord(cause) && isString(cause.code) ? cause.code : "unavailable", cause };
+}
+
+function issuedRoute(result: IngressRouteResult): RouteIssue {
+  return "error" in result ? { error: result.error, cause: { code: result.error } } : result;
+}
+
+function routeTicket(issue: RouteIssue | null | undefined): LinkedRouteTicket | null {
+  return issue && "ticket" in issue ? issue : null;
+}
+
+function routeError(issue: RouteIssue | null | undefined): RouteFailure | null {
+  return issue && "error" in issue ? issue : null;
+}
+
+function requiredRoute(issue: RouteIssue | undefined): Effect.Effect<LinkedRouteTicket | null, RemoteWorkflowError> {
+  const failure = routeError(issue);
+  return failure ? Effect.fail(new RemoteWorkflowError({ cause: failure.cause })) : Effect.succeed(routeTicket(issue));
 }
 
 type LinkedRouteIds = Record<LinkedRoutePlatform, ReadonlySet<string> | null>;
@@ -106,6 +156,10 @@ export interface SignalIngressOptions {
   issueWebhookRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
   issueGitHubRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
   issueTelegramRoute?(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
+  issueIngressTickets?(
+    hostId: string,
+    routes: readonly IngressTicketRoute[],
+  ): Effect.Effect<IngressTickets | "unsupported", RemoteWorkflowError>;
   queueKey?(): Effect.Effect<IngressQueueKey | null>;
   resolveProxy?(url: string): Effect.Effect<string>;
 }
@@ -130,7 +184,11 @@ class SignalIngressAccount extends Context.Service<
     discordRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
     webhookRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
     githubRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-    telegramRoute(hostId: string): Effect.Effect<LinkedRouteTicket | null>;
+    telegramRoute(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
+    ingressTickets(
+      hostId: string,
+      routes: readonly IngressTicketRoute[],
+    ): Effect.Effect<IngressTickets | "unsupported", RemoteWorkflowError>;
   }
 >()("openbot/main/SignalIngressAccount") {
   static layer(options: SignalIngressOptions) {
@@ -144,18 +202,12 @@ class SignalIngressAccount extends Context.Service<
         githubRoute: (hostId) => options.issueGitHubRoute(hostId),
         telegramRoute: (hostId) =>
           options.issueTelegramRoute
-            ? options.issueTelegramRoute(hostId).pipe(
-                Effect.catch((failure) =>
-                  Effect.sync(() => {
-                    logger.warn(
-                      "The Telegram route ticket is not available. The socket opens again later for Telegram.",
-                      toLogValue(failure.cause),
-                    );
-                    return null;
-                  }),
-                ),
-              )
-            : Effect.succeed(null),
+            ? options.issueTelegramRoute(hostId)
+            : Effect.fail(new RemoteWorkflowError({ cause: { code: TELEGRAM_NOT_CONFIGURED } })),
+        ingressTickets: (hostId, routes) =>
+          options.issueIngressTickets
+            ? options.issueIngressTickets(hostId, routes)
+            : Effect.succeed("unsupported" as const),
       }),
     );
   }
@@ -242,6 +294,8 @@ export class SignalIngress implements MessagingIngress {
   #githubLostAt: number | null = null;
   #telegramMissing = false;
   #telegramBackoffMs = BACKOFF_START_MS;
+  #combinedTickets = true;
+  #routeRequest: RouteRequest | null = null;
   #watchHolders = 0;
   #watchHandler: WatchIngressHandler | null = null;
   #authEpoch: number | null = null;
@@ -538,21 +592,6 @@ export class SignalIngress implements MessagingIngress {
     const webhooks = this.#webhookHolders > 0;
     const github = this.#githubHolders > 0;
     const watchRelay = this.#watchHolders > 0;
-    let webhookTicket: Effect.Effect<string | null, RemoteWorkflowError> = webhooks
-      ? account.webhookRoute(hostId)
-      : Effect.succeed(null);
-    if (webhooks && (slack || discord || telegram || github || watchRelay))
-      webhookTicket = webhookTicket.pipe(
-        Effect.catch((failure) =>
-          Effect.sync(() => {
-            logger.warn(
-              "The webhook route ticket is not available. The socket opens again later for webhooks.",
-              toLogValue(failure.cause),
-            );
-            return null;
-          }),
-        ),
-      );
     let githubTicket: Effect.Effect<string | null, RemoteWorkflowError> = github
       ? account.githubRoute(hostId)
       : Effect.succeed(null);
@@ -568,17 +607,37 @@ export class SignalIngress implements MessagingIngress {
           }),
         ),
       );
+    const wants: Record<IngressTicketRoute, boolean> = { slack, discord, telegram, webhook: webhooks };
+    const webhookOptional = slack || discord || telegram || github || watchRelay;
     const issued = yield* Effect.all(
       [
-        account.ticket(hostId),
-        slack ? account.slackRoute(hostId) : Effect.succeed(null),
-        discord ? account.discordRoute(hostId) : Effect.succeed(null),
-        webhookTicket,
-        telegram ? account.telegramRoute(hostId) : Effect.succeed(null),
+        this.#issueRoutes(
+          account,
+          hostId,
+          INGRESS_TICKET_ROUTES.filter((route) => wants[route]),
+        ),
         githubTicket,
       ],
       { concurrency: "unbounded" },
-    ).pipe(Effect.result);
+    ).pipe(
+      Effect.flatMap(([tickets, githubRoute]) =>
+        Effect.all([
+          requiredRoute(tickets.routes.slack),
+          requiredRoute(tickets.routes.discord),
+          webhookOptional ? this.#optionalWebhook(tickets.routes.webhook) : requiredRoute(tickets.routes.webhook),
+        ]).pipe(
+          Effect.map(([slackRoute, discordRoute, webhookRoute]) => ({
+            bootstrap: tickets.bootstrap,
+            slackRoute,
+            discordRoute,
+            webhookRoute,
+            telegramIssue: tickets.routes.telegram,
+            githubRoute,
+          })),
+        ),
+      ),
+      Effect.result,
+    );
     if (Result.isFailure(issued)) {
       logger.warn("The Signal ticket for the ingress socket is not available.", toLogValue(issued.failure.cause));
       if (generation !== this.#generation) return;
@@ -586,11 +645,14 @@ export class SignalIngress implements MessagingIngress {
       this.#wait("unavailable");
       return;
     }
-    const [bootstrap, slackRoute, discordRoute, webhookRoute, telegramRoute, githubRoute] = issued.success;
+    const { bootstrap, slackRoute, discordRoute, webhookRoute, telegramIssue, githubRoute } = issued.success;
+    const telegramRoute = routeTicket(telegramIssue);
+    const telegramFailure = routeError(telegramIssue);
+    if (telegramFailure) this.#logTelegramFailure(telegramFailure);
     const routes = {
       ...(slackRoute === null ? {} : { slackRoute: slackRoute.ticket }),
-      ...(discordRoute === null ? {} : { discordRoute }),
-      ...(webhookRoute === null ? {} : { webhookRoute }),
+      ...(discordRoute === null ? {} : { discordRoute: discordRoute.ticket }),
+      ...(webhookRoute === null ? {} : { webhookRoute: webhookRoute.ticket }),
       ...(telegramRoute === null ? {} : { telegramRoute: telegramRoute.ticket }),
       ...(githubRoute === null ? {} : { githubRoute }),
     };
@@ -600,8 +662,9 @@ export class SignalIngress implements MessagingIngress {
     if (generation !== this.#generation || this.#unheld()) return;
     this.#webhookMissing = webhooks && webhookRoute === null;
     this.#githubMissing = github && githubRoute === null;
-    this.#telegramMissing = telegram && telegramRoute === null;
+    this.#telegramMissing = telegram && telegramRoute === null && telegramFailure?.error !== TELEGRAM_NOT_CONFIGURED;
     if (telegram && telegramRoute !== null) this.#telegramBackoffMs = BACKOFF_START_MS;
+    this.#routeRequest = null;
     this.#pendingLinkedRoutes = { slack: linkedRouteIds(slackRoute), telegram: linkedRouteIds(telegramRoute) };
     const socket = new WebSocket(bootstrap.signalUrl, proxyUrl ? { agent: new HttpsProxyAgent(proxyUrl) } : {});
     this.#socket = socket;
@@ -723,7 +786,24 @@ export class SignalIngress implements MessagingIngress {
       this.#startPing(socket);
       this.#setLinkedRoutes(this.#pendingLinkedRoutes);
       this.#setState("online");
-      if (this.#webhookMissing || this.#githubMissing || this.#telegramMissing) this.#retryRoutes();
+      if (this.#telegramMissing && !this.#capabilities.has(TELEGRAM_CAPABILITY)) this.#telegramMissing = false;
+      if (this.#routesMissing()) this.#retryRoutes();
+      return;
+    }
+    if (message.type === "ingress-routes-result") {
+      const request = this.#routeRequest;
+      if (request?.requestId !== message.requestId || request.socket !== socket) return;
+      this.#routeRequest = null;
+      if (message.status === "accepted") {
+        if (request.webhook) this.#webhookMissing = false;
+        if (request.github) this.#githubMissing = false;
+        if (request.telegram) {
+          this.#telegramMissing = false;
+          this.#telegramBackoffMs = BACKOFF_START_MS;
+          this.#setLinkedRoutes({ ...this.#linkedRoutes, telegram: linkedRouteIds(request.telegram) });
+        }
+      } else logger.warn("Signal refused the missing route tickets. OpenBot tries again later.");
+      if (this.#routesMissing()) this.#retryRoutes();
       return;
     }
     if (message.type === "webhook-ready") {
@@ -905,9 +985,158 @@ export class SignalIngress implements MessagingIngress {
     }
     this.#retry = setTimeout(() => {
       this.#retry = null;
-      this.reconnect();
+      if (this.#capabilities.has(INGRESS_ROUTES_CAPABILITY)) this.#run(this.#addRoutes());
+      else this.reconnect();
     }, delay);
   }
+
+  #routesMissing(): boolean {
+    return this.#webhookMissing || this.#githubMissing || this.#telegramMissing;
+  }
+
+  #issueRoutes(
+    account: Context.Service.Shape<typeof SignalIngressAccount>,
+    hostId: string,
+    routes: readonly IngressTicketRoute[],
+  ): Effect.Effect<{ bootstrap: IngressBootstrap; routes: IssuedRoutes }, RemoteWorkflowError> {
+    const separate = Effect.suspend(() => this.#issueSeparateRoutes(account, hostId, routes));
+    if (!this.#combinedTickets) return separate;
+    return account.ingressTickets(hostId, routes).pipe(
+      Effect.flatMap((issued) => {
+        if (issued !== "unsupported") {
+          const decoded: IssuedRoutes = {};
+          for (const route of routes) {
+            const result = issued.routes[route];
+            if (result) decoded[route] = issuedRoute(result);
+          }
+          return Effect.succeed({ bootstrap: issued, routes: decoded });
+        }
+        this.#combinedTickets = false;
+        logger.info("The account service has no combined ingress ticket route. OpenBot asks for each ticket.");
+        return separate;
+      }),
+    );
+  }
+
+  #issueSeparateRoutes(
+    account: Context.Service.Shape<typeof SignalIngressAccount>,
+    hostId: string,
+    routes: readonly IngressTicketRoute[],
+  ): Effect.Effect<{ bootstrap: IngressBootstrap; routes: IssuedRoutes }, RemoteWorkflowError> {
+    const issuers: Record<IngressTicketRoute, Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>> = {
+      slack: account.slackRoute(hostId),
+      discord: account.discordRoute(hostId).pipe(Effect.map((ticket) => ({ ticket, ids: null }))),
+      telegram: account.telegramRoute(hostId),
+      webhook: account.webhookRoute(hostId).pipe(Effect.map((ticket) => ({ ticket, ids: null }))),
+    };
+    return Effect.all(
+      [
+        account.ticket(hostId),
+        Effect.forEach(
+          routes,
+          (route) =>
+            issuers[route].pipe(
+              Effect.map((ticket): RouteIssue => ticket),
+              Effect.catch((failure) => Effect.succeed(routeFailure(failure.cause))),
+              Effect.map((issue) => [route, issue] as const),
+            ),
+          { concurrency: "unbounded" },
+        ),
+      ],
+      { concurrency: "unbounded" },
+    ).pipe(
+      Effect.map(([bootstrap, issued]) => {
+        const decoded: IssuedRoutes = {};
+        for (const [route, issue] of issued) decoded[route] = issue;
+        return { bootstrap, routes: decoded };
+      }),
+    );
+  }
+
+  #optionalWebhook(issue: RouteIssue | undefined): Effect.Effect<LinkedRouteTicket | null> {
+    const failure = routeError(issue);
+    if (!failure) return Effect.succeed(routeTicket(issue));
+    return Effect.sync(() => {
+      logger.warn(
+        "The webhook route ticket is not available. The socket opens again later for webhooks.",
+        toLogValue(failure.cause),
+      );
+      return null;
+    });
+  }
+
+  #logTelegramFailure(failure: RouteFailure): void {
+    if (failure.error === TELEGRAM_NOT_CONFIGURED)
+      logger.warn("Telegram routing is not configured on the account service. OpenBot does not ask again now.");
+    else
+      logger.warn(
+        "The Telegram route ticket is not available. OpenBot asks for it again later.",
+        toLogValue(failure.cause),
+      );
+  }
+
+  readonly #addRoutes = Effect.fn("SignalIngress.addRoutes")(function* (this: SignalIngress) {
+    const socket = this.#socket;
+    const generation = this.#generation;
+    const hostId = this.#options.hostId();
+    if (!socket || socket.readyState !== WebSocket.OPEN || !hostId || this.#disposing) return;
+    const account = yield* SignalIngressAccount;
+    const github = this.#githubMissing;
+    const routes: IngressTicketRoute[] = [
+      ...(this.#webhookMissing ? (["webhook"] as const) : []),
+      ...(this.#telegramMissing ? (["telegram"] as const) : []),
+    ];
+    const issued = yield* Effect.all(
+      [
+        routes.length > 0
+          ? this.#issueRoutes(account, hostId, routes).pipe(Effect.map((tickets) => tickets.routes))
+          : Effect.succeed<IssuedRoutes>({}),
+        github
+          ? account.githubRoute(hostId).pipe(
+              Effect.map((ticket): RouteIssue => ({ ticket, ids: null })),
+              Effect.catch((failure) => Effect.succeed(routeFailure(failure.cause))),
+            )
+          : Effect.succeed(null),
+      ],
+      { concurrency: "unbounded" },
+    ).pipe(Effect.result);
+    if (generation !== this.#generation || socket !== this.#socket) return;
+    if (Result.isFailure(issued)) {
+      logger.warn("The missing route tickets are not available.", toLogValue(issued.failure.cause));
+      this.#retryRoutes();
+      return;
+    }
+    const [issuedRoutes, githubIssue] = issued.success;
+    const webhookRoute = routeTicket(issuedRoutes.webhook);
+    const telegramRoute = routeTicket(issuedRoutes.telegram);
+    const githubRoute = routeTicket(githubIssue);
+    const telegramFailure = routeError(issuedRoutes.telegram);
+    if (telegramFailure) {
+      this.#logTelegramFailure(telegramFailure);
+      if (telegramFailure.error === TELEGRAM_NOT_CONFIGURED) this.#telegramMissing = false;
+    }
+    if (!webhookRoute && !telegramRoute && !githubRoute) {
+      if (this.#routesMissing()) this.#retryRoutes();
+      return;
+    }
+    const requestId = crypto.randomUUID().replaceAll("-", "");
+    this.#routeRequest = {
+      requestId,
+      socket,
+      webhook: webhookRoute !== null,
+      github: githubRoute !== null,
+      telegram: telegramRoute,
+    };
+    const request: SignalClientMessage = {
+      type: "ingress-routes",
+      version: SIGNAL_PROTOCOL_VERSION,
+      requestId,
+      ...(webhookRoute ? { webhookRoute: webhookRoute.ticket } : {}),
+      ...(githubRoute ? { githubRoute: githubRoute.ticket } : {}),
+      ...(telegramRoute ? { telegramRoute: telegramRoute.ticket } : {}),
+    };
+    socket.send(JSON.stringify(request));
+  });
 
   #telegramCall<M extends TelegramCallMethod>(
     botId: string,
