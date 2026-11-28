@@ -6,7 +6,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import { strFromU8, unzipSync, type Zippable, zipSync } from "fflate";
-import { parse as parseYaml } from "yaml";
+import { parseDocument, parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 
 export const SKILL_FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
@@ -87,6 +87,34 @@ export function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "dr
   if (!name || name.length > 80 || !description || description.length > SKILL_DESCRIPTION_MAX_LENGTH)
     throw new Error(sourceText("error.skill.nameAndDescriptionRequired"));
   return { name, description, slug: slugify(name), files: Object.keys(files).sort() };
+}
+
+export function renameSkill(
+  files: ReadonlyArray<readonly [string, Uint8Array]>,
+  taken: (slug: string, name: string) => boolean,
+  attempts: number,
+) {
+  const index = files.findIndex(([name]) => name === "SKILL.md");
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(files[index]?.[1]);
+  const match = text.match(SKILL_FRONTMATTER);
+  const frontmatter = parseDocument(match?.[1] ?? "");
+  const from = String(frontmatter.get("name")).trim();
+  const base = from.slice(0, 56).trimEnd();
+  for (let number = 2; number <= attempts; number++) {
+    const name = `${base} ${number}`;
+    frontmatter.set("name", name);
+    const head = `---\n${frontmatter.toString({ lineWidth: 0 })}---\n`;
+    const skillFile = new TextEncoder().encode(head + text.slice(match?.[0].length ?? 0));
+    const { slug } = inspectArchive(zipSync({ "SKILL.md": skillFile }));
+    if (!taken(slug, name))
+      return {
+        files: files.map((file, at) => (at === index ? (["SKILL.md", skillFile] as const) : file)),
+        slug,
+        from,
+        name,
+      };
+  }
+  throw new Error(sourceText("error.skill.localNameTaken"));
 }
 
 export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
