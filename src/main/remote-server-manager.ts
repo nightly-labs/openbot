@@ -561,7 +561,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("sync", (serverId, message) => this.sync.receive(serverId, message));
-    this.#webrtcTransport?.on("eventReset", (serverId) => this.sync.reset(serverId));
+    this.#webrtcTransport?.on("eventReset", (serverId) => {
+      this.sync.reset(serverId);
+      this.emit("syncChanged", serverId, "agent-tasks");
+    });
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
       const hostedStarting = this.#awaitsHostedStart(serverId);
       const hostRestarting =

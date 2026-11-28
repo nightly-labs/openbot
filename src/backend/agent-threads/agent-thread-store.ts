@@ -391,28 +391,33 @@ export class AgentThreadStore {
   }
 
   rename(threadId: string, title: string): void {
-    this.#database.dispatch(
-      `agent-thread-renamed:${threadId}:${randomUUID()}`,
-      [{ aggregateType: "agent-thread", aggregateId: threadId, eventType: "agent-thread.renamed", payload: {} }],
-      (db, sequences) => {
-        db.prepare(
-          `UPDATE projection_agent_threads SET title = ?, title_source = 'user', last_event_sequence = ?
-           WHERE thread_id = ?`,
-        ).run(title, sequences[0] ?? 0, threadId);
-        return null;
-      },
-    );
+    this.#setTitle(threadId, title, "renamed");
   }
 
   retitle(threadId: string, title: string): void {
+    this.#setTitle(threadId, title, "retitled");
+  }
+
+  #setTitle(threadId: string, title: string, action: "renamed" | "retitled"): void {
+    const source = action === "renamed" ? "user" : null;
     this.#database.dispatch(
-      `agent-thread-retitled:${threadId}:${randomUUID()}`,
+      `agent-thread-${action}:${threadId}:${randomUUID()}`,
       [{ aggregateType: "agent-thread", aggregateId: threadId, eventType: "agent-thread.renamed", payload: {} }],
       (db, sequences) => {
-        db.prepare(
-          `UPDATE projection_agent_threads SET title = ?, last_event_sequence = ?
-           WHERE thread_id = ? AND title_source <> 'user'`,
-        ).run(title, sequences[0] ?? 0, threadId);
+        const sequence = sequences[0] ?? 0;
+        const result = db
+          .prepare(
+            `UPDATE projection_agent_threads SET title = ?, title_source = COALESCE(?, title_source), last_event_sequence = ?
+             WHERE thread_id = ? AND (? IS NOT NULL OR title_source <> 'user')`,
+          )
+          .run(title, source, sequence, threadId, source);
+        if (result.changes > 0) {
+          db.prepare("UPDATE projection_threads SET title = ?, last_event_sequence = ? WHERE thread_id = ?").run(
+            title,
+            sequence,
+            threadId,
+          );
+        }
         return null;
       },
     );
