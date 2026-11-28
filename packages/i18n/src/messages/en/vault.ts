@@ -106,7 +106,7 @@ export const messages = defineMessages("vault", {
   "vault.importDone": "Imported: {imported}. Skipped: {skipped}.",
   "vault.unavailableTitle": "This computer cannot keep secrets",
   "vault.unavailableDescription":
-    "OpenBot encrypts the Vault with the secret storage of the system. Set up a keyring, then open this page again.",
+    "OpenBot encrypts the Vault with the secret storage of the system, and OpenBot cannot use that storage now. Unlock or set up the secret storage, then quit and open OpenBot again. OpenBot does not delete your Vault items.",
   "vault.unreadableTitle": "OpenBot cannot read the Vault",
   "vault.unreadableDescription":
     "The Vault file is on this computer, but OpenBot cannot decrypt it. This can occur when the system keychain changes. Reset the Vault to start again with no items.",

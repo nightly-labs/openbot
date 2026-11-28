@@ -94,7 +94,7 @@ export const messages = {
   "vault.importDone": "Geïmporteerd: {imported}. Overgeslagen: {skipped}.",
   "vault.unavailableTitle": "Deze computer kan geen geheimen bewaren",
   "vault.unavailableDescription":
-    "OpenBot versleutelt de kluis met de geheimenopslag van het systeem. Stel een sleutelhanger in en open deze pagina daarna opnieuw.",
+    "OpenBot versleutelt de kluis met de geheimenopslag van het systeem en kan die opslag nu niet gebruiken. Ontgrendel de geheimenopslag of stel deze in, sluit OpenBot af en open het opnieuw. OpenBot verwijdert de items in je kluis niet.",
   "vault.unreadableTitle": "OpenBot kan de kluis niet lezen",
   "vault.unreadableDescription":
     "Het kluisbestand staat op deze computer, maar OpenBot kan het niet ontsleutelen. Dit kan gebeuren als de sleutelhanger van het systeem verandert. Reset de kluis om opnieuw te beginnen zonder items.",

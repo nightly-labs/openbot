@@ -320,9 +320,8 @@ export class VaultService {
       this.#status = "unavailable";
       return this.#status;
     }
-    const readable = yield* this.#store.load();
-    this.#status = readable ? "ready" : "unreadable";
-    if (readable) registerSecrets(this.#store.read());
+    this.#status = yield* this.#store.load();
+    if (this.#status === "ready") registerSecrets(this.#store.read());
     return this.#status;
   });
 
@@ -448,6 +447,11 @@ export class VaultService {
       Effect.gen({ self: this }, function* () {
         if (!this.#canPersist()) {
           this.#status = "unavailable";
+          return this.state();
+        }
+        const before = this.#status;
+        if (before !== "ready" && (yield* this.load()) !== "unreadable") {
+          if (this.#status !== before) this.#emit();
           return this.state();
         }
         yield* this.#store.clear();

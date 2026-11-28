@@ -93,7 +93,8 @@ export const messages = {
   "vault.importChoose": "选择 CSV 文件",
   "vault.importDone": "已导入：{imported}。已跳过：{skipped}。",
   "vault.unavailableTitle": "这台电脑无法保管密钥",
-  "vault.unavailableDescription": "OpenBot 使用系统的密钥存储来加密保险库。请先设置钥匙串，然后重新打开该页面。",
+  "vault.unavailableDescription":
+    "OpenBot 使用系统的密钥存储来加密保险库，但现在无法使用该存储。请解锁或设置密钥存储，然后退出并重新打开 OpenBot。OpenBot 不会删除你的保险库项目。",
   "vault.unreadableTitle": "OpenBot 无法读取保险库",
   "vault.unreadableDescription":
     "保险库文件在这台电脑上，但 OpenBot 无法解密。系统钥匙串发生变化时可能出现这种情况。重置保险库后将从空白开始。",

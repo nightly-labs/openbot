@@ -108,7 +108,7 @@ export const messages = {
   "vault.importDone": "Zaimportowano: {imported}. Pominięto: {skipped}.",
   "vault.unavailableTitle": "Ten komputer nie może przechowywać sekretów",
   "vault.unavailableDescription":
-    "OpenBot szyfruje Sejf za pomocą systemowego magazynu sekretów. Skonfiguruj pęk kluczy, a potem otwórz tę stronę ponownie.",
+    "OpenBot szyfruje Sejf za pomocą systemowego magazynu sekretów, a teraz nie może z niego korzystać. Odblokuj lub skonfiguruj magazyn sekretów, a potem zamknij OpenBot i otwórz go ponownie. OpenBot nie usuwa elementów twojego Sejfu.",
   "vault.unreadableTitle": "OpenBot nie może odczytać Sejfu",
   "vault.unreadableDescription":
     "Plik Sejfu jest na tym komputerze, ale OpenBot nie może go odszyfrować. Może się tak zdarzyć po zmianie systemowego pęku kluczy. Zresetuj Sejf, aby zacząć od nowa bez żadnych elementów.",
