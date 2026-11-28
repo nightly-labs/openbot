@@ -128,7 +128,7 @@ export const messages = {
   "settings.sendShortcut.description":
     "Wybierz klawisze, które wysyłają wiadomość na tym urządzeniu i w tej przeglądarce.",
   "settings.chatOrder.description":
-    "Wybierz, jak pasek boczny sortuje czaty na tym urządzeniu. Ręcznie i Ostatnia aktywność wyłączają grupę Nieprzeczytane.",
+    "Wybierz, jak pasek boczny sortuje czaty na tym urządzeniu. Ręcznie, Ostatnia aktywność i Nazwa wyłączają grupę Nieprzeczytane.",
   "settings.sendShortcut.enter": "Enter wysyła",
   "settings.sendShortcut.modEnterMac": "⌘Enter wysyła",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter wysyła",

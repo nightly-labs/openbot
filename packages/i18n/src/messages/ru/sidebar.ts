@@ -43,6 +43,7 @@ export const messages = {
   "sidebar.order.title": "Сортировка чатов",
   "sidebar.order.manual": "Вручную",
   "sidebar.order.recent": "Недавняя активность",
+  "sidebar.order.name": "Название",
   "sidebar.order.unreadGroup": "Непрочитанные в группе",
   "sidebar.order.unreadFirst": "Непрочитанные первыми в папках",
   "sidebar.topbar.openSettings": "Открыть настройки: {name}",

@@ -127,7 +127,7 @@ export const messages = {
   "settings.sendShortcut.title": "Сочетание для отправки",
   "settings.sendShortcut.description": "Выберите клавиши для отправки сообщения на этом устройстве и в этом браузере.",
   "settings.chatOrder.description":
-    "Выберите, как боковая панель сортирует чаты на этом устройстве. «Вручную» и «Недавняя активность» отключают группу «Непрочитанные».",
+    "Выберите, как боковая панель сортирует чаты на этом устройстве. «Вручную», «Недавняя активность» и «Название» отключают группу «Непрочитанные».",
   "settings.sendShortcut.enter": "Отправка по Enter",
   "settings.sendShortcut.modEnterMac": "Отправка по ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Отправка по Ctrl+Enter",

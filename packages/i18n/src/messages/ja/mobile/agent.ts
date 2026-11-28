@@ -629,6 +629,7 @@ export const messages = {
   "mobile.agent.home.sort.title": "チャットの並べ替え",
   "mobile.agent.home.sort.manual": "手動",
   "mobile.agent.home.sort.recent": "最近のアクティビティ",
+  "mobile.agent.home.sort.name": "名前",
   "mobile.agent.home.sort.unreadGroup": "未読をグループにまとめる",
   "mobile.agent.home.sort.unreadFirst": "フォルダー内で未読を先頭に",
   "mobile.agent.route.appearance": "外観",

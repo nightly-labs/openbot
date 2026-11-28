@@ -36,6 +36,7 @@ export const messages = {
   "sidebar.order.title": "Sohbetleri sırala",
   "sidebar.order.manual": "Elle",
   "sidebar.order.recent": "Son etkinlik",
+  "sidebar.order.name": "Ad",
   "sidebar.order.unreadGroup": "Okunmamışlar bir grupta",
   "sidebar.order.unreadFirst": "Klasörlerde önce okunmamışlar",
   "sidebar.topbar.openSettings": "{name} için ayarları aç",

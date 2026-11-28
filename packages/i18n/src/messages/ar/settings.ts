@@ -124,7 +124,7 @@ export const messages = {
   "settings.sendShortcut.title": "اختصار الإرسال",
   "settings.sendShortcut.description": "اختر المفاتيح التي ترسل رسالة على هذا الجهاز والمتصفح.",
   "settings.chatOrder.description":
-    "اختر كيف يرتب الشريط الجانبي الدردشات على هذا الجهاز. الخياران يدوي والنشاط الأخير يوقفان مجموعة غير المقروءة.",
+    "اختر كيف يرتب الشريط الجانبي الدردشات على هذا الجهاز. الخيارات يدوي والنشاط الأخير والاسم توقف مجموعة غير المقروءة.",
   "settings.sendShortcut.enter": "Enter للإرسال",
   "settings.sendShortcut.modEnterMac": "⌘Enter للإرسال",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter للإرسال",

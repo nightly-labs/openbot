@@ -33,6 +33,7 @@ export const messages = {
   "sidebar.order.title": "채팅 정렬",
   "sidebar.order.manual": "수동",
   "sidebar.order.recent": "최근 활동",
+  "sidebar.order.name": "이름",
   "sidebar.order.unreadGroup": "읽지 않음을 그룹으로",
   "sidebar.order.unreadFirst": "폴더에서 읽지 않음 먼저",
   "sidebar.topbar.openSettings": "{name} 설정 열기",

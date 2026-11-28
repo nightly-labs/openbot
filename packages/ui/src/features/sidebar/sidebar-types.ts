@@ -18,11 +18,12 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
 
 export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
 
-export type SidebarChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
+export type SidebarChatOrder = "manual" | "recent" | "name" | "unread-group" | "unread-first";
 
 export const SIDEBAR_CHAT_ORDERS = [
   "manual",
   "recent",
+  "name",
   "unread-group",
   "unread-first",
 ] as const satisfies readonly SidebarChatOrder[];
@@ -30,12 +31,13 @@ export const SIDEBAR_CHAT_ORDERS = [
 export const SIDEBAR_CHAT_ORDER_LABEL = {
   manual: "sidebar.order.manual",
   recent: "sidebar.order.recent",
+  name: "sidebar.order.name",
   "unread-group": "sidebar.order.unreadGroup",
   "unread-first": "sidebar.order.unreadFirst",
 } as const satisfies Record<SidebarChatOrder, AppTextKey>;
 
 export function sidebarChatOrderSortsSections(order: SidebarChatOrder | undefined): boolean {
-  return order === "recent" || order === "unread-first";
+  return order === "recent" || order === "name" || order === "unread-first";
 }
 
 export interface SidebarProps {

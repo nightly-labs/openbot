@@ -276,6 +276,7 @@ function applyChatDrop(workspace: MobileWorkspaceActions, serverId: string, chan
 const CHAT_ORDER_LABEL = {
   manual: "mobile.agent.home.sort.manual",
   recent: "mobile.agent.home.sort.recent",
+  name: "mobile.agent.home.sort.name",
   "unread-group": "mobile.agent.home.sort.unreadGroup",
   "unread-first": "mobile.agent.home.sort.unreadFirst",
 } as const satisfies Record<MobileChatOrder, MobileTextKey>;
@@ -368,7 +369,7 @@ function openFromMenu(href: Href): void {
 
 export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "pane" }) {
   const pane = variant === "pane";
-  const { t, sourceText } = useText();
+  const { t, sourceText, locale } = useText();
   const { isLoaderPresent } = useAppLoadingOverlay();
   const { openDrawer } = useAppDrawer();
   const workspace = useMobileWorkspaceReader();
@@ -469,7 +470,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const chatOrder = useChatOrderPreference((state) => state.order);
   const unreadChatIds = useMemo(
     () =>
-      chatOrder === "manual" || chatOrder === "recent"
+      chatOrder === "manual" || chatOrder === "recent" || chatOrder === "name"
         ? NO_CHAT_IDS
         : new Set<string>([
             ...unreadAgentIds,
@@ -500,6 +501,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         : []),
       ...mobileSidebarItems(layout, listedAgents, listedChannels, undefined, t, {
         recent: chatOrder === "recent",
+        nameLocale: chatOrder === "name" ? locale : null,
         unreadFirst: chatOrder === "unread-first" ? unread : null,
         aside: grouped ? unread : null,
       }),
@@ -516,6 +518,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     unreadChatIds,
     dragging,
     t,
+    locale,
   ]);
   const insets = useSafeAreaInsets();
   const barTop = useBarTop();

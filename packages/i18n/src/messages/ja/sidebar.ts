@@ -33,6 +33,7 @@ export const messages = {
   "sidebar.order.title": "チャットの並べ替え",
   "sidebar.order.manual": "手動",
   "sidebar.order.recent": "最近のアクティビティ",
+  "sidebar.order.name": "名前",
   "sidebar.order.unreadGroup": "未読をグループにまとめる",
   "sidebar.order.unreadFirst": "フォルダー内で未読を先頭に",
   "sidebar.topbar.openSettings": "{name} の設定を開く",

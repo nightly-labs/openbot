@@ -27,17 +27,18 @@ export type MobileSidebarItem =
 
 type MobileChatItem = Extract<MobileSidebarItem, { kind: "agent" | "channel" }>;
 
-export type MobileChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
+export type MobileChatOrder = "manual" | "recent" | "name" | "unread-group" | "unread-first";
 
 export const MOBILE_CHAT_ORDERS = [
   "manual",
   "recent",
+  "name",
   "unread-group",
   "unread-first",
 ] as const satisfies readonly MobileChatOrder[];
 
 export function mobileChatOrderSortsSections(order: MobileChatOrder): boolean {
-  return order === "recent" || order === "unread-first";
+  return order === "recent" || order === "name" || order === "unread-first";
 }
 
 function chatActivity(chat: MobileChatItem): number {
@@ -48,6 +49,15 @@ function chatActivity(chat: MobileChatItem): number {
 
 function byRecent<Item extends MobileChatItem>(chats: readonly Item[]): Item[] {
   return [...chats].sort((a, b) => chatActivity(b) - chatActivity(a));
+}
+
+function chatName(chat: MobileChatItem): string {
+  return chat.kind === "agent" ? chat.agent.name : chat.channel.name;
+}
+
+function byName<Item extends MobileChatItem>(chats: readonly Item[], locale: string): Item[] {
+  const collator = new Intl.Collator(locale, { numeric: true });
+  return [...chats].sort((a, b) => collator.compare(chatName(a), chatName(b)));
 }
 
 function chatItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[], channels: ChannelSummary[]) {
@@ -66,9 +76,14 @@ export function mobileSidebarItems(
   channels: ChannelSummary[],
   collapsedSectionIds: ReadonlySet<string> = new Set(),
   t: MobileTranslate = currentText().t,
-  order: { recent?: boolean; unreadFirst?: ReadonlySet<string> | null; aside?: ReadonlySet<string> | null } = {},
+  order: {
+    recent?: boolean;
+    nameLocale?: string | null;
+    unreadFirst?: ReadonlySet<string> | null;
+    aside?: ReadonlySet<string> | null;
+  } = {},
 ): MobileSidebarItem[] {
-  const { recent, unreadFirst, aside } = order;
+  const { recent, nameLocale, unreadFirst, aside } = order;
   const sorted = chatItems(layout, agents, channels);
   const chats = unreadFirst
     ? [
@@ -77,7 +92,9 @@ export function mobileSidebarItems(
       ]
     : recent
       ? byRecent(sorted)
-      : sorted;
+      : nameLocale
+        ? byName(sorted, nameLocale)
+        : sorted;
   if (!layout) return aside ? chats.filter((chat) => !aside.has(chat.id)) : chats;
   const names = new Map(layout.sections.map((section) => [section.id, section.name]));
   const groups = new Map<string, MobileSidebarItem[]>();

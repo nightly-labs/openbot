@@ -132,7 +132,7 @@ export const messages = {
   "settings.sendShortcut.description":
     "Choisissez les touches qui envoient un message sur cet appareil et dans ce navigateur.",
   "settings.chatOrder.description":
-    "Choisissez comment la barre latérale trie les discussions sur cet appareil. Manuel et Activité récente désactivent le groupe Non lues.",
+    "Choisissez comment la barre latérale trie les discussions sur cet appareil. Manuel, Activité récente et Nom désactivent le groupe Non lues.",
   "settings.sendShortcut.enter": "Entrée pour envoyer",
   "settings.sendShortcut.modEnterMac": "⌘Entrée pour envoyer",
   "settings.sendShortcut.modEnterWin": "Ctrl+Entrée pour envoyer",
