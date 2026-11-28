@@ -28,6 +28,7 @@ import { channelLane, type DeliveryContext, laneChannelId, type MailboxStore, ME
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { decodeTurnResponse } from "../protocol";
 import { ProviderSignInError } from "../provider-client-effects";
+import { authenticatedBatchUser } from "./acp-user-meta";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -934,9 +935,20 @@ export class DrainScheduler {
           .startRoutineThread(agent, client, execution?.threadId)
           .pipe(toDeliveryStartFailed);
       }
+      const authenticatedUserId =
+        channelDelivery || messagingDelivery || planNote !== undefined
+          ? undefined
+          : authenticatedBatchUser(
+              batch.map(({ delivery: item }) => ({
+                kind: item.sender.kind,
+                id: this.#mailbox.senderMember(item.messageId)?.id,
+              })),
+            );
       let threadId =
         routineThreadId ??
-        (yield* this.#threads.ensureThread(agent, client, execution?.threadId).pipe(toDeliveryStartFailed));
+        (yield* this.#threads
+          .ensureThread(agent, client, execution?.threadId, authenticatedUserId)
+          .pipe(toDeliveryStartFailed));
       this.#startRetry.forget(delivery.id);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       if (snapshot.activeTurnId) {
@@ -1092,6 +1104,9 @@ export class DrainScheduler {
                   this.#store.list().find((current) => current.id === agent.id) ?? agent,
                 ),
                 clientUserMessageId: delivery.id,
+                ...(client.acceptsAuthenticatedUserMeta && authenticatedUserId
+                  ? { openbotAuthenticatedUserId: authenticatedUserId }
+                  : {}),
                 ...((context.resumeAfterUsageLimit || planNote !== undefined) && client.provider !== "codex"
                   ? { clientTurnId: randomUUID() }
                   : {}),
@@ -1132,7 +1147,9 @@ export class DrainScheduler {
         if (this.#conversation.loadedClientFor(unavailableThreadId) === client) {
           this.#conversation.unloadThread(unavailableThreadId);
         }
-        threadId = yield* this.#threads.ensureThread(agent, client, execution?.threadId).pipe(toDeliveryStartFailed);
+        threadId = yield* this.#threads
+          .ensureThread(agent, client, execution?.threadId, authenticatedUserId)
+          .pipe(toDeliveryStartFailed);
         response = yield* startTurn(threadId);
         if (threadId === unavailableThreadId) {
           this.#threads.logRecovery(agent.id, client.provider, "resumed");

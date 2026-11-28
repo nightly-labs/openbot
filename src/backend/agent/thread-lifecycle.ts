@@ -426,6 +426,7 @@ export class ThreadLifecycle {
     agent: AgentSummary,
     client: AgentClient,
     executionThreadId?: string,
+    authenticatedUserId?: string,
   ) {
     const publicThreadId =
       executionThreadId ?? (yield* this.#store.ensureThreadId(agent.id).pipe(toThreadOperationFailed));
@@ -453,6 +454,7 @@ export class ThreadLifecycle {
           client,
           publicThreadId,
           "configuration-change",
+          authenticatedUserId,
         );
         yield* this.#releaseProviderSession(session.externalSessionId, client);
         yield* threadStep(() => {
@@ -470,7 +472,13 @@ export class ThreadLifecycle {
         if (Result.isFailure(resumed)) {
           if (!isMissingProviderSessionError(resumed.failure.cause, client.provider)) return yield* resumed.failure;
           yield* threadStep(() => this.retireProviderSession(currentAgent, session.externalSessionId));
-          const replacement = yield* this.startProviderThread(currentAgent, client, publicThreadId, "missing-session");
+          const replacement = yield* this.startProviderThread(
+            currentAgent,
+            client,
+            publicThreadId,
+            "missing-session",
+            authenticatedUserId,
+          );
           this.#hooks.logRecovery(currentAgent.id, client.provider, "replaced");
           return replacement;
         }
@@ -478,7 +486,7 @@ export class ThreadLifecycle {
       this.#conversation.bindThread(session.externalSessionId, agent.id, publicThreadId);
       return session.externalSessionId;
     }
-    return yield* this.startProviderThread(currentAgent, client, publicThreadId);
+    return yield* this.startProviderThread(currentAgent, client, publicThreadId, undefined, authenticatedUserId);
   }, Effect.uninterruptible).bind(this);
 
   holdRuntimeRefresh(agentId: string, sideThread = false): () => void {
@@ -546,10 +554,11 @@ export class ThreadLifecycle {
     client: AgentClient,
     publicThreadId: string,
     reason?: "configuration-change" | "missing-session",
+    authenticatedUserId?: string,
   ) {
     return yield* Effect.acquireUseRelease(
       Effect.sync(() => this.holdRuntimeRefresh(agent.id, this.#conversation.isSideThread(publicThreadId))),
-      () => this.#startProviderThread(agent, client, publicThreadId, reason),
+      () => this.#startProviderThread(agent, client, publicThreadId, reason, authenticatedUserId),
       (release) => Effect.sync(release),
     );
   }, Effect.uninterruptible).bind(this);
@@ -695,13 +704,24 @@ export class ThreadLifecycle {
     client: AgentClient,
     publicThreadId: string,
     reason?: "configuration-change" | "missing-session",
+    authenticatedUserId?: string,
   ) {
     const givenContext = yield* this.#turnContextKey(owner, client);
     const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
       yield* this.#startParams(owner, client, publicThreadId);
     const mcpSet = this.#mcpSetFingerprint(mcpServers, toolRuntimes);
     const response = yield* client
-      .request("thread/start", { ...params, ephemeral: false }, decodeThreadResponse)
+      .request(
+        "thread/start",
+        {
+          ...params,
+          ephemeral: false,
+          ...(client.acceptsAuthenticatedUserMeta && authenticatedUserId
+            ? { openbotAuthenticatedUserId: authenticatedUserId }
+            : {}),
+        },
+        decodeThreadResponse,
+      )
       .pipe(toThreadOperationFailed);
     const sessions = this.#store.database.listProviderSessions(publicThreadId);
     const previousSession = sessions.at(-1);

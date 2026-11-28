@@ -125,6 +125,7 @@ function requiredCwd(params: unknown): string {
 }
 
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
+  readonly acceptsAuthenticatedUserMeta = true;
   readonly contextCompaction = CUSTOM_ACP_CONTEXT_COMPACTION;
   readonly provider = "acp" as const;
   readonly turnContext = true;
