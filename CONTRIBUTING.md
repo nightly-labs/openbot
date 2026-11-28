@@ -53,6 +53,9 @@ A maintainer who reopens a closed pull request starts a new 7-day period.
 
 ## Development setup
 
+Install Node.js 24 or newer and Bun 1.4.2 before you run the setup commands. The requirements
+are in `engines.node` and `packageManager` in `package.json`.
+
 ```bash
 git clone https://github.com/nightly-labs/openbot.git
 cd openbot
@@ -63,9 +66,10 @@ bun run dev
 
 Coding agents skip `bun run check`: see [AGENTS.md, Checks](AGENTS.md#checks).
 
-The supported toolchain is pinned in `package.json`. Use stable Bun 1.4.2, TypeScript 7, Vite 7, and the
-existing Biome configuration. Biome is the only lint and format tool. Do not add a second linter,
-Prettier, a second state library, or a UI kit without first discussing the architectural cost.
+The supported toolchain is pinned in `package.json`. Use the TypeScript, Vite, and Biome versions
+from that file and the existing Biome configuration. Biome is the only lint and format tool. Do not
+add a second linter, Prettier, a second state library, or a UI kit without first discussing the
+architectural cost.
 The Biome configuration also loads the repository-owned GritQL rules in
 `tools/biome/anti-slop/rules`. Fix these findings at the domain boundary. Do not suppress a rule or
 replace a concrete contract with a broad dictionary type.
