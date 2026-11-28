@@ -1,9 +1,15 @@
 # Host state Durable Object
 
 Status: slices 1 to 3 are in the code behind `HOST_STATE_MODE`, and the mode is `off`. Production has
-no `HOST_STATE` binding yet. Decided by the developer on 2026-11-28: a Durable Object for each host,
-for a target of 100 times the current users. A revoked sign-in, a removed member or a rotated host
-key may work for up to 60 s. The sign-in check of a remote session is a cache.
+the `HOST_STATE` binding and the migration tag `host-state-v1` since 2026-11-28 (step 2 of the
+production deploy, approved by the developer). The preview Worker has no binding: CI publishes it only
+with `wrangler versions upload`, which does not apply a Durable Object migration. Wrangler gives an
+environment the top-level `migrations` when the environment has none, so `env.preview` sets
+`migrations` to `[]` and `durable_objects` to no bindings.
+
+Decided by the developer on 2026-11-28: a Durable Object for each host, for a target of 100 times the
+current users. A revoked sign-in, a removed member or a rotated host key may work for up to 60 s. The
+sign-in check of a remote session is a cache.
 
 ## Goal
 
@@ -204,12 +210,12 @@ the recheck at 10 min or longer, and fill only the keys that a request needs (th
 4. **One flag for all hosts.** `HOST_STATE_MODE` has no percentage. The D1 fallback and the outbox
    retry make a global switch safe enough, because the object keeps only copies.
 
-## Production deploy (not done in this change)
+## Production deploy
 
 | Step | Change | Approval |
 | --- | --- | --- |
 | 1 | Merge slices 1 to 3. Mode `off`. Binding and migration only in `env.test` | PR review. The deploy makes no production change |
-| 2 | Add the `HOST_STATE` binding and the migration tag `host-state-v1` (`new_sqlite_classes: ["HostState"]`) to production and preview `wrangler.jsonc`, mode `off` | Developer approval for the migration tag (rollback barrier) |
+| 2 | Add the `HOST_STATE` binding and the migration tag `host-state-v1` (`new_sqlite_classes: ["HostState"]`) to the production `wrangler.jsonc`, mode `off`. `env.preview` sets no bindings and `migrations` to `[]` | Developer approval for the migration tag (rollback barrier) |
 | 3 | `HOST_STATE_MODE` = `write` | Watch the `Host state call failed` log count, the `host-state:` marker rows and the object request count for 1 day |
 | 4 | `HOST_STATE_MODE` = `read` | Watch D1 primary queries a minute, 7429 errors at the next Signal restart, and the object bill |
 
@@ -226,3 +232,4 @@ Go back at any step: set `HOST_STATE_MODE` to `off` and deploy. To remove the cl
 | 3,650 active hosts, 0.1M session and membership writes a day | Estimates; no count in the measurement data |
 | validate-batch calls a day (459k) | Route share (3,533 / 16,180) times 2.1M tickets; not counted |
 | Rollback across a Durable Object migration is refused | Not tested; no Cloudflare API call was made |
+| `wrangler versions upload` does not apply a Durable Object migration | Cloudflare Versions documentation as remembered; not tested. Checked in the installed Wrangler that `migrations` is inherited and `durable_objects` is not |
