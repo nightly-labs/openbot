@@ -61,7 +61,7 @@ function handle(message) {
       update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "ok" } },
     } });
     write({ id: message.id, result: { stopReason: "end_turn", usage: {
-      inputTokens: 100, outputTokens: 10, thoughtTokens: 5, cachedReadTokens: 0, cachedWriteTokens: 0, totalTokens: 115,
+      inputTokens: 100, outputTokens: 10, thoughtTokens: 5, cachedReadTokens: 0, cachedWriteTokens: 0, totalTokens: 110,
     } } });
     return;
   }
@@ -238,7 +238,7 @@ try {
   );
   check(
     "the Workflows row counts the tokens of the four answered steps",
-    usage.totals.uncachedInput === 400 && usage.totals.output === 60,
+    usage.totals.uncachedInput === 400 && usage.totals.output === 40,
     usage.totals,
   );
   check(

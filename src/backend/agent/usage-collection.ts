@@ -88,7 +88,6 @@ export function collectProviderUsage(
   if (!value) return;
   const model = usage.turnModel(agent.id, session.id, turnId) ?? agent.model;
   if (session.provider === "antigravity") {
-    const output = count(value.outputTokens);
     usage.record({
       agentId: agent.id,
       sessionId: session.id,
@@ -101,7 +100,7 @@ export function collectProviderUsage(
         uncachedInput: count(value.inputTokens),
         cachedInput: count(value.cachedReadTokens ?? 0),
         cacheCreation: count(value.cachedWriteTokens ?? 0),
-        output: output === null ? null : output + (count(value.thoughtTokens) ?? 0),
+        output: count(value.outputTokens),
       },
     });
     return;
