@@ -324,9 +324,9 @@ function userFramedTeammateText(
     ].join("\n");
   if (delivery.expectsReply === false)
     return [
-      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement.`,
+      `${teammate} sent you this message through OpenBot. It needs no answer: send the teammate no reply or acknowledgement, but tell the user each new result or finding for their work.`,
       steersQuietTurn
-        ? `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`
+        ? `When nothing in it is new for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`
         : null,
       USER_LANGUAGE_LINE,
       displayText,
@@ -490,10 +490,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       : delivery.expectsReply === false
         ? [
             NO_ANSWER_LINE,
-            "Use it if it changes your work, and continue. Send no reply, acknowledgement or result: OpenBot sends the sender nothing back.",
+            "Use it if it changes your work, and continue. Send the sender no reply, acknowledgement or result: OpenBot sends it nothing back. Tell the user each new result or finding for their work.",
             sources.externalChat
-              ? `OpenBot posts your written answer in the external chat of this turn. When nothing in it is for the people in that chat, answer only ${QUIET_ANSWER}: nothing is posted.`
-              : `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
+              ? `OpenBot posts your written answer in the external chat of this turn. When nothing in it is new for the people in that chat, answer only ${QUIET_ANSWER}: nothing is posted.`
+              : `When nothing in it is new for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
             USER_LANGUAGE_LINE,
           ]
         : [
