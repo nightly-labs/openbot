@@ -4,6 +4,7 @@ import {
   WORKFLOW_GITHUB_ACTIONS,
   WORKFLOW_GITHUB_CLOSE_REASONS,
   WORKFLOW_GITHUB_PULL_REQUEST_ACTIONS,
+  type WorkflowGitHubAction,
   type WorkflowGitHubItem,
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
@@ -24,6 +25,7 @@ import {
 import { fieldText, inputText } from "./workflow-walk";
 
 const TITLE_LIMIT = 256;
+const WORKFLOW_GITHUB_REVIEW_ACTIONS: readonly WorkflowGitHubAction[] = ["review.approve", "review.changes"];
 
 export interface GitHubOutputChoice {
   labels: boolean;
@@ -58,7 +60,13 @@ export function githubOutputPlan(
   if (action !== "issue.create") {
     const item = outputItem(node, input, repository, runItem);
     if (!item) return { kind: "failed", error: sourceText("error.workflow.githubItemMissing") };
-    if (item.pullRequest === false && isOneOf(WORKFLOW_GITHUB_PULL_REQUEST_ACTIONS, action))
+    const trigger = graph?.nodes.find((candidate) => candidate.id === triggerNodeId);
+    const triggerEvent = trigger?.fields.event;
+    const commentOrMention = triggerEvent === "comment" || triggerEvent === "mention";
+    if (
+      (item.pullRequest === false && isOneOf(WORKFLOW_GITHUB_PULL_REQUEST_ACTIONS, action)) ||
+      (commentOrMention && isOneOf(WORKFLOW_GITHUB_REVIEW_ACTIONS, action))
+    )
       return { kind: "failed", error: sourceText("error.workflow.githubPullRequestOnly") };
     number = item.number;
   }

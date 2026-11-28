@@ -146,6 +146,8 @@ const eventGroups = (t: AppTranslate) =>
 const isPullRequestAction = (action: WorkflowGitHubAction) =>
   WORKFLOW_GITHUB_PULL_REQUEST_ACTIONS.some((value) => value === action);
 
+const isReviewAction = (action: WorkflowGitHubAction) => action === "review.approve" || action === "review.changes";
+
 const labelTone = (color: string | undefined) => (color ? `#${color}` : undefined);
 
 const itemIcon = (item: WorkflowGitHubItem) => () =>
@@ -756,7 +758,10 @@ function useGitHubOutput(id: () => string) {
     !fromEvent() && (repository() === "trigger" || !repository() || (!creates() && item() === "event"));
   const issuesOnly = () =>
     fromEvent() && !creates() && item() === "event" && workflowGitHubEventItemKind(trigger.event()) === "issue";
-  const pullRequestOnly = () => isPullRequestAction(action()) && issuesOnly();
+  const commentOrMention = () =>
+    fromEvent() && !creates() && item() === "event" && (trigger.event() === "comment" || trigger.event() === "mention");
+  const pullRequestOnly = () =>
+    (isPullRequestAction(action()) && issuesOnly()) || (isReviewAction(action()) && commentOrMention());
   const chooseRepository = (value: string) => board.setFields(id(), { repository: value, labels: "", person: "" });
   return {
     fromEvent,
@@ -782,6 +787,7 @@ function useGitHubOutput(id: () => string) {
     noEvent,
     pullRequestOnly,
     issuesOnly,
+    commentOrMention,
   };
 }
 
@@ -836,7 +842,12 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
   ];
   const actions = (): Choice<WorkflowGitHubAction>[] =>
     WORKFLOW_GITHUB_ACTIONS.filter(
-      (action) => action === fields.action() || !(fields.issuesOnly() && isPullRequestAction(action)),
+      (action) =>
+        action === fields.action() ||
+        !(
+          (fields.issuesOnly() && isPullRequestAction(action)) ||
+          (fields.commentOrMention() && isReviewAction(action))
+        ),
     ).map((action) => ({ value: action, label: actionLabel(action), icon: ACTION_ICONS[action] }));
   const people = (): Choice<string>[] => [
     { value: "agent", label: t("workflow.row.agentChooses"), icon: () => <Bot aria-hidden="true" /> },

@@ -605,6 +605,26 @@ try {
     { lastEnd, lastItem },
   );
 
+  const prComment = comment("acme/pr-comment", 15, "ana");
+  const prCommentBody = JSON.parse(prComment.body);
+  prCommentBody.issue.pull_request = { url: "https://api.github.com/repos/acme/pr-comment/pulls/15" };
+  const reviewBlocked = await run(
+    workflows.create({
+      title: "PR comment review blocked",
+      graph: saying(lineOf("acme/pr-comment", [githubOutput({ action: "review.changes" })])),
+    }),
+  );
+  const reviewBlockedRun = await startedRun(reviewBlocked.summary.id, JSON.stringify(prCommentBody));
+  const reviewBlockedEnd = await runEnd(reviewBlockedRun);
+  const reviewBlockedStep = await outputStep(reviewBlockedRun);
+  check(
+    "a comment event on a pull request refuses review submission actions",
+    reviewBlockedEnd.status === "failed" &&
+      reviewBlockedStep?.error === sourceText("error.workflow.githubPullRequestOnly") &&
+      !changes.some((change) => change.repository === "acme/pr-comment" && change.action === "review.changes"),
+    { reviewBlockedEnd, reviewBlockedStep },
+  );
+
   report.history = await history(queue.summary.id);
   report.passed = true;
 } catch (error) {
