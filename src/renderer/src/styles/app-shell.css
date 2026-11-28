@@ -976,9 +976,14 @@ textarea {
     color: var(--openbot-text-primary);
   }
 
+  .app-frame-edge .first-agent-setup-header {
+    padding-inline-end: calc(var(--openbot-space-3) + var(--window-controls-end));
+  }
+
   .app-frame-edge .direct-conversation-header {
     height: var(--left-header-height);
     border-bottom: 0;
+    padding-inline-end: calc(14px + var(--window-controls-end));
     background: transparent;
   }
 

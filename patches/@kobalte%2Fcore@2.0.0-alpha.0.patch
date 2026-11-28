@@ -647,7 +647,7 @@ index b0a38568346e4997cc03f97803f316dd5cdebae1..8246fd0e5ef76aeccef54d3d3e40fd17
  	});
  	createEffect(() => mergedProps.id, (id) => context.registerTriggerId(id));
 diff --git a/dist/popper/BzGqGM_d.jsx b/dist/popper/BzGqGM_d.jsx
-index 59a51a1abef975b10524d0eb99a2acdea8669fab..2bc6364286aafb2697203865f4996fe18363f170 100644
+index 59a51a1abef975b10524d0eb99a2acdea8669fab..f3d0a0d08f74d6a435ae61437f4260fa780c5d9d 100644
 --- a/dist/popper/BzGqGM_d.jsx
 +++ b/dist/popper/BzGqGM_d.jsx
 @@ -1,7 +1,7 @@
@@ -659,7 +659,25 @@ index 59a51a1abef975b10524d0eb99a2acdea8669fab..2bc6364286aafb2697203865f4996fe1
  import { arrow, autoUpdate, computePosition, flip, hide, offset, platform, shift, size } from "@floating-ui/dom";
  //#region src/popper/popper-context.tsx
  const PopperContext = createContext();
-@@ -151,7 +151,7 @@ function PopperRoot(props) {
+@@ -133,6 +133,17 @@ function getTransformOrigin(placement, readingDirection) {
+ /**
+ * Display a floating content relative to an anchor element with an optional arrow.
+ */
++function withTopInset(padding) {
++	if (typeof document === "undefined") return padding;
++	const inset = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--openbot-popper-top-inset"));
++	if (!(inset > 0)) return padding;
++	return {
++		top: padding + inset,
++		right: padding,
++		bottom: padding,
++		left: padding
++	};
++}
+ function PopperRoot(props) {
+ 	const mergedProps = merge({
+ 		getAnchorRect: (anchor) => anchor?.getBoundingClientRect(),
+@@ -151,7 +162,7 @@ function PopperRoot(props) {
  	}, props);
  	const [positionerRef, setPositionerRef] = createSignal();
  	const [arrowRef, setArrowRef] = createSignal();
@@ -668,8 +686,37 @@ index 59a51a1abef975b10524d0eb99a2acdea8669fab..2bc6364286aafb2697203865f4996fe1
  	const anchorRef = () => getAnchorElement(mergedProps.anchorRef?.(), mergedProps.getAnchorRect);
  	const { direction } = useLocale();
  	async function updatePosition() {
+@@ -162,6 +173,7 @@ function PopperRoot(props) {
+ 		const arrowOffset = (arrowEl?.clientHeight || 0) / 2;
+ 		const finalGutter = typeof mergedProps.gutter === "number" ? mergedProps.gutter + arrowOffset : mergedProps.gutter ?? arrowOffset;
+ 		floatingEl.style.setProperty("--kb-popper-content-overflow-padding", `${mergedProps.overflowPadding}px`);
++		const overflowPadding = withTopInset(mergedProps.overflowPadding);
+ 		referenceEl.getBoundingClientRect();
+ 		const middleware = [offset(({ placement }) => {
+ 			const hasAlignment = !!placement.split("-")[1];
+@@ -175,17 +187,17 @@ function PopperRoot(props) {
+ 			const fallbackPlacements = typeof mergedProps.flip === "string" ? mergedProps.flip.split(" ") : void 0;
+ 			if (fallbackPlacements !== void 0 && !fallbackPlacements.every(isValidPlacement)) throw new Error("`flip` expects a spaced-delimited list of placements");
+ 			middleware.push(flip({
+-				padding: mergedProps.overflowPadding,
++				padding: overflowPadding,
+ 				fallbackPlacements
+ 			}));
+ 		}
+ 		if (mergedProps.slide || mergedProps.overlap) middleware.push(shift({
+ 			mainAxis: mergedProps.slide,
+ 			crossAxis: mergedProps.overlap,
+-			padding: mergedProps.overflowPadding
++			padding: overflowPadding
+ 		}));
+ 		middleware.push(size({
+-			padding: mergedProps.overflowPadding,
++			padding: overflowPadding,
+ 			apply({ availableWidth, availableHeight, rects }) {
+ 				const referenceWidth = Math.round(rects.reference.width);
+ 				availableWidth = Math.floor(availableWidth);
 diff --git a/dist/popper/CfE13srM.js b/dist/popper/CfE13srM.js
-index 5d13a2135a9e2772caf8388ddf129bdd1355f41b..af03868659847e1aa6650b618040baf3645ec5d6 100644
+index 5d13a2135a9e2772caf8388ddf129bdd1355f41b..58e77b7ad74a51ba757689d44d829640d534551e 100644
 --- a/dist/popper/CfE13srM.js
 +++ b/dist/popper/CfE13srM.js
 @@ -2,7 +2,7 @@ import { Polymorphic } from "../polymorphic/index.js";
@@ -681,7 +728,25 @@ index 5d13a2135a9e2772caf8388ddf129bdd1355f41b..af03868659847e1aa6650b618040baf3
  import { arrow, autoUpdate, computePosition, flip, hide, offset, platform, shift, size } from "@floating-ui/dom";
  //#region src/popper/popper-context.tsx
  const PopperContext = createContext();
-@@ -166,7 +166,7 @@ function PopperRoot(props) {
+@@ -148,6 +148,17 @@ function getTransformOrigin(placement, readingDirection) {
+ /**
+ * Display a floating content relative to an anchor element with an optional arrow.
+ */
++function withTopInset(padding) {
++	if (typeof document === "undefined") return padding;
++	const inset = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--openbot-popper-top-inset"));
++	if (!(inset > 0)) return padding;
++	return {
++		top: padding + inset,
++		right: padding,
++		bottom: padding,
++		left: padding
++	};
++}
+ function PopperRoot(props) {
+ 	const mergedProps = merge({
+ 		getAnchorRect: (anchor) => anchor?.getBoundingClientRect(),
+@@ -166,7 +177,7 @@ function PopperRoot(props) {
  	}, props);
  	const [positionerRef, setPositionerRef] = createSignal();
  	const [arrowRef, setArrowRef] = createSignal();
@@ -690,6 +755,35 @@ index 5d13a2135a9e2772caf8388ddf129bdd1355f41b..af03868659847e1aa6650b618040baf3
  	const anchorRef = () => getAnchorElement(mergedProps.anchorRef?.(), mergedProps.getAnchorRect);
  	const { direction } = useLocale();
  	async function updatePosition() {
+@@ -177,6 +188,7 @@ function PopperRoot(props) {
+ 		const arrowOffset = (arrowEl?.clientHeight || 0) / 2;
+ 		const finalGutter = typeof mergedProps.gutter === "number" ? mergedProps.gutter + arrowOffset : mergedProps.gutter ?? arrowOffset;
+ 		floatingEl.style.setProperty("--kb-popper-content-overflow-padding", `${mergedProps.overflowPadding}px`);
++		const overflowPadding = withTopInset(mergedProps.overflowPadding);
+ 		referenceEl.getBoundingClientRect();
+ 		const middleware = [offset(({ placement }) => {
+ 			const hasAlignment = !!placement.split("-")[1];
+@@ -190,17 +202,17 @@ function PopperRoot(props) {
+ 			const fallbackPlacements = typeof mergedProps.flip === "string" ? mergedProps.flip.split(" ") : void 0;
+ 			if (fallbackPlacements !== void 0 && !fallbackPlacements.every(isValidPlacement)) throw new Error("`flip` expects a spaced-delimited list of placements");
+ 			middleware.push(flip({
+-				padding: mergedProps.overflowPadding,
++				padding: overflowPadding,
+ 				fallbackPlacements
+ 			}));
+ 		}
+ 		if (mergedProps.slide || mergedProps.overlap) middleware.push(shift({
+ 			mainAxis: mergedProps.slide,
+ 			crossAxis: mergedProps.overlap,
+-			padding: mergedProps.overflowPadding
++			padding: overflowPadding
+ 		}));
+ 		middleware.push(size({
+-			padding: mergedProps.overflowPadding,
++			padding: overflowPadding,
+ 			apply({ availableWidth, availableHeight, rects }) {
+ 				const referenceWidth = Math.round(rects.reference.width);
+ 				availableWidth = Math.floor(availableWidth);
 diff --git a/dist/radio-group/Bpz3OGAn.jsx b/dist/radio-group/Bpz3OGAn.jsx
 index 4bea7d4bf444635c89f9bb5417cc54e1db6896d2..8cf41967407c919096187ab797ed593fa35dbaef 100644
 --- a/dist/radio-group/Bpz3OGAn.jsx

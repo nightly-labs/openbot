@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "A janela parou várias vezes. Suas conversas estão salvas e seus agentes continuam trabalhando.",
   "window.rendererStoppedReload": "Recarregar",
+  "window.minimize": "Minimizar",
+  "window.maximize": "Maximizar",
+  "window.restore": "Restaurar",
 } as const satisfies PartialTranslation<typeof source>;

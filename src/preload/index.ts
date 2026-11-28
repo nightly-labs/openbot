@@ -256,6 +256,7 @@ import {
   decodeVoiceStreamTranscript,
   decodeVoiceTranscriptionResult,
   decodeVoid,
+  decodeWindowFrameState,
   decodeWorkflowNotificationOpenedEvent,
 } from "./app-decoding";
 import { decodeBackgroundProcesses } from "./background-process-decoding";
@@ -886,6 +887,13 @@ const openbotApi: OpenBotDesktopApi = {
     listDisplays: decodeAgentDockDisplays,
     drag: decodeVoid,
     moved: decodeAgentDockOffset,
+  }),
+  windowFrame: bridgeGroup(IPC_ENDPOINTS.windowFrame, {
+    getState: decodeWindowFrameState,
+    state: decodeWindowFrameState,
+    minimize: decodeVoid,
+    toggleMaximize: decodeVoid,
+    close: decodeVoid,
   }),
   dynamicIsland: bridgeGroup(IPC_ENDPOINTS.dynamicIsland, {
     getPreference: decodeDynamicIslandPreference,

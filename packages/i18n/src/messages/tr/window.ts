@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "Pencere birkaç kez durdu. Sohbetleriniz kaydedildi ve ajanlarınız çalışmaya devam ediyor.",
   "window.rendererStoppedReload": "Yeniden yükle",
+  "window.minimize": "Simge durumuna küçült",
+  "window.maximize": "Ekranı kapla",
+  "window.restore": "Önceki boyut",
 } as const satisfies PartialTranslation<typeof source>;

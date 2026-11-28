@@ -263,7 +263,7 @@
 .account-login-language {
   position: absolute;
   top: var(--openbot-space-4);
-  inset-inline-end: var(--openbot-space-6);
+  inset-inline-end: calc(var(--openbot-space-6) + var(--window-controls-end, 0px));
   width: auto;
   color: var(--openbot-text-muted);
   -webkit-app-region: no-drag;

@@ -567,6 +567,10 @@
   -webkit-app-region: no-drag;
 }
 
+:root[data-openbot-window-buttons] .server-onboarding-close {
+  display: none;
+}
+
 .first-run-screen[data-step="choose"] .onboarding-shell {
   width: min(100%, 960px);
 }

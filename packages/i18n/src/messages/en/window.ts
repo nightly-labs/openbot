@@ -7,4 +7,7 @@ export const messages = defineMessages("window", {
   "window.rendererStoppedTitle": "OpenBot stopped working",
   "window.rendererStoppedBody": "The window stopped several times. Your chats are saved, and your agents keep working.",
   "window.rendererStoppedReload": "Reload",
+  "window.minimize": "Minimize",
+  "window.maximize": "Maximize",
+  "window.restore": "Restore",
 });

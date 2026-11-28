@@ -1462,6 +1462,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       drag: async () => undefined,
       onMoved: () => () => undefined,
     },
+    windowFrame: {
+      getState: async () => ({ buttons: false, maximized: false }),
+      onState: () => () => undefined,
+      minimize: async () => undefined,
+      toggleMaximize: async () => undefined,
+      close: async () => undefined,
+    },
     dynamicIsland: {
       getPreference: async () => clone(dynamicIslandPreference),
       setPreference: async (preference) => {

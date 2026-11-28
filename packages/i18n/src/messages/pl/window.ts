@@ -8,4 +8,7 @@ export const messages = {
   "window.rendererStoppedTitle": "OpenBot przestał działać",
   "window.rendererStoppedBody": "Okno kilka razy przestało działać. Twoje czaty są zapisane, a agenci dalej pracują.",
   "window.rendererStoppedReload": "Wczytaj ponownie",
+  "window.minimize": "Minimalizuj",
+  "window.maximize": "Maksymalizuj",
+  "window.restore": "Przywróć",
 } as const satisfies PartialTranslation<typeof source>;

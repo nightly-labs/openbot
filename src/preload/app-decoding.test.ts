@@ -43,6 +43,7 @@ import {
   decodeUpdateStatus,
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
+  decodeWindowFrameState,
   decodeWorkflowNotificationOpenedEvent,
 } from "./app-decoding";
 
@@ -376,6 +377,7 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     { serverId: "local", workflowId: "workflow-1" } satisfies WorkflowNotificationOpenedEvent,
   ],
   ["chat windows", decodeChatWindowTargets, [{ serverId: "local", agentId: "agent-1" }]],
+  ["window frame state", decodeWindowFrameState, { buttons: true, maximized: false }],
   ["detected model servers", decodeDetectedModelServers, [detectedServer]],
   ["custom agents", decodeCustomAgents, [customAgent, { ...customAgent, id: "qwen", resolvedCommand: null }]],
   ["a custom agent with a usage prompt", decodeCustomAgents, [{ ...customAgent, usagePrompt: "/usage" }]],
@@ -590,6 +592,8 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["opened workflow notification without a workflow", decodeWorkflowNotificationOpenedEvent, { serverId: "local" }],
   ["a chat window without an agent", decodeChatWindowTargets, [{ serverId: "local" }]],
   ["chat windows that are not a list", decodeChatWindowTargets, { serverId: "local", agentId: "agent-1" }],
+  ["a window frame state without buttons", decodeWindowFrameState, { maximized: true }],
+  ["a window frame state with a text value", decodeWindowFrameState, { buttons: "yes", maximized: false }],
   ["a detected server with a key", decodeDetectedModelServers, [{ ...detectedServer, apiKey: "sk-x" }]],
   ["a detected server with headers", decodeDetectedModelServers, [{ ...detectedServer, headers: [] }]],
   ["a custom agent with its environment", decodeCustomAgents, [{ ...customAgent, env: [] }]],

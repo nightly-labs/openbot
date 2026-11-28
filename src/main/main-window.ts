@@ -65,7 +65,12 @@ import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
 import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
-import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
+import {
+  followWindowButtonSide,
+  followWindowFrameState,
+  WINDOW_BUTTON_INSET,
+  windowButtonOptions,
+} from "./window-buttons";
 
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
 const logger = createOpenBotLogger("main-window");
@@ -306,9 +311,7 @@ export function createMainWindowController({
           ? getTranslate()("window.localClientTitle")
           : getTranslate()("window.localHostTitle"),
       icon: appIconPath,
-      ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
-        : {}),
+      ...windowButtonOptions(),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -321,6 +324,7 @@ export function createMainWindowController({
     });
     hideMenuBar(window);
     followWindowGlass(window, MAIN_WINDOW_DARK_BACKGROUND);
+    followWindowFrameState(window);
 
     window.once("ready-to-show", () => {
       performance.mark("openbot:window-ready");
@@ -441,9 +445,7 @@ export function createMainWindowController({
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
-      ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
-        : {}),
+      ...windowButtonOptions(),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -455,6 +457,7 @@ export function createMainWindowController({
     });
     hideMenuBar(window);
     followWindowGlass(window, MAIN_WINDOW_DARK_BACKGROUND);
+    followWindowFrameState(window);
     chatWindows.set(key, { target: { serverId: target.serverId, agentId: target.agentId }, window });
     window.once("ready-to-show", () => window.show());
     window.on("closed", () => {

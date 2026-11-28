@@ -9,4 +9,7 @@ export const messages = {
   "window.rendererStoppedBody":
     "Окно несколько раз останавливалось. Ваши чаты сохранены, а агенты продолжают работать.",
   "window.rendererStoppedReload": "Перезагрузить",
+  "window.minimize": "Свернуть",
+  "window.maximize": "Развернуть",
+  "window.restore": "Восстановить",
 } as const satisfies PartialTranslation<typeof source>;
