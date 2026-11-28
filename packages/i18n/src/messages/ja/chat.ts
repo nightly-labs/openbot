@@ -446,6 +446,7 @@ export const messages = {
   "chat.send.unconfirmed": "未確認です。もう一度送信する前にチャットを確認してください。",
   "chat.send.edit": "編集",
   "chat.send.dismiss": "閉じる",
+  "chat.send.waitingForFailed": "送信されなかったメッセージを待っています",
   "chat.history.olderFailed": "以前のメッセージを読み込めませんでした。",
   "chat.messageUnavailable": "このメッセージはもう利用できません。",
   "chat.activity.workingIn": "{channel} で作業しています",

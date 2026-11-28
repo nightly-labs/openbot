@@ -452,6 +452,7 @@ export const messages = {
   "chat.send.unconfirmed": "확인되지 않았어요. 다시 보내기 전에 채팅을 확인해 주세요.",
   "chat.send.edit": "편집",
   "chat.send.dismiss": "닫기",
+  "chat.send.waitingForFailed": "보내지 못한 메시지를 기다리는 중",
   "chat.history.olderFailed": "이전 메시지를 불러올 수 없어요.",
   "chat.messageUnavailable": "이 메시지는 더 이상 사용할 수 없어요.",
   "chat.activity.workingIn": "{channel}에서 작업 중",

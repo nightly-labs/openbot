@@ -474,6 +474,7 @@ export const messages = {
   "chat.send.unconfirmed": "Sin confirmar. Revisa el chat antes de volver a enviarlo.",
   "chat.send.edit": "Editar",
   "chat.send.dismiss": "Descartar",
+  "chat.send.waitingForFailed": "Espera al mensaje que no se envió",
   "chat.history.olderFailed": "No se pudieron cargar los mensajes anteriores.",
   "chat.messageUnavailable": "Este mensaje ya no está disponible.",
   "chat.activity.workingIn": "Trabajando en {channel}",

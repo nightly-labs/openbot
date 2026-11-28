@@ -8,6 +8,7 @@ export interface PendingSendStatusProps {
   error?: string | null;
   errorReference?: string | null;
   updateRequired?: boolean;
+  heldByFailed?: boolean;
   retrySafe: boolean;
   canEdit: boolean;
   onRetry: () => void;
@@ -27,6 +28,7 @@ export function PendingSendStatus(props: PendingSendStatusProps): JSX.Element {
           <Show when={props.error}>{(error) => <span class="pending-send-error">{error()}</span>}</Show>
           <ErrorReference reference={props.errorReference ?? null} />
         </Show>
+        <Show when={props.state === "waiting" && props.heldByFailed}>{t("chat.send.waitingForFailed")}</Show>
       </span>
       <Show when={failed()}>
         <Show when={props.retrySafe && !props.updateRequired}>

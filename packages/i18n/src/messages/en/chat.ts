@@ -452,6 +452,7 @@ export const messages = defineMessages("chat", {
   "chat.send.unconfirmed": "Not confirmed. Check the chat before you send it again.",
   "chat.send.edit": "Edit",
   "chat.send.dismiss": "Dismiss",
+  "chat.send.waitingForFailed": "Waits for the message that was not sent",
   "chat.history.olderFailed": "Older messages could not load.",
   "chat.messageUnavailable": "This message is no longer available.",
   "chat.activity.workingIn": "Working in {channel}",

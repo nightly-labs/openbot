@@ -1978,6 +1978,10 @@ button.chat-action-target:active,
   margin-inline-end: var(--openbot-space-1);
 }
 
+.pending-send-status[data-state="waiting"] .pending-send-label {
+  color: var(--openbot-text-muted);
+}
+
 .message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) {
   width: auto;
   max-width: min(80%, 720px);

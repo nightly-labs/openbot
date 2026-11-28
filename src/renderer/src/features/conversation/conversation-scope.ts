@@ -834,6 +834,9 @@ export function createConversationViewScope(props: ConversationProps) {
       .filter((send) => !send.queued || send.state === "failed" || (send.late && !queuedIds.has(send.clientMessageId)))
       .map(pendingSendMessage);
   });
+  const pendingSendsHeldByFailed = createMemo(
+    () => currentPendingSends().find((send) => send.state !== "sent")?.state === "failed",
+  );
   const pendingSendFor = (messageId: string | undefined) =>
     messageId?.startsWith(PENDING_SEND_ID_PREFIX)
       ? currentPendingSends().find((send) => `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}` === messageId)
@@ -2908,6 +2911,7 @@ export function createConversationViewScope(props: ConversationProps) {
     awaitingReplies,
     channel,
     pendingSendFor,
+    pendingSendsHeldByFailed,
     retryPendingSend,
     editPendingSend,
     dismissPendingSend,

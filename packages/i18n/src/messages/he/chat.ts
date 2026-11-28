@@ -468,6 +468,7 @@ export const messages = {
   "chat.send.unconfirmed": "לא אושרה. יש לבדוק את הצ'אט לפני שליחה חוזרת.",
   "chat.send.edit": "עריכה",
   "chat.send.dismiss": "סגירה",
+  "chat.send.waitingForFailed": "ממתין להודעה שלא נשלחה",
   "chat.history.olderFailed": "לא ניתן היה לטעון הודעות ישנות יותר.",
   "chat.messageUnavailable": "ההודעה הזו אינה זמינה עוד.",
   "chat.activity.workingIn": "עובד ב-{channel}",
