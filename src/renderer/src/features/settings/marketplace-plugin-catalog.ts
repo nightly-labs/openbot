@@ -7,6 +7,7 @@
  */
 
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { OPENBOT_PLUGIN_ORIGIN, OPENBOT_PLUGIN_PATH_PREFIX } from "@openbot/contracts/plugin-links";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
@@ -25,6 +26,21 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
     workingDirectory: "",
     url: app.server.transport === "http" ? app.server.url : "",
     headers: [],
+  };
+}
+
+function accountServiceIconUrl(slug: string, iconUrl: string | null, appId?: string): string | null {
+  if (!iconUrl) return null;
+  const url = new URL(`${OPENBOT_PLUGIN_PATH_PREFIX}icon/${encodeURIComponent(slug)}`, OPENBOT_PLUGIN_ORIGIN);
+  if (appId) url.searchParams.set("app", appId);
+  return url.toString();
+}
+
+function withAccountServiceIcons(plugin: MarketplacePluginDetail): MarketplacePluginDetail {
+  return {
+    ...plugin,
+    iconUrl: accountServiceIconUrl(plugin.slug, plugin.iconUrl),
+    apps: plugin.apps.map((app) => ({ ...app, iconUrl: accountServiceIconUrl(plugin.slug, app.iconUrl, app.id) })),
   };
 }
 
@@ -11034,4 +11050,4 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   YOU,
   ZAPIER,
   ZOOMINFO,
-];
+].map(withAccountServiceIcons);

@@ -39,7 +39,7 @@ export const pluginIconResponse = Effect.fn("PluginIcon.response")(function* (sl
     Effect.tryPromise({
       try: (signal) =>
         fetch(url, {
-          headers: { Accept: "image/*" },
+          headers: { Accept: "image/*", "User-Agent": "OpenBot/1.0 (+https://openbot.run)" },
           redirect: "follow",
           signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
         }),
