@@ -69,9 +69,11 @@ async function runTurn(threadId, turnId) {
   parent("item/completed", { ...spawn, status: "completed", receiverThreadIds: ["child-1"],
     agentsStates: { "child-1": { status: "running", message: null } } });
   await step(20);
-  const activity = (kind) => ({ type: "subAgentActivity", id: "activity-" + kind, kind, agentThreadId: "child-2", agentPath: "/root/review" });
+  const activity = (kind) => ({ type: "subAgentActivity", id: "activity-" + kind, kind, agentThreadId: "child-2", agentPath: "/root/review", model: "gpt-5.5" });
   parent("item/started", activity("started"));
   parent("item/completed", activity("started"));
+  await step(20);
+  child("child-2", "item/completed", { type: "commandExecution", id: "cmd-2", command: "bun lint" });
   await step(20);
   const consented = {
     v1: await consent("child-1", "child-turn"),
@@ -275,6 +277,14 @@ try {
       status: "completed",
       error: null,
       steps: ["command: bun test", "thinking: Two tests fail.", "text: Fixing the parser.", "text: All tests pass."],
+    },
+    {
+      title: "review",
+      agentType: "gpt-5.5",
+      prompt: null,
+      status: "completed",
+      error: null,
+      steps: ["command: bun lint"],
     },
   ];
   const consentText = snapshot.messages.find((message) => message.text.startsWith("Consents: "))?.text ?? "";

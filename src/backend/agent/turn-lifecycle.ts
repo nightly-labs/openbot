@@ -112,6 +112,7 @@ import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
   endCodexChild,
   foldCodexChildItem,
+  foldCodexSubagentActivity,
   foldCodexSubagentItem,
   SUBAGENTS_UPDATED_METHOD,
   stopRunningSubagents,
@@ -3611,9 +3612,19 @@ export class TurnLifecycle {
     const childThreadId = getString(item, "agentThreadId");
     if (!childThreadId) return;
     const kind = getString(item, "kind");
-    if (kind === "started" || kind === "interacted")
-      this.#codexChildren.set(childThreadId, { agentId, threadId, turnId });
-    else this.#codexChildren.delete(childThreadId);
+    const starts = kind === "started" || kind === "interacted";
+    if (starts) this.#codexChildren.set(childThreadId, { agentId, threadId, turnId });
+    const parent = this.#codexChildren.get(childThreadId) ?? { agentId, threadId, turnId };
+    const snapshot = this.#conversation.ensureSnapshot(parent.agentId, parent.threadId);
+    const id = `${parent.turnId}:subagents`;
+    const current =
+      snapshot.messages.find((candidate) => candidate.id === id)?.subagents ??
+      this.#store.database.readConversationMessages(parent.agentId, snapshot.threadId, [id])[0]?.subagents ??
+      [];
+    const subagents = foldCodexSubagentActivity(current, item, new Date().toISOString());
+    const clamped = subagents && clampConversationSubagents(subagents);
+    if (clamped) this.#applySubagents(parent.agentId, parent.threadId, parent.turnId, clamped);
+    if (!starts) this.#codexChildren.delete(childThreadId);
   }
 
   workingCodexChildren(
