@@ -61,6 +61,10 @@ const server = createServer((request, response) => {
     response.end(
       "<!doctype html><title>busy</title><script>setTimeout(() => { while (true) {} }, 50)</script><img src='/stall'>",
     );
+  else if (request.url === "/ask-twice")
+    response.end(
+      "<!doctype html><title>start</title><script>document.title = 'first:' + confirm('First?'); alert('Second'); document.title += ':done'</script>",
+    );
   else if (request.url === "/ask")
     response.end(
       "<!doctype html><title>start</title><script>document.title = 'asked:' + confirm('Continue?')</script>",
@@ -284,6 +288,32 @@ async function main(): Promise<void> {
       assert.equal((await answer(welcome.tabId, welcome.dialog.id, true)).success, true);
       await waitUntil(async () => (await title(loadContents("/welcome"))) === "greeted");
       recordCases("open-load-alert-returned");
+
+      const first = parsedDialog(await call("open", { url: `${origin}/ask-twice` }));
+      assert.equal(first.dialog.message, "First?");
+      assert(first.dialog.id, "The agent got no id for the first dialog of its open.");
+      const second = parsedDialog(await answer(first.tabId, first.dialog.id, true));
+      assert.equal(second.dialog.message, "Second");
+      assert(second.dialog.id, "The agent got no id for the second dialog of the same load.");
+      assert.equal((await answer(second.tabId, second.dialog.id, true)).success, true);
+      await waitUntil(async () => (await title(loadContents("/ask-twice"))) === "first:true:done");
+      recordCases("open-load-dialogs-chained");
+
+      const stalled = call("open", { url: `${origin}/stall` });
+      let stalledTabId: string | undefined;
+      await waitUntil(async () => {
+        const tabs = z
+          .object({ tabs: z.array(z.object({ id: z.string(), url: z.string() })) })
+          .parse(JSON.parse(text(await call("list_tabs", {}))));
+        stalledTabId = tabs.tabs.find((tab) => tab.url.endsWith("/stall"))?.id;
+        return stalledTabId !== undefined;
+      });
+      assert(stalledTabId, "Missing the tab of the stalled open.");
+      assert.equal((await call("close_tab", { tabId: stalledTabId })).success, true);
+      const closedOpen = await stalled;
+      assert.equal(closedOpen.success, false, text(closedOpen));
+      assert.match(text(closedOpen), /Unable to open/);
+      recordCases("open-fails-when-tab-closes-during-load");
     }
 
     {

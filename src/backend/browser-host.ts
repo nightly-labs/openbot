@@ -1100,33 +1100,48 @@ export class BrowserHost {
       yield* Effect.gen({ self: this }, function* () {
         tab.opening = true;
         const dialogWatch = dialogOwner ? tab.engine.watchDialogs(dialogOwner) : undefined;
-        yield* Effect.gen(function* () {
-          const loading = yield* Effect.forkIn(
-            navigateAndWait(
-              tab.contents,
-              () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
-              firstLoadTimeoutMs,
-              dialogWatch
-                ? (settle) =>
-                    tab.engine.onDialogChange(() => {
-                      if (tab.engine.dialog) settle();
-                    })
-                : undefined,
-            ),
+        const loadStarted = Deferred.makeUnsafe<void>();
+        if (dialogWatch)
+          yield* Effect.forkIn(
+            Deferred.await(loadStarted).pipe(Effect.andThen(tab.engine.observeDialogs()), Effect.ignore),
             tab.scope,
             { startImmediately: true },
           );
-          if (dialogWatch)
-            yield* Effect.forkIn(tab.engine.observeDialogs().pipe(Effect.ignore), tab.scope, {
-              startImmediately: true,
-            });
-          yield* Fiber.join(loading).pipe(Effect.onInterrupt(() => Fiber.interrupt(loading)));
-        }).pipe(
+        let watchOutlivesOpen = false;
+        yield* navigateAndWait(
+          tab.contents,
+          () => {
+            const loading = tab.contents.loadURL(normalizedUrl, browserLoadOptions());
+            Deferred.doneUnsafe(loadStarted, Effect.void);
+            return loading;
+          },
+          firstLoadTimeoutMs,
+          dialogWatch
+            ? (settle) =>
+                tab.engine.onDialogChange(() => {
+                  if (tab.engine.dialog) settle();
+                })
+            : undefined,
+        ).pipe(
+          Effect.tap(() =>
+            Effect.suspend(() => {
+              if (!dialogWatch || !tab.engine.dialog || !tab.contents.isLoading()) return Effect.void;
+              watchOutlivesOpen = true;
+              return Effect.forkIn(
+                waitForLoading(tab.contents, firstLoadTimeoutMs ?? AGENT_OPEN_LOAD_TIMEOUT_MS).pipe(
+                  Effect.ignore,
+                  Effect.ensuring(Effect.sync(dialogWatch.end)),
+                ),
+                tab.scope,
+                { startImmediately: true },
+              );
+            }),
+          ),
           Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
           Effect.ensuring(
             Effect.sync(() => {
               tab.opening = false;
-              dialogWatch?.end();
+              if (!watchOutlivesOpen) dialogWatch?.end();
             }),
           ),
         );

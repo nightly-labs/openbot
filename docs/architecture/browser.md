@@ -714,8 +714,9 @@ stops with status `dialog`. The agent answers with `handle_dialog`, which sends
 tool on that tab is refused; `close_tab` still works.
 
 The agent's `open` also watches during the first load of its new tab, so a dialog that the page
-opens while it loads ends `open` with the same dialog result. It sends `Page.enable` only after
-`loadURL` starts, because a tab with no page yet answers no CDP command. When a load time limit ends,
+opens while it loads ends `open` with the same dialog result. The watch stays until that load ends
+or its time limit ends, so `handle_dialog` also returns a second dialog of the same load. It sends
+`Page.enable` only after `loadURL` starts, because a tab with no page yet answers no CDP command. When a load time limit ends,
 `navigateAndWait` stops the page and then waits at most 2 s for its stop event: a page that a dialog
 or a busy script holds sends none, and `open` waited until the tab closed (#17955).
 
