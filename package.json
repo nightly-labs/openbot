@@ -317,6 +317,7 @@
     "test:plugin-catalog": "bun scripts/plugin-catalog-e2e.ts",
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
     "test:mcp-oauth-store": "bun scripts/mcp-oauth-store-e2e.ts",
+    "test:mcp-probe-connect-retry": "bun scripts/mcp-probe-connect-retry-e2e.ts",
     "test:mcp-sign-in-client-refused": "bun scripts/mcp-sign-in-client-refused-e2e.ts",
     "test:mcp-sign-in-client-metadata-document": "bun scripts/mcp-sign-in-client-metadata-document-e2e.ts",
     "test:mcp-sign-in-https-relay": "bun scripts/mcp-sign-in-https-relay-e2e.ts",

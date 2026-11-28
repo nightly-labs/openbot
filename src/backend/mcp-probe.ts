@@ -37,7 +37,7 @@ import {
   normalizeResource,
   secureOAuthFetch,
 } from "./mcp-oauth-provider";
-import { insufficientScopeChallenge } from "./mcp-oauth-proxy";
+import { insufficientScopeChallenge, notConnected } from "./mcp-oauth-proxy";
 import {
   clearMcpCommandCache,
   type McpShapeFailed,
@@ -537,7 +537,7 @@ function createTransport(
 
 function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void): FetchLike {
   return async (input, init) => {
-    const response = await fetch(input, init);
+    const response = await fetchAgainWhenNotConnected(input, init);
     if (response.status === 401 || response.status === 403) {
       const challenge = response.headers.get("www-authenticate") ?? "";
       const bearer = /(?:^|,)\s*bearer\b/iu.test(challenge);
@@ -554,6 +554,15 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
     }
     return response;
   };
+}
+
+async function fetchAgainWhenNotConnected(input: string | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (init?.signal?.aborted || !notConnected(error)) throw error;
+    return await fetch(input, init);
+  }
 }
 
 const ORIGIN_METADATA = ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"];
