@@ -28,6 +28,7 @@ import { createEffect, createMemo, createSignal, Loading, onCleanup, Show, untra
 import { actionToast } from "./action-toast";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
+import { ProviderSignInDialogs } from "./components/ProviderSignInDialogs";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { desktopBrowserProfileCalls } from "./features/browser/browser-profiles-port";
@@ -119,6 +120,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <LeaveServer />
       <RestartServer />
       <ServerSettings />
+      <TransferSignInDialogs />
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
       <RemoteDesktop />
@@ -467,6 +469,11 @@ function RestartServer() {
       restoreFocusTarget={restartRestoreTarget()}
     />
   );
+}
+
+function TransferSignInDialogs() {
+  const { connection } = useProviders();
+  return <ProviderSignInDialogs api={connection} opener="transfer" />;
 }
 
 function ServerSettings() {
@@ -945,7 +952,7 @@ function ServerSettings() {
           instanceTransfer={
             server().kind === "local"
               ? {
-                  onSignIn: (provider) => void connection.connect(provider),
+                  onSignIn: (provider) => void connection.connect(provider, "transfer"),
                   history: true,
                   fullCopy: true,
                   copy: copyOptions(),

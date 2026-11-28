@@ -75,6 +75,7 @@ export interface AgentProviderDescriptor {
   readonly accountSignIn?: "key";
   readonly accountCodeSignIn?: "device" | "paste";
   readonly signInPageEnd: "callback" | "page";
+  readonly globalSignInSite?: string;
   readonly mainlandChinaSignInSite?: string;
   readonly skillFolders: readonly [string, ...string[]];
   readonly homeSkills: "native" | "plugin" | "instructions";
@@ -268,6 +269,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     pickerOrder: 7,
     localCodeSignIn: "device",
     signInPageEnd: "page",
+    globalSignInSite: "kimi.ai",
     mainlandChinaSignInSite: "kimi.com",
     skillFolders: [".kimi/skills", ".claude/skills", ".codex/skills", ".agents/skills"],
     homeSkills: "native",

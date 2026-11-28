@@ -4,6 +4,7 @@ import { Button, ErrorReference, Info, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, Show } from "solid-js";
 import { createCodeSignInFallback } from "../../components/createCodeSignInFallback";
+import { providerCodeSignInText } from "../../components/provider-row";
 import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 
@@ -144,7 +145,7 @@ export function ComposerSignInNotice(props: {
                   signInWithCode()(props.provider);
                 }}
               >
-                {t("provider.action.signInWithCode")}
+                {providerCodeSignInText(t, props.provider)}
               </Button>
             )}
           </Show>

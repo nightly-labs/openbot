@@ -49,7 +49,7 @@ export const messages = {
   "provider.action.signIn": "Oturum aç",
   "provider.action.apiKey": "API anahtarı",
   "provider.action.signInWithCode": "Kodla oturum aç",
-  "provider.action.signInMainlandChina": "{site} ile oturum aç (Çin)",
+  "provider.action.signInWithCodeAt": "Kodla oturum aç ({site})",
   "provider.action.pasteAddress": "Adresi yapıştır",
   "provider.aria.download": "{name} sağlayıcısını indir",
   "provider.aria.cancel": "{name} için işlemi iptal et",
@@ -108,6 +108,10 @@ export const messages = {
   "provider.useApp.description":
     "{name} oturum açma işlemi onu başlatan bilgisayara döner ve bir tarayıcı sekmesi bunu alamaz. {name} bağlantısını OpenBot uygulamasında yapın. Uygulama oturum açmayı kendiliğinden tamamlar.",
   "provider.useApp.download": "Uygulamayı indir",
+  "provider.region.title": "{name} hesabınız hangi sitede?",
+  "provider.region.description": "{name} hesabınızı oluşturduğunuz siteyi seçin.",
+  "provider.region.mainlandChina": "{site} (Çin)",
+  "provider.region.global": "{site} (küresel)",
 
   "provider.picker.noEndpoints": "Henüz uç nokta yok",
   "provider.picker.customCounts": "{endpoints} · {agents}",

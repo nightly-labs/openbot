@@ -83,6 +83,8 @@ export function createFakeConnection(options: FakeConnectionOptions = {}): Provi
     alternative: start,
     useApp,
     closeUseApp: () => setUseApp(null),
+    regionChoice: () => null,
+    chooseRegion: () => undefined,
     openAppDownload: useAppProviders.length > 0 ? () => undefined : undefined,
     submit: () => {
       const current = provider();

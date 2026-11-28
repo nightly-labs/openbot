@@ -49,7 +49,7 @@ export const messages = {
   "provider.action.signIn": "サインイン",
   "provider.action.apiKey": "API キー",
   "provider.action.signInWithCode": "コードでログイン",
-  "provider.action.signInMainlandChina": "{site} でログイン (中国)",
+  "provider.action.signInWithCodeAt": "コードでログイン ({site})",
   "provider.action.pasteAddress": "アドレスを貼り付け",
   "provider.aria.download": "{name} をダウンロード",
   "provider.aria.cancel": "{name} をキャンセル",
@@ -110,6 +110,10 @@ export const messages = {
   "provider.useApp.description":
     "{name} のサインインは開始したコンピューターに戻るため、ブラウザーのタブでは受け取れません。OpenBot アプリで {name} に接続してください。アプリがサインインを自動で完了します。",
   "provider.useApp.download": "アプリを入手",
+  "provider.region.title": "{name} アカウントはどのサイトですか？",
+  "provider.region.description": "{name} アカウントを作成したサイトを選んでください。",
+  "provider.region.mainlandChina": "{site} (中国)",
+  "provider.region.global": "{site} (グローバル)",
 
   "provider.picker.noEndpoints": "エンドポイントはまだありません",
   "provider.picker.customCounts": "{endpoints} · {agents}",

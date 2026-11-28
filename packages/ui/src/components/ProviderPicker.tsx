@@ -16,7 +16,6 @@ import {
   Copy,
   DropdownMenu,
   Ellipsis,
-  Globe2,
   Input,
   Link,
   RefreshCw,
@@ -41,6 +40,7 @@ import {
   PROVIDER_ACTION_TEXT,
   type ProviderAction,
   providerAction,
+  providerCodeSignInText,
   providerStatusLabel,
   providerStatusVariant,
   runtimeStoreAction,
@@ -57,8 +57,6 @@ export interface ProviderConnection {
   alternativeKind: (provider: AgentProviderId) => ProviderAlternativeSignIn | null;
   connect: (provider: AgentProviderId) => void | Promise<void>;
   alternative: (provider: AgentProviderId) => void;
-  mainlandChinaSite?: (provider: AgentProviderId) => string | null;
-  connectInMainlandChina?: (provider: AgentProviderId) => Promise<void>;
 }
 
 export interface ProviderPickerOption {
@@ -358,8 +356,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 version,
                 visualState,
                 alternative,
-                mainlandChinaSite,
-                connectInMainlandChina,
                 connectOptional,
                 runtimeAction,
                 browserConnect,
@@ -388,7 +384,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
               } = createProviderRow(option, props);
               const actionsMenu = () =>
                 alternative() !== null ||
-                mainlandChinaSite() !== null ||
                 (accountCodeOffered() && !hasKeyAccounts(option().id)) ||
                 updateOffered() ||
                 restartOffered() ||
@@ -541,11 +536,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           disabled={props.disabled || props.refreshingProviders}
                           onClick={signInAlternative}
                         >
-                          {t(
-                            alternative() === "address"
-                              ? "provider.action.pasteAddress"
-                              : "provider.action.signInWithCode",
-                          )}
+                          {alternative() === "address"
+                            ? t("provider.action.pasteAddress")
+                            : providerCodeSignInText(t, option().id)}
                         </Button>
                       </Show>
                       <Show when={runtimeAction()}>
@@ -682,19 +675,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                     <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
                                       <Link aria-hidden="true" />
                                     </Show>
-                                    {t(
-                                      kind() === "address"
-                                        ? "provider.action.pasteAddress"
-                                        : "provider.action.signInWithCode",
-                                    )}
-                                  </DropdownMenu.Item>
-                                )}
-                              </Show>
-                              <Show when={mainlandChinaSite()}>
-                                {(site) => (
-                                  <DropdownMenu.Item onSelect={connectInMainlandChina}>
-                                    <Globe2 aria-hidden="true" />
-                                    {t("provider.action.signInMainlandChina", { site: site() })}
+                                    {kind() === "address"
+                                      ? t("provider.action.pasteAddress")
+                                      : providerCodeSignInText(t, option().id)}
                                   </DropdownMenu.Item>
                                 )}
                               </Show>

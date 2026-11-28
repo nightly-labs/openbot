@@ -64,7 +64,7 @@ export const messages = {
   "provider.action.signIn": "Zaloguj się",
   "provider.action.apiKey": "Klucz API",
   "provider.action.signInWithCode": "Zaloguj się kodem",
-  "provider.action.signInMainlandChina": "Zaloguj przez {site} (Chiny)",
+  "provider.action.signInWithCodeAt": "Zaloguj się kodem ({site})",
   "provider.action.pasteAddress": "Wklej adres",
   "provider.aria.download": "Pobierz {name}",
   "provider.aria.cancel": "Anuluj {name}",
@@ -125,6 +125,10 @@ export const messages = {
   "provider.useApp.description":
     "Logowanie do {name} wraca na komputer, który je rozpoczął, a karta przeglądarki nie może go odebrać. Połącz {name} w aplikacji OpenBot. Aplikacja sama dokończy logowanie.",
   "provider.useApp.download": "Pobierz aplikację",
+  "provider.region.title": "Gdzie jest Twoje konto {name}?",
+  "provider.region.description": "Wybierz stronę, na której utworzono Twoje konto {name}.",
+  "provider.region.mainlandChina": "{site} (Chiny)",
+  "provider.region.global": "{site} (globalnie)",
 
   "provider.picker.noEndpoints": "Brak endpointów",
   "provider.picker.customCounts": "{endpoints} · {agents}",
