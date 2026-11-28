@@ -949,7 +949,7 @@ export const messages = {
   "mobile.server.connectors.telegram.directDescription":
     "Todas as mensagens deste chat vão para o Orquestrador do Telegram.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "O bot do OpenBot não está mais neste chat. Desconecte o chat e adicione o bot novamente.",
+    "O bot foi removido, ou o grupo virou um supergrupo. Vincule de novo com “Vincular outro chat”.",
   "mobile.server.connectors.telegram.helpRelay":
     "O OpenBot em {host} não consegue receber mensagens do Telegram. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
   "mobile.server.connectors.telegram.helpError":

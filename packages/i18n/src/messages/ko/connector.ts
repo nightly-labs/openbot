@@ -235,7 +235,7 @@ export const messages = {
   "connector.telegram.groupDescription": "사람들이 봇을 멘션하거나 봇의 메시지에 답장해요.",
   "connector.telegram.directDescription": "이 채팅의 모든 메시지가 Telegram 오케스트레이터에게 전달돼요.",
   "connector.telegram.helpRemoved":
-    "OpenBot 봇이 더 이상 이 채팅에 없어요. 채팅 연결을 해제한 뒤 봇을 다시 추가해 주세요.",
+    "봇이 제거되었거나 그룹이 슈퍼그룹으로 바뀌었어요. ‘채팅 연결’로 다시 연결해 주세요.",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot이 이 컴퓨터에서 Telegram 메시지를 받을 수 없어요. 로그인하고, 서버 설정에서 이 컴퓨터에 이름을 지정한 뒤 OpenBot을 열어 두세요.",
   "connector.telegram.helpRelayUnavailableHost":

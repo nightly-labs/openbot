@@ -969,7 +969,7 @@ export const messages = {
   "mobile.server.connectors.telegram.directDescription":
     "Jede Nachricht in diesem Chat geht an den Telegram-Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "Der OpenBot-Bot ist nicht mehr in diesem Chat. Trenne den Chat und füge den Bot dann erneut hinzu.",
+    "Der Bot wurde entfernt, oder die Gruppe wurde zur Supergruppe. Verknüpfe sie neu mit „Weiteren Chat verknüpfen“.",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot auf {host} kann keine Telegram-Nachrichten empfangen. Melde dich auf {host} an, gib dem Server in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
   "mobile.server.connectors.telegram.helpError":

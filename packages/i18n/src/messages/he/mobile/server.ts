@@ -1194,7 +1194,7 @@ export const messages = {
   "mobile.server.connectors.telegram.groupDescription": "אנשים מזכירים את הבוט או משיבים להודעות שלו.",
   "mobile.server.connectors.telegram.directDescription": "כל הודעה בצ'אט הזה מועברת ל-Telegram Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "הבוט של OpenBot כבר לא נמצא בצ'אט הזה. יש לנתק את הצ'אט ולהוסיף את הבוט שוב.",
+    "הבוט הוסר, או שהקבוצה הפכה לקבוצת־על. יש לקשר אותה שוב דרך “קישור צ'אט נוסף”.",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל הודעות מ-Telegram. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
   "mobile.server.connectors.telegram.helpError": "OpenBot לא מצליח להגיע לצ'אט הזה. אפשר לחבר מחדש, או לנתק את הצ'אט.",

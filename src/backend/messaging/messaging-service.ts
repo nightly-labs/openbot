@@ -56,6 +56,7 @@ import {
   type MessagingHistory,
   type MessagingHistoryScope,
   type MessagingSlackSend,
+  type MessagingStopReason,
   type MessagingTelegramSend,
   type MessagingThreads,
 } from "./messaging-threads";
@@ -91,7 +92,7 @@ import { slackPingedUsers } from "./slack/slack-render";
 import { SlackApiError, SlackWebApi } from "./slack/slack-web-api";
 import { type TelegramAppPort, telegramLinkUrl } from "./telegram/telegram-connect";
 import { telegramOrchestratorMemories, telegramOrchestratorProfile } from "./telegram/telegram-orchestrator";
-import { parseTelegramUpdate, telegramLink, telegramRemoval } from "./telegram/telegram-updates";
+import { parseTelegramUpdate, telegramLink, telegramMigration, telegramRemoval } from "./telegram/telegram-updates";
 import { WHATSAPP_HISTORY_KEEP_MS } from "./whatsapp/whatsapp-archive";
 import { WhatsAppConnect } from "./whatsapp/whatsapp-connect";
 import { whatsAppOrchestratorMemories, whatsAppOrchestratorProfile } from "./whatsapp/whatsapp-orchestrator";
@@ -283,6 +284,7 @@ export class MessagingService {
         const record = this.#threads.store.connection(connectionId);
         return record ? this.#summary(record).state === "secret_storage_unavailable" : false;
       },
+      stopped: (connectionId) => this.#stopReason(connectionId),
       places: (connectionId) => this.#outboundPlaces(connectionId),
       history: (connectionId, placeId, limit, filter) => this.#outboundHistory(connectionId, placeId, limit, filter),
       post: (connectionId, target, markdown, files, embeds) =>
@@ -1027,6 +1029,8 @@ export class MessagingService {
       !telegramRemoval(update, botId, chatId)
     )
       return;
+    const migratedTo = telegramMigration(update, chatId);
+    if (migratedTo) yield* this.#rememberTelegramMove(record.connectionId, migratedTo);
     yield* this.#stopConnection(record.connectionId);
     this.#threads.store.updateConnection(record.connectionId, { enabled: true, lastErrorCode: "removed" });
     if (this.#telegramApp)
@@ -1154,10 +1158,17 @@ export class MessagingService {
     const transport = driver.createTransport(credentials, identity);
     live.transport = transport;
     transport.start({
-      state: (state) => {
+      state: (state, detail) => {
         live.reported = state;
         if (state === "connected") live.retryAt = null;
-        this.#dispatch(this.#setState(live, state));
+        const migratedTo = detail?.migratedTo;
+        this.#dispatch(
+          migratedTo
+            ? this.#rememberTelegramMove(record.connectionId, migratedTo).pipe(
+                Effect.andThen(this.#setState(live, state)),
+              )
+            : this.#setState(live, state),
+        );
       },
       message: (message) => this.#dispatch(this.#receive(live, message)),
       action: (action) => this.#dispatch(this.#action(live, action)),
@@ -1236,6 +1247,33 @@ export class MessagingService {
         yield* this.#stopConnection(live.record.connectionId);
     }
   });
+
+  readonly #rememberTelegramMove = Effect.fn("MessagingService.rememberTelegramMove")(function* (
+    this: MessagingService,
+    connectionId: string,
+    migratedTo: string,
+  ) {
+    const values = this.#credentials.get(connectionId);
+    if (values)
+      yield* this.#credentials
+        .set(connectionId, { ...values, migratedTo })
+        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
+  });
+
+  #stopReason(connectionId: string): MessagingStopReason | null {
+    const record = this.#threads.store.connection(connectionId);
+    if (!record?.enabled) return null;
+    const state = this.#summary(record).state;
+    if (state === "invalid_token") return { kind: "access" };
+    if (this.#live.get(connectionId)?.identity) return null;
+    if (this.#credentials.status(connectionId) !== "saved" || state === "secret_storage_unavailable")
+      return { kind: "keys" };
+    if (state !== "removed") return null;
+    const migratedTo = this.#credentials.get(connectionId)?.migratedTo;
+    if (!migratedTo) return { kind: "removed" };
+    const relinked = this.#threads.store.connectionForWorkspace("telegram", migratedTo);
+    return { kind: "moved", relinkedAs: relinked?.enabled ? relinked.connectionId : null };
+  }
 
   #summary(record: MessagingConnectionRecord): MessagingConnection {
     const live = this.#live.get(record.connectionId);

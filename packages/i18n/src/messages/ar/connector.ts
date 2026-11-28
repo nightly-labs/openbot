@@ -316,7 +316,7 @@ export const messages = {
   "connector.telegram.chatsTitle": "الدردشات",
   "connector.telegram.groupDescription": "يذكر الأشخاص البوت أو يردّون على رسائله.",
   "connector.telegram.directDescription": "تذهب كل رسالة في هذه الدردشة إلى Telegram Orchestrator.",
-  "connector.telegram.helpRemoved": "لم يعد بوت OpenBot في هذه الدردشة. اقطع اتصال الدردشة، ثم أضف البوت مرة أخرى.",
+  "connector.telegram.helpRemoved": "أُزيل البوت، أو أصبحت المجموعة مجموعة خارقة. اربطها مجددًا عبر “ربط دردشة”.",
   "connector.telegram.helpRelayUnavailable":
     "لا يستطيع OpenBot استقبال رسائل Telegram على هذا الحاسوب. سجّل الدخول، وأعطِ هذا الحاسوب اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
   "connector.telegram.helpRelayUnavailableHost":

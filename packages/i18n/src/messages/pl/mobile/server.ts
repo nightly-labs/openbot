@@ -1040,7 +1040,7 @@ export const messages = {
   "mobile.server.connectors.telegram.directDescription":
     "Każda wiadomość w tym czacie trafia do Telegram Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "Bota OpenBot nie ma już w tym czacie. Odłącz czat, a potem dodaj bota ponownie.",
+    "Bot został usunięty albo grupa stała się supergrupą. Połącz ją ponownie przez „Połącz kolejny czat”.",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot na serwerze {host} nie może odbierać wiadomości z Telegram. Na serwerze {host} zaloguj się, nadaj serwerowi nazwę w ustawieniach serwera i nie zamykaj OpenBot.",
   "mobile.server.connectors.telegram.helpError":

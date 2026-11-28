@@ -201,7 +201,7 @@ export interface MessagingAdapter {
 }
 
 export interface TransportSink {
-  state(state: MessagingConnectionState, detail?: { retryAt?: string }): void;
+  state(state: MessagingConnectionState, detail?: { retryAt?: string; migratedTo?: string }): void;
   message(message: InboundMessage): void;
   action(action: InboundAction): void;
   placeCreated?(platformChannelId: string): void;

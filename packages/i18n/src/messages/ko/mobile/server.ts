@@ -894,7 +894,7 @@ export const messages = {
   "mobile.server.connectors.telegram.groupDescription": "봇을 멘션하거나 봇의 메시지에 답장하세요.",
   "mobile.server.connectors.telegram.directDescription": "이 채팅의 모든 메시지는 Telegram Orchestrator로 전달돼요.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "OpenBot 봇이 더 이상 이 채팅에 없어요. 채팅 연결을 해제한 다음 봇을 다시 추가해 주세요.",
+    "봇이 제거되었거나 그룹이 슈퍼그룹으로 바뀌었어요. ‘다른 채팅 연결’로 다시 연결해 주세요.",
   "mobile.server.connectors.telegram.helpRelay":
     "{host}의 OpenBot이 Telegram 메시지를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
   "mobile.server.connectors.telegram.helpError":

@@ -912,7 +912,7 @@ export const messages = {
   "mobile.server.connectors.telegram.groupDescription": "Mensen noemen de bot of reageren op zijn berichten.",
   "mobile.server.connectors.telegram.directDescription": "Elk bericht in deze chat gaat naar de Telegram Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "De OpenBot-bot zit niet meer in deze chat. Ontkoppel de chat en voeg de bot opnieuw toe.",
+    "De bot is verwijderd, of de groep is een supergroep geworden. Koppel hem opnieuw met “Nog een chat koppelen”.",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot op {host} kan geen Telegram-berichten ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
   "mobile.server.connectors.telegram.helpError":

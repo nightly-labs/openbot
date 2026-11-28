@@ -915,7 +915,7 @@ export const messages = {
   "mobile.server.connectors.telegram.directDescription":
     "このチャットのすべてのメッセージが Telegram Orchestrator に届きます。",
   "mobile.server.connectors.telegram.helpRemoved":
-    "OpenBot ボットはこのチャットにいません。チャットを切断してから、ボットをもう一度追加してください。",
+    "ボットが削除されたか、グループがスーパーグループになりました。「別のチャットをリンク」でもう一度リンクしてください。",
   "mobile.server.connectors.telegram.helpRelay":
     "{host} の OpenBot は Telegram のメッセージを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
   "mobile.server.connectors.telegram.helpError":

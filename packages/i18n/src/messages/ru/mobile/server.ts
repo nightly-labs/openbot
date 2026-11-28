@@ -1035,7 +1035,7 @@ export const messages = {
   "mobile.server.connectors.telegram.groupDescription": "Люди упоминают бота или отвечают на его сообщения.",
   "mobile.server.connectors.telegram.directDescription": "Каждое сообщение в этом чате получает Оркестратор Telegram.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "Бота OpenBot больше нет в этом чате. Отключите чат, затем снова добавьте бота.",
+    "Бота удалили, или группа стала супергруппой. Привяжите её снова через «Привязать ещё один чат».",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot на {host} не может получать сообщения Telegram. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
   "mobile.server.connectors.telegram.helpError":

@@ -266,7 +266,7 @@ export const messages = {
   "connector.telegram.groupDescription": "Mensen noemen de bot of antwoorden op zijn berichten.",
   "connector.telegram.directDescription": "Elk bericht in deze chat gaat naar de Telegram Orchestrator.",
   "connector.telegram.helpRemoved":
-    "De OpenBot-bot zit niet meer in deze chat. Koppel de chat los en voeg de bot daarna opnieuw toe.",
+    "De bot is verwijderd, of de groep is een supergroep geworden. Koppel hem opnieuw met “Koppel een chat”.",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot kan op deze computer geen Telegram-berichten ontvangen. Log in, geef deze computer een naam in Serverinstellingen en houd OpenBot open.",
   "connector.telegram.helpRelayUnavailableHost":
