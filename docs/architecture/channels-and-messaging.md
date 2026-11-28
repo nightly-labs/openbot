@@ -155,6 +155,15 @@ or the member sent, answered, or typed from another session in the last 30 secon
 app on a computer does not count for it, because no desktop then tells about that turn. A host does
 not keep such a turn for a phone that does not take it.
 
+A joined desktop and the web client get the routine thread turn through the optional
+`routine-thread-turn-v1` capability (`packages/contracts/src/team-protocol/routine-thread-turn-v1.ts`).
+The host sends a client with the capability a `routine-thread-turn-completed` event with the agent,
+the thread, the task, the turn and its status, and the client changes it back to
+`thread-turn-completed`. The desktop then notifies as for the host's own routine thread, and reads
+the preview from the task through `/v1/agent-tasks/read`. The web client notifies the turn as a
+`turn-completed`. A host does not send the event of another side thread, and a client without the
+capability gets nothing, as before.
+
 The notification data has the thread of the event, not a task id, and the phone does not know the
 thread of an agent's own chat. So the app (`outside-target.ts`, used by `(app)/_layout.tsx`) opens
 the channel whose thread it is, or the side thread when the phone has read the agent's thread list.

@@ -1,0 +1,9 @@
+{
+  "type": "routine-thread-turn-completed",
+  "agentId": "agent-1",
+  "threadId": "thread-routine-1",
+  "taskId": "task-1",
+  "turnId": "turn-1",
+  "status": "completed",
+  "origin": "routine"
+}

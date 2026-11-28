@@ -299,6 +299,10 @@ import {
 import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import {
+  ROUTINE_THREAD_TURN_CAPABILITY,
+  routineThreadTurnForPeer,
+} from "@openbot/contracts/team-protocol/routine-thread-turn-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SERVER_SAFE_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/server-safe-mode-v1";
@@ -2110,6 +2114,7 @@ export class TeamApiServer {
         (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));
         continue;
       }
+      if (event.type === "thread-turn-completed") optional = routineThreadTurnForPeer(event);
       if (optional) {
         const agentId = optionalEventAgentId(optional);
         if (
@@ -3633,6 +3638,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
     return AGENT_TASKS_CAPABILITY;
   if (event.type === "skills-changed") return SKILLS_EVENTS_CAPABILITY;
   if (event.type === "routine-flows-changed") return ROUTINE_FLOWS_CAPABILITY;
+  if (event.type === "thread-turn-completed") return ROUTINE_THREAD_TURN_CAPABILITY;
   if (event.type === "workflows-changed") return WORKFLOWS_CAPABILITY;
   if (event.type === "workflow-folders-changed") return WORKFLOW_FOLDERS_CAPABILITY;
   if (event.type === "crm-changed") return CRM_CAPABILITY;

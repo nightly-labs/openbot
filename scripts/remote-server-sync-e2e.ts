@@ -907,6 +907,36 @@ try {
 
   const hostService = agents;
   assert.ok(hostService, "The host has no agent service.");
+
+  await step(
+    "routine-thread-turn-v1: the turn of a routine thread reaches the joined desktop as thread-turn-completed, and the turn of another side thread does not",
+    async () => {
+      const threadTurns: AgentEvent[] = [];
+      const recordThreadTurn = (eventServerId: string, event: AgentEvent) => {
+        if (eventServerId === serverId && event.type === "thread-turn-completed") threadTurns.push(event);
+      };
+      const threadTurn = (taskId: string, routine: boolean, turnId: string, status: string): AgentEvent => ({
+        type: "thread-turn-completed",
+        taskId,
+        routine,
+        turn: { type: "turn-completed", agentId, threadId: `${taskId}-thread`, turnId, status, origin: "routine" },
+      });
+      const completed = threadTurn("routine-task", true, "routine-turn-1", "completed");
+      const failed = threadTurn("routine-task", true, "routine-turn-2", "failed");
+      manager.on("agent", recordThreadTurn);
+      hostService.emit("event", threadTurn("side-task", false, "side-turn-1", "completed"));
+      hostService.emit("event", completed);
+      hostService.emit("event", failed);
+      await until(manager, () => (threadTurns.length >= 2 ? true : null));
+      manager.off("agent", recordThreadTurn);
+      assert.deepStrictEqual(
+        threadTurns,
+        [completed, failed],
+        "The joined desktop did not get exactly the two routine thread turns.",
+      );
+      return { threadTurns };
+    },
+  );
   const baseTime = Date.now();
   let messageClock = 0;
   const conversationMessage = (id: string, author: "user" | "assistant", text: string): ConversationMessage => {

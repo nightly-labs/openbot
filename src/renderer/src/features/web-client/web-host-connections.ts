@@ -83,13 +83,18 @@ export type WebHostNotice = Extract<
   }
 >;
 
-export function isWebHostNotice(event: AgentEvent | TeamRealtimeEvent): event is WebHostNotice {
+function isWebHostNotice(event: AgentEvent | TeamRealtimeEvent): event is WebHostNotice {
   return (
     agentEventCanNotify(event) ||
     event.type === "agent-input-resolved" ||
     event.type === "browser-takeover-resolved" ||
     event.type === "runtime-snapshot"
   );
+}
+
+export function webHostNotice(event: AgentEvent | TeamRealtimeEvent): WebHostNotice | null {
+  if (event.type === "thread-turn-completed") return event.routine ? event.turn : null;
+  return isWebHostNotice(event) ? event : null;
 }
 
 export interface WebHostConnections {
@@ -213,7 +218,10 @@ export function createWebHostConnections(options: {
           if (event.type === "agents-changed") {
             entry.agents = event.agents;
             entry.agentsRevision += 1;
-          } else if (isWebHostNotice(event)) options.onNotice?.(host.hostId, event, entry.agents);
+          } else {
+            const notice = webHostNotice(event);
+            if (notice) options.onNotice?.(host.hostId, notice, entry.agents);
+          }
         },
       },
     };

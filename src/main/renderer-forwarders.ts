@@ -8,6 +8,7 @@ import {
   type ChannelSummary,
   type ChatWindowTarget,
   type ClientAgentSummary,
+  type ConversationSnapshot,
   decodeChannelSummaries,
   type HiddenAgentsSnapshot,
   IPC_ENDPOINTS,
@@ -22,6 +23,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   AGENT_HIDDEN_WORK_CAPABILITY,
@@ -63,7 +65,11 @@ import {
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { decodeAgentSummaries, decodeHiddenAgentsFromHost } from "./remote-agent-decoding";
+import {
+  decodeAgentSummaries,
+  decodeHiddenAgentsFromHost,
+  decodeRemoteTaskConversation,
+} from "./remote-agent-decoding";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -399,7 +405,7 @@ export function createRendererForwarders({
     const answer =
       preview && event.type === "turn-completed" && event.status === "completed"
         ? routineTaskId
-          ? routineTurnAnswer(event.agentId, routineTaskId, event.turnId)
+          ? routineTurnAnswer(serverId, event.agentId, routineTaskId, event.turnId)
           : turnAnswer(serverId, event.agentId, event.turnId)
         : null;
     const agentLookup = notificationAgents(serverId);
@@ -479,11 +485,28 @@ export function createRendererForwarders({
     return answer && !isNoUpdateAnswer(answer) ? answer : null;
   }
 
-  function routineTurnAnswer(agentId: string, taskId: string, turnId: string): string | null {
-    try {
-      const snapshot = getHostService()?.readAgentTask(agentId, taskId);
+  function routineTurnAnswer(
+    serverId: string,
+    agentId: string,
+    taskId: string,
+    turnId: string,
+  ): string | null | Promise<string | null> {
+    const answerOf = (snapshot: ConversationSnapshot | undefined) => {
       const answer = snapshot && latestTurnAnswer(snapshot.messages, turnId)?.text;
       return answer && !isNoUpdateAnswer(answer) ? answer : null;
+    };
+    if (serverId !== LOCAL_SERVER_ID) {
+      const remoteManager = getRemoteServerManager();
+      if (!remoteManager?.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) return null;
+      return runCauseEffect(
+        remoteManager.request(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, {
+          method: "POST",
+          body: { agentId, taskId },
+        }),
+      ).then(answerOf, () => null);
+    }
+    try {
+      return answerOf(getHostService()?.readAgentTask(agentId, taskId));
     } catch {
       return null;
     }

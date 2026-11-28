@@ -22,7 +22,7 @@ import { startActionSounds } from "../../action-sounds";
 import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { createAgentEventSounds } from "../agents/agent-event-sounds";
 import type { WebWorkspace } from "./web-client-context";
-import { isWebHostNotice } from "./web-host-connections";
+import { webHostNotice } from "./web-host-connections";
 import type { createWebServerNotifications } from "./web-notification-preferences";
 import {
   requestWebNotificationPermission,
@@ -168,7 +168,8 @@ export function createWebNotificationRouting(options: {
   onCleanup(
     workspace.onHostEvent((event) => {
       const hostId = workspace.state.host?.hostId;
-      if (hostId && isWebHostNotice(event)) notify(hostId, event, workspace.state.agents);
+      const notice = hostId ? webHostNotice(event) : null;
+      if (hostId && notice) notify(hostId, notice, workspace.state.agents);
       playAgentEventSound(event);
     }),
   );

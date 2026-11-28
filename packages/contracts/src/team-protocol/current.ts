@@ -208,6 +208,7 @@ import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "./routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
+import { ROUTINE_THREAD_TURN_CAPABILITY } from "./routine-thread-turn-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SERVER_SAFE_MODE_CAPABILITY } from "./server-safe-mode-v1";
@@ -900,6 +901,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [REMOTE_CHAT_CONTENT_CAPABILITY, V10],
   [PLUGIN_CATALOG_CAPABILITY, V10],
   [TEAM_ATTACHMENT_DIMENSIONS_CAPABILITY, V10],
+  [ROUTINE_THREAD_TURN_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
