@@ -162,6 +162,8 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     queueKey: z.string().max(128).optional(),
     webhookFormats: z.array(z.string().min(1).max(64)).max(8).optional().catch(undefined),
     watchRelay: z.boolean().optional(),
+    goAway: z.boolean().optional(),
+    resumeFrom: z.string().min(1).max(8_192).optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),

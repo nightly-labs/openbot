@@ -446,6 +446,34 @@ export class RemoteTokenService {
     }),
   );
 
+  readonly verifyContinuity = Effect.fn("RemoteTokens.verifyContinuity")(
+    (token: string, ticket: RemoteTicketClaims, now = new Date()) =>
+      Effect.gen({ self: this }, function* () {
+        const expiresAt = yield* tokenDecode(() => z.number().int().safe().parse(decodeJwt(token).exp));
+        const nowSeconds = Math.floor(now.getTime() / 1_000);
+        if (nowSeconds - expiresAt > MAXIMUM_STALE_RESUME_SECONDS) return false;
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#sessionSecret, {
+            audience: RESUME_AUDIENCE,
+            algorithms: ["HS256"],
+            currentDate: expiresAt > nowSeconds ? now : new Date((expiresAt - 1) * 1_000),
+          }),
+        );
+        const previous = yield* tokenDecode(() =>
+          decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now, null),
+        );
+        return (
+          previous.iat <= nowSeconds &&
+          previous.sessionId === ticket.sessionId &&
+          previous.hostId === ticket.hostId &&
+          previous.userId === ticket.userId &&
+          previous.membershipId === ticket.membershipId &&
+          previous.authEpoch === ticket.authEpoch &&
+          previous.clientPublicKey === ticket.clientPublicKey
+        );
+      }).pipe(Effect.orElseSucceed(() => false)),
+  );
+
   readonly issueResumeToken = Effect.fn("RemoteTokens.issueResumeToken")(
     (claims: RemoteTicketClaims, nowSeconds = Math.floor(Date.now() / 1_000)) =>
       Effect.gen({ self: this }, function* () {

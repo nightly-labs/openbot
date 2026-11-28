@@ -17,6 +17,7 @@ export interface RemoteApiConfig {
   turnPort: number;
   turnTlsPort: number;
   metricsToken: string | null;
+  adminToken: string | null;
   maximumConnectionsPerUser: number;
   maximumConnectionsPerIp: number;
   maximumMessagesPerMinute: number;
@@ -152,6 +153,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     turnPort: positiveInteger(environment.TURN_PORT, 3478),
     turnTlsPort: positiveInteger(environment.TURN_TLS_PORT, 5349),
     metricsToken: optional(environment.REMOTE_METRICS_TOKEN),
+    adminToken: optional(environment.REMOTE_ADMIN_TOKEN),
     maximumConnectionsPerUser: positiveInteger(environment.REMOTE_MAX_CONNECTIONS_PER_USER, 32),
     maximumConnectionsPerIp: positiveInteger(environment.REMOTE_MAX_CONNECTIONS_PER_IP, 32),
     maximumMessagesPerMinute: positiveInteger(environment.REMOTE_MAX_MESSAGES_PER_MINUTE, 600),

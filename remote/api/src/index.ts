@@ -1,7 +1,8 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { Context, Effect, Layer, ManagedRuntime, Schema, Semaphore } from "effect";
+import { goAwayRoute, sameSecret } from "./admin-go-away";
 import { createRemoteApiApp, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
 import type { DiscordApi } from "./discord-api";
@@ -475,6 +476,7 @@ const healthServer = Bun.serve({
         headers: { "Content-Type": "text/plain; version=0.0.4" },
       });
     },
+    "/admin/go-away": { POST: goAwayRoute(signal, config.adminToken) },
   },
   fetch: () => new Response("Not found", { status: 404 }),
 });
@@ -557,7 +559,3 @@ const shutdown = () => {
 };
 process.once("SIGINT", () => void shutdown());
 process.once("SIGTERM", () => void shutdown());
-
-function sameSecret(actual: string, expected: string): boolean {
-  return timingSafeEqual(createHash("sha256").update(actual).digest(), createHash("sha256").update(expected).digest());
-}

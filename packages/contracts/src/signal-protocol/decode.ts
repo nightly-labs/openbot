@@ -5,6 +5,7 @@ import { GITHUB_DELIVERY_BODY_BYTES_LIMIT, GITHUB_DELIVERY_ID_PATTERN, GITHUB_EV
 import {
   type IceServer,
   QUEUED_DELIVERY_SEALED_LIMIT,
+  SIGNAL_GO_AWAY_WITHIN_MS_LIMIT,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_SESSIONS_ENDED_LIMIT,
   type SignalChannel,
@@ -49,6 +50,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       };
     case "host-waiting":
       return { type: kind, version, resumeToken: identifier(value.resumeToken) };
+    case "go-away":
+      return { type: kind, version, withinMs: goAwayWindow(value.withinMs) };
     case "sessions-ended":
       return { type: kind, version, sessionIds: sessionIdList(value.sessionIds) };
     case "peer-ready":
@@ -236,6 +239,12 @@ function mLineIndex(value: unknown): number {
 function duration(value: unknown): number {
   const candidate = integer(value);
   if (candidate < 0 || candidate > 86_400_000) invalid();
+  return candidate;
+}
+
+function goAwayWindow(value: unknown): number {
+  const candidate = integer(value);
+  if (candidate < 0 || candidate > SIGNAL_GO_AWAY_WITHIN_MS_LIMIT) invalid();
   return candidate;
 }
 

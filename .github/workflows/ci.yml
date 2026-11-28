@@ -276,6 +276,10 @@ jobs:
       - name: Run the Signal E2E test
         run: bun run test:signal
 
+      - name: Run the Signal cross-home E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:signal-cross-home
+
       - name: Run the direct remote protocol E2E test
         if: ${{ !cancelled() }}
         run: bun run test:remote-protocol
@@ -299,6 +303,7 @@ jobs:
           name: signal-security-e2e
           path: |
             .openbot-build/signal-security-e2e/
+            .openbot-build/signal-cross-home/
             .openbot-build/remote-protocol-e2e/
             .openbot-build/d1-request-session-e2e/
           if-no-files-found: ignore
