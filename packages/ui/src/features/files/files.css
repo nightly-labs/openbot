@@ -1363,6 +1363,17 @@
   list-style: none;
 }
 
+.library-side-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+}
+
+.library-side-skeleton {
+  height: 28px;
+  border-radius: var(--openbot-radius-md);
+}
+
 .library-row {
   --library-row-start: 8px;
   --library-row-step: 18px;

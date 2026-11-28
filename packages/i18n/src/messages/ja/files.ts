@@ -66,6 +66,7 @@ export const messages = {
   "files.library.agents": "エージェント",
   "files.library.allAgents": { other: "全 {count} エージェント" },
   "files.library.folders": "フォルダ",
+  "files.library.loadingFolders": "フォルダを読み込んでいます",
   "files.library.workflows": "ワークフロー",
   "files.library.workflowsOf": "{name} のワークフロー",
   "files.library.favorite": "{name} をお気に入りにする",

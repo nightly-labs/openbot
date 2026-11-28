@@ -69,6 +69,7 @@ export const messages = {
   "files.library.agents": "Agenti",
   "files.library.allAgents": { one: "{count} agente", other: "Tutti i {count} agenti" },
   "files.library.folders": "Cartelle",
+  "files.library.loadingFolders": "Caricamento delle cartelle",
   "files.library.workflows": "Flussi",
   "files.library.workflowsOf": "Flussi in {name}",
   "files.library.favorite": "{name} nei preferiti",

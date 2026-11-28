@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Skeleton,
   Star,
   StarOff,
   Trash2,
@@ -64,7 +65,10 @@ export type LibraryFavorite =
 
 const AGENTS_SHOWN = 6;
 
+const LOADING_ROWS = [0, 1, 2, 3, 4];
+
 interface LibraryFolderTreeProps {
+  loading?: boolean | undefined;
   agents: readonly AgentProfile[];
   activeAgents: readonly AgentProfile[];
   folders: readonly LibraryFolder[];
@@ -678,112 +682,126 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
         </label>
       </div>
       <div class="library-side-scroll" data-library-autoscroll="">
-        <ul class="library-side-list">
-          <li>
-            <SideRow
-              icon={<GalleryVerticalEnd aria-hidden="true" />}
-              label={t("files.library.allFiles")}
-              count={props.counts.all}
-              off={props.dropOff(undefined)}
-              current={current(ALL_FILES)}
-              onGo={() => props.onGo(ALL_FILES)}
-            />
-          </li>
-          <li>
-            <SideRow
-              icon={<Clock3 aria-hidden="true" />}
-              label={t("files.library.recent")}
-              count={props.counts.recent}
-              off={props.dropOff(undefined)}
-              current={current(RECENT_FILES)}
-              onGo={() => props.onGo(RECENT_FILES)}
-            />
-          </li>
-          <li>
-            <SideRow
-              icon={<Inbox aria-hidden="true" />}
-              label={t("files.library.unsorted")}
-              count={props.counts.unsorted}
-              out={true}
-              drop={props.outMark()}
-              off={props.outOff()}
-              landed={props.landedOut()}
-              current={current(UNSORTED_FILES)}
-              onGo={() => props.onGo(UNSORTED_FILES)}
-            />
-          </li>
-        </ul>
-        <Show when={props.favorites.length > 0}>
-          <SideSection rows={rows} key={FAVORITES_SECTION} title={t("files.library.favorites")}>
-            <ul class="library-side-list">
-              <For each={props.favorites} keyed={(favorite) => favorite.key}>
-                {(favorite) => <FavoriteRow rows={rows} favorite={favorite()} />}
-              </For>
-            </ul>
-          </SideSection>
-        </Show>
-        <Show when={props.agents.length > 0}>
-          <SideSection
-            rows={rows}
-            key={AGENTS_SECTION}
-            title={t("files.library.agents")}
-            action={
-              <Show when={props.canCreate && organizable().length > 0}>
-                <AgentPicker
-                  agents={organizable()}
-                  label={t("files.folder.newForAgent")}
-                  triggerClass={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} library-section-action`}
-                  triggerLabel={t("files.folder.newForAgent")}
-                  onChange={(agentId) => {
-                    keep(agentId);
-                    props.onNewFolder(agentId);
-                  }}
-                >
-                  <FolderPlus aria-hidden="true" />
-                </AgentPicker>
-              </Show>
-            }
-          >
-            <ul class="library-side-list">
-              <For each={shownAgents()} keyed={(agent) => agent.id}>
-                {(agent) => <AgentBranch rows={rows} agent={agent()} />}
-              </For>
-            </ul>
-            <Show when={many()}>
-              <AgentPicker
-                agents={pickerAgents()}
-                value={props.place.kind === "agent" || props.place.kind === "folder" ? props.place.agentId : null}
-                count={agentCount}
-                label={t("files.library.agents")}
-                triggerClass={`${buttonVariants({ variant: "ghost" })} library-side-more`}
-                triggerLabel={t("files.library.allAgents", { count: props.agents.length })}
-                onChange={(agentId) => {
-                  keep(agentId);
-                  props.onGo(agentPlace(agentId));
-                }}
-              >
-                <UsersRound aria-hidden="true" />
-                <span class="library-truncate">{t("files.library.allAgents", { count: props.agents.length })}</span>
-              </AgentPicker>
-            </Show>
-          </SideSection>
-        </Show>
-        <Show when={props.workflows.count > 0}>
-          <WorkflowSection rows={rows} />
-        </Show>
-        <Show when={props.removedFiles}>
+        <Show
+          when={!props.loading}
+          fallback={
+            <div
+              class="library-side-loading"
+              role="status"
+              aria-busy="true"
+              aria-label={t("files.library.loadingFolders")}
+            >
+              <For each={LOADING_ROWS}>{() => <Skeleton class="library-side-skeleton" />}</For>
+            </div>
+          }
+        >
           <ul class="library-side-list">
             <li>
               <SideRow
-                icon={<Archive aria-hidden="true" />}
-                label={t("files.library.removedAgents")}
-                count={props.counts.removed}
+                icon={<GalleryVerticalEnd aria-hidden="true" />}
+                label={t("files.library.allFiles")}
+                count={props.counts.all}
                 off={props.dropOff(undefined)}
-                current={current(REMOVED_AGENTS)}
-                onGo={() => props.onGo(REMOVED_AGENTS)}
+                current={current(ALL_FILES)}
+                onGo={() => props.onGo(ALL_FILES)}
+              />
+            </li>
+            <li>
+              <SideRow
+                icon={<Clock3 aria-hidden="true" />}
+                label={t("files.library.recent")}
+                count={props.counts.recent}
+                off={props.dropOff(undefined)}
+                current={current(RECENT_FILES)}
+                onGo={() => props.onGo(RECENT_FILES)}
+              />
+            </li>
+            <li>
+              <SideRow
+                icon={<Inbox aria-hidden="true" />}
+                label={t("files.library.unsorted")}
+                count={props.counts.unsorted}
+                out={true}
+                drop={props.outMark()}
+                off={props.outOff()}
+                landed={props.landedOut()}
+                current={current(UNSORTED_FILES)}
+                onGo={() => props.onGo(UNSORTED_FILES)}
               />
             </li>
           </ul>
+          <Show when={props.favorites.length > 0}>
+            <SideSection rows={rows} key={FAVORITES_SECTION} title={t("files.library.favorites")}>
+              <ul class="library-side-list">
+                <For each={props.favorites} keyed={(favorite) => favorite.key}>
+                  {(favorite) => <FavoriteRow rows={rows} favorite={favorite()} />}
+                </For>
+              </ul>
+            </SideSection>
+          </Show>
+          <Show when={props.agents.length > 0}>
+            <SideSection
+              rows={rows}
+              key={AGENTS_SECTION}
+              title={t("files.library.agents")}
+              action={
+                <Show when={props.canCreate && organizable().length > 0}>
+                  <AgentPicker
+                    agents={organizable()}
+                    label={t("files.folder.newForAgent")}
+                    triggerClass={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} library-section-action`}
+                    triggerLabel={t("files.folder.newForAgent")}
+                    onChange={(agentId) => {
+                      keep(agentId);
+                      props.onNewFolder(agentId);
+                    }}
+                  >
+                    <FolderPlus aria-hidden="true" />
+                  </AgentPicker>
+                </Show>
+              }
+            >
+              <ul class="library-side-list">
+                <For each={shownAgents()} keyed={(agent) => agent.id}>
+                  {(agent) => <AgentBranch rows={rows} agent={agent()} />}
+                </For>
+              </ul>
+              <Show when={many()}>
+                <AgentPicker
+                  agents={pickerAgents()}
+                  value={props.place.kind === "agent" || props.place.kind === "folder" ? props.place.agentId : null}
+                  count={agentCount}
+                  label={t("files.library.agents")}
+                  triggerClass={`${buttonVariants({ variant: "ghost" })} library-side-more`}
+                  triggerLabel={t("files.library.allAgents", { count: props.agents.length })}
+                  onChange={(agentId) => {
+                    keep(agentId);
+                    props.onGo(agentPlace(agentId));
+                  }}
+                >
+                  <UsersRound aria-hidden="true" />
+                  <span class="library-truncate">{t("files.library.allAgents", { count: props.agents.length })}</span>
+                </AgentPicker>
+              </Show>
+            </SideSection>
+          </Show>
+          <Show when={props.workflows.count > 0}>
+            <WorkflowSection rows={rows} />
+          </Show>
+          <Show when={props.removedFiles}>
+            <ul class="library-side-list">
+              <li>
+                <SideRow
+                  icon={<Archive aria-hidden="true" />}
+                  label={t("files.library.removedAgents")}
+                  count={props.counts.removed}
+                  off={props.dropOff(undefined)}
+                  current={current(REMOVED_AGENTS)}
+                  onGo={() => props.onGo(REMOVED_AGENTS)}
+                />
+              </li>
+            </ul>
+          </Show>
         </Show>
       </div>
     </nav>
