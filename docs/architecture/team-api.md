@@ -67,7 +67,10 @@ of the 10 restarts are left. A failed attempt is retried after 0.5, 1.2, 2.7 and
 up to 20 % more, then the recovery waits 15 s before the next 5 attempts (`REMOTE_RETRY_DELAYS_MS`,
 `REMOTE_RETRY_COOLDOWN_MS`). Each next wait is two times longer, up to 5 minutes
 (`REMOTE_RETRY_COOLDOWN_MAX_MS`). A connection, a refresh, a return to the app and a network change
-start the waits again at 15 s. A new connection to a known host opens its Signal socket while the ticket request runs,
+start the waits again at 15 s. When Signal answers `host_unavailable`, the host is off: the quick
+retries stop, and each attempt waits 15 s, then two times longer, up to 5 minutes. A return to the
+app keeps this wait, but tries again no later than 15 s after the last attempt; a refresh and a
+network change try at once. A new connection to a known host opens its Signal socket while the ticket request runs,
 and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
 holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
