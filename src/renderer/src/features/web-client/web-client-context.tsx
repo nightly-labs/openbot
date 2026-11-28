@@ -62,6 +62,7 @@ import {
 import {
   approvalIsCut,
   keepWholeApprovals,
+  keepWholePrompts,
   reconcilePendingRequests,
   withWholeApproval,
 } from "@openbot/team-client/runtime-attention";
@@ -623,7 +624,10 @@ export function createWebWorkspace(
             );
             draft.prompts = reconcilePendingRequests(
               draft.prompts,
-              event.snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" as const })),
+              keepWholePrompts(
+                draft.prompts,
+                event.snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" as const })),
+              ),
               attentionComplete,
             );
             if (attentionComplete) listedPrompts = { generation, prompts: [] };

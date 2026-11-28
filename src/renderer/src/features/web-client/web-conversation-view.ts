@@ -7,6 +7,7 @@ import {
   type RespondToApprovalInput,
   type RespondToPromptInput,
 } from "@openbot/contracts/ipc";
+import { withWholePromptText } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage } from "@openbot/ui/data";
 import { createEffect, createMemo, createProjection, createSignal, mapArray } from "solid-js";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
@@ -66,7 +67,11 @@ export function createWebConversationView(options: {
       (item) =>
         item.agentId === page.agentId && item.threadId === page.threadId && !isAnswered(item.turnId, item.requestId),
     );
-    if (pending) return pending;
+    if (pending) {
+      const requestKey = promptRequestKey(pending.turnId, pending.requestId);
+      const saved = page.messages.findLast((item) => messagePromptRequestKey(item) === requestKey);
+      return withWholePromptText(pending, saved?.questionPrompt?.questions);
+    }
     const answered = answeredPrompt();
     if (
       answered &&

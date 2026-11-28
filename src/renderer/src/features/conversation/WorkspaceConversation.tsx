@@ -14,6 +14,7 @@ import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-pro
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { withWholePromptText } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
@@ -442,22 +443,27 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       ? event.request
       : undefined;
   });
-  const activePrompt = createMemo(() => {
+  const pendingPromptEvent = createMemo(() => {
     const agent = activeAgent();
     const threadId = shownThreadId();
     const event = agent && threadId ? pendingPrompts()[attentionKey(agent.id, threadId)] : undefined;
     return event?.type === "prompt" && event.threadId === threadId ? event : undefined;
   });
-
-  const activePromptUiBlock = createMemo(() => {
+  const activePromptMessage = createMemo(() => {
     const agent = activeAgent();
-    const prompt = activePrompt();
+    const prompt = pendingPromptEvent();
     if (!agent || !prompt) return undefined;
     const requestKey = promptRequestKey(prompt.turnId, prompt.requestId);
     const messages =
       threads()?.open === undefined ? conversations[agent.id]?.messages : threads()?.conversation?.messages;
-    return (messages ?? []).findLast((message) => messagePromptRequestKey(message) === requestKey)?.uiBlock;
+    return (messages ?? []).findLast((message) => messagePromptRequestKey(message) === requestKey);
   });
+  const activePrompt = createMemo(() => {
+    const prompt = pendingPromptEvent();
+    return prompt && withWholePromptText(prompt, activePromptMessage()?.questionPrompt?.questions);
+  });
+
+  const activePromptUiBlock = () => activePromptMessage()?.uiBlock;
   const usageLimitsShown = () => serverSupportsCapability(activeServer(), "agent-usage-limit-v1");
   const usageLimitAskFor = usageLimitAskFrom({
     available: (agentId) =>
