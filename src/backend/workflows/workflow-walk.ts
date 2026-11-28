@@ -160,12 +160,27 @@ export function soloInputs(
   });
 }
 
+const TEXT_READER_KINDS: ReadonlySet<WorkflowNode["kind"]> = new Set<WorkflowNode["kind"]>(["agent", "llm", "image"]);
+const PASS_THROUGH_KINDS: ReadonlySet<WorkflowNode["kind"]> = new Set<WorkflowNode["kind"]>(["condition", "approval"]);
+
 export function feedsWorkingStep(graph: WorkflowGraph, nodeId: string): boolean {
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
-  return graph.edges.some((edge) => {
-    const reader = kinds.get(edge.to);
-    return edge.from === nodeId && edge.type === "text" && (reader === "agent" || reader === "llm");
-  });
+  const next = outgoing(graph.edges.filter((edge) => edge.type === "text"));
+  const seen = new Set([nodeId]);
+  const pending = [nodeId];
+  while (pending.length > 0) {
+    const id = pending.pop();
+    if (id === undefined) break;
+    for (const edge of next.get(id) ?? []) {
+      const reader = kinds.get(edge.to);
+      if (reader === undefined || seen.has(edge.to)) continue;
+      if (TEXT_READER_KINDS.has(reader)) return true;
+      if (!PASS_THROUGH_KINDS.has(reader)) continue;
+      seen.add(edge.to);
+      pending.push(edge.to);
+    }
+  }
+  return false;
 }
 
 function textEdges(
