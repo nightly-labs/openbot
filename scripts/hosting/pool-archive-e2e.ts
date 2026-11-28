@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -34,6 +34,9 @@ const TEST_REFERENCE = /^pool-test-\d{2}$/u;
 const WAIT_MS = 15 * 60_000;
 const DOWNLOAD_URL_SECONDS = 60 * 60;
 const LEFT_BEHIND = "ls -d /var/tmp/openbot-restore.* /run/openbot-restore-key.* 2>/dev/null | wc -l";
+const OFFER_INSTALL = "/usr/local/lib/openbot-pool";
+const OFFER_HOST = "/etc/openbot-pool/host";
+const FALSE_NOTES = ["added outside the home", "boat image that the lists of this script do not know"];
 
 const SEEDED_CACHES = [
   ".cache/e2e/models.json",
@@ -360,6 +363,19 @@ async function main() {
     await step("prepare a pool machine", () => preparePool(machine, release, keys));
     const age = remoteOrEmpty(machine, "age --version");
     checks.push({ name: "the bootstrap installed age", pass: age !== "", detail: age || "missing" });
+    await step("offer the machine and withdraw the offer", () =>
+      remote(
+        machine,
+        `bash ${MACHINE_HOSTING}/move-from-boat.sh offer leaseweb:${machine.id} && bash ${MACHINE_HOSTING}/move-from-boat.sh withdraw`,
+        { input: `${randomBytes(32).toString("base64url")}\n` },
+      ),
+    );
+    const offered = remoteOrEmpty(machine, `test -d ${OFFER_INSTALL} && test -s ${OFFER_HOST} && echo offered`);
+    checks.push({
+      name: "the machine has the offer tool and its machine ID, as a claimed pool machine has",
+      pass: offered === "offered",
+      detail: offered || "missing",
+    });
     await step("run a server with customer files", () =>
       remote(machine, "bash -s", { input: SEED(randomUUID(), extraGb) }),
     );
@@ -373,13 +389,23 @@ async function main() {
     const archived = await step("export, encrypt and upload to B2 on the machine", () =>
       remote(
         machine,
-        `bash -c ${shellWord(archiveScript(MACHINE_HOSTING))} archive ${archiveKey.recipient} ${PART_BYTES}`,
+        `bash -c ${shellWord(archiveScript(MACHINE_HOSTING))} archive ${archiveKey.recipient} ${PART_BYTES} 2>&1`,
         {
           input: `${urls}\n`,
         },
       ),
     );
     const upload = uploadedParts(archived.result);
+    const exportNotes = archived.result
+      .split("\n")
+      .filter((line) => line !== "" && !line.startsWith("part ") && !line.startsWith("sha256 "));
+    for (const line of exportNotes) logger.info(line);
+    const falseNotes = exportNotes.filter((line) => FALSE_NOTES.some((note) => line.includes(note)));
+    checks.push({
+      name: "the export of a pool machine names no customer directory and no unknown boat image",
+      pass: falseNotes.length === 0,
+      detail: falseNotes.length === 0 ? `${exportNotes.length} notes` : JSON.stringify(falseNotes),
+    });
     const parts = upload.parts;
     archiveSha256 = upload.sha256;
     archiveBytes = upload.bytes;
@@ -443,6 +469,12 @@ async function main() {
       name: "each file, mode, owner, link and the crontab are the same after the import",
       pass: missing.length === 0 && added.length === 0,
       detail: `${exported.size} facts; missing ${JSON.stringify(missing.slice(0, 20))}; added ${JSON.stringify(added.slice(0, 20))}`,
+    });
+    const offerTool = remote(machine, `test -e ${OFFER_INSTALL} && echo restored || echo absent`).trim();
+    checks.push({
+      name: "the import does not restore the offer tool of the old machine",
+      pass: offerTool === "absent",
+      detail: offerTool,
     });
     const cachesLeft = remote(machine, "bash -s", { input: CACHES_LEFT }).trim();
     checks.push({
