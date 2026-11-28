@@ -1351,6 +1351,11 @@ export class AttentionRegistry {
     return (yield* this.#awaitToolAnswer(client, request, approval, options)).decision;
   }).bind(this);
 
+  lateNoteSender(agentId: string, publicThreadId: string): ((text: string) => void) | null {
+    const target = this.#lateAnswerTarget(agentId, publicThreadId);
+    return target ? (text) => this.#sendLateAnswer(agentId, target, text, undefined) : null;
+  }
+
   readonly awaitMediaApproval = Effect.fn("AttentionRegistry.awaitMediaApproval")(function* (
     this: AttentionRegistry,
     client: AgentClient,
