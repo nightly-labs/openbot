@@ -28,6 +28,7 @@ const home = join(root, "home");
 const accountsRoot = join(root, "provider-accounts");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
+const releaseFile = join(root, "release-held-turn");
 
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
@@ -43,6 +44,7 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { NO_PROVIDER_CREDENTIALS } = await import("../src/backend/provider-drivers");
 
 const CALL_MARK = "PROFILE-CALL";
+const HOLD_MARK = "PROFILE-HOLD";
 const MODEL = "gpt-6-luna";
 const OTHER_MODEL = "gpt-6-sol";
 const ACCOUNT_MODEL = "gpt-6.1-sol";
@@ -64,7 +66,7 @@ const ENDPOINT = {
 } as const;
 
 const FAKE_CODEX = `#!/usr/bin/env node
-const { appendFileSync } = require("node:fs");
+const { appendFileSync, existsSync } = require("node:fs");
 if (process.argv.includes("--version")) {
   process.stdout.write("codex-cli 0.160.1\\n");
   process.exit(0);
@@ -108,6 +110,14 @@ const answer = (message) => {
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
       const match = text.includes(${JSON.stringify(CALL_MARK)}) ? /<<ARGS([\\s\\S]*?)ARGS>>/.exec(text) : null;
+      if (text.includes(${JSON.stringify(HOLD_MARK)})) {
+        const held = setInterval(() => {
+          if (!existsSync(${JSON.stringify(releaseFile)})) return;
+          clearInterval(held);
+          finish(params.threadId, turnId);
+        }, 20);
+        return;
+      }
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
       waiting.set(id, { threadId: params.threadId, turnId });
@@ -706,6 +716,59 @@ try {
     "update_profile with avatarSeed removes the photo and its file",
     face.success && storedAgent(coordinator.id).avatarUrl === null && !existsSync(photoFile),
     face.text,
+  );
+  const busy = await create("Busy");
+  await waitFor("the busy agent's first turn to end", () => idle(busy.id));
+  await callTool("busy agent backups", coordinator.id, "update_profile", {
+    agentId: busy.id,
+    backupModels: { automatic: true, order: [{ provider: "codex", model: OTHER_MODEL }] },
+  });
+  await runCauseEffect(agents.sendMessage({ agentId: busy.id, text: `${HOLD_MARK} Work on this.` }));
+  await waitFor("the busy agent to work", () => !idle(busy.id));
+  const queuedAccount = await callTool("queue an account change", coordinator.id, "update_profile", {
+    agentId: busy.id,
+    providerAccountId: second.id,
+  });
+  pass(
+    "An account change for a working agent waits for its next turn",
+    queuedAccount.success && storedAgent(busy.id).pendingRuntime?.providerAccountId === second.id,
+    queuedAccount.text,
+  );
+  const keptOutgoing = await callTool("backups with the outgoing model", coordinator.id, "update_profile", {
+    agentId: busy.id,
+    backupModels: {
+      automatic: true,
+      order: [
+        { provider: "codex", model: MODEL, providerAccountId: "default" },
+        { provider: "codex", model: OTHER_MODEL, providerAccountId: second.id },
+      ],
+    },
+  });
+  const outgoingKept = JSON.stringify({
+    automatic: true,
+    order: [
+      { provider: "codex", model: MODEL },
+      { provider: "codex", model: OTHER_MODEL, providerAccountId: second.id },
+    ],
+  });
+  pass(
+    "update_profile keeps the model that a working agent leaves at its next turn in the backup models",
+    keptOutgoing.success &&
+      JSON.stringify(storedAgent(busy.id).backupModels) === outgoingKept &&
+      keptOutgoing.body?.backupModels?.order
+        .map((choice) => `${choice.model}@${choice.providerAccountId}`)
+        .join(",") === `${MODEL}@default,${OTHER_MODEL}@${second.id}`,
+    keptOutgoing.text,
+  );
+  writeFileSync(releaseFile, "");
+  await waitFor(
+    "the queued account change",
+    () => storedAgent(busy.id).providerAccountId === second.id && !storedAgent(busy.id).pendingRuntime,
+  );
+  pass(
+    "The backup models stay after the queued account change",
+    JSON.stringify(storedAgent(busy.id).backupModels) === outgoingKept,
+    JSON.stringify(storedAgent(busy.id).backupModels),
   );
   report.passed = true;
 } catch (error) {
