@@ -356,6 +356,12 @@ To roll back one machine, remove it from `REMOTE_SIGNAL_HOMES`, `REMOTE_SIGNAL_H
 one list fails each ticket with `503 remote_not_configured`. Its hosts move at their next ticket, or
 after 20 seconds without Signal when the machine is stopped.
 
+TURN on port 443 ([remote/README.md](../remote/README.md#turn-on-port-443)): `au` is the first
+machine. `us` can follow on its own, because its Signal gives only its own relay. `signal1` and
+`signal2` give each other's relay, so they must both have the setup before either sets
+`TURN_TLS_PORT=443`. On `sui-alexandria` about 12 other sites (OpenPanel and others) listen on 443, and
+each one must move to the internal listener.
+
 ## Required device validation — pending
 
 Use a current desktop B as host, desktop A as a client, and a mobile client from a compatible source.
