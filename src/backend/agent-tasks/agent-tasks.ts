@@ -137,6 +137,7 @@ export class AgentTasks implements TaskLanes {
   readonly #progress = new Map<string, string>();
   readonly #stoppedTurns = new Map<string, string>();
   readonly #userStops = new Map<string, string>();
+  readonly #shownResults = new Set<string>();
   readonly #progressPublish = new Map<string, NodeJS.Timeout>();
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   readonly #pendingReports = new Map<string, number>();
@@ -291,7 +292,14 @@ export class AgentTasks implements TaskLanes {
       .slice(0, TASK_REPORT_RUNNING_LIMIT)
       .map((other) => ({ taskId: other.taskId, title: other.title }));
     const outcome = task.outcome === "interrupted" && this.#userStops.has(task.taskId) ? "stopped" : task.outcome;
-    return { taskId: task.taskId, title: task.title, outcome, closed: task.closedAt !== null, stillRunning };
+    return {
+      taskId: task.taskId,
+      title: task.title,
+      outcome,
+      closed: task.closedAt !== null,
+      stillRunning,
+      resultsShown: this.#shownResults.has(task.taskId),
+    };
   }
 
   isRoutineThread(taskId: string): boolean {
@@ -415,6 +423,7 @@ export class AgentTasks implements TaskLanes {
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
     this.#userStops.delete(task.taskId);
+    this.#shownResults.delete(task.taskId);
     this.#turnEndWaiters.delete(task.taskId);
     this.#store.delete(task.taskId);
     this.changed(task.agentId);
@@ -524,6 +533,7 @@ export class AgentTasks implements TaskLanes {
       this.#progress.delete(taskId);
       this.#stoppedTurns.delete(taskId);
       this.#userStops.delete(taskId);
+      this.#shownResults.delete(taskId);
     }
     this.#store.deleteForAgent(agentId);
   }
@@ -883,6 +893,7 @@ export class AgentTasks implements TaskLanes {
     event: AgentTurnCompletedEvent,
   ): Effect.fn.Return<void> {
     const task = this.#store.task(ended.taskId) ?? ended;
+    this.#shownResults.delete(task.taskId);
     if (event.status === "completed")
       yield* this.#showTaskResults(task, event.turnId).pipe(
         Effect.catchCause((cause) =>
@@ -927,6 +938,7 @@ export class AgentTasks implements TaskLanes {
     const staged: string[] = [];
     yield* Effect.gen({ self: this }, function* () {
       const added: ConversationMessage[] = [];
+      const copiedFiles = new Set<string>();
       for (const result of runResults(this.#conversation.ensureSnapshot(task.agentId, task.threadId).messages)) {
         const visual = chatVisualReply(result);
         const id = visual
@@ -935,6 +947,9 @@ export class AgentTasks implements TaskLanes {
         if (shown.has(id)) continue;
         const copies: AttachmentSummary[] = [];
         for (const attachment of visual ? [visual.attachment] : (result.attachments ?? [])) {
+          const digest = visual ? null : this.#mailbox.attachmentSha256(attachment.id);
+          if (digest !== null && copiedFiles.has(digest)) continue;
+          if (digest !== null) copiedFiles.add(digest);
           const file = yield* this.#mailbox.resolveAttachment(attachment.id);
           if (!file) continue;
           const copy = yield* this.#mailbox.stageGeneratedCopy({
@@ -975,6 +990,7 @@ export class AgentTasks implements TaskLanes {
         throw error;
       }
       this.#conversation.publishConversation(chat);
+      this.#shownResults.add(task.taskId);
     }).pipe(Effect.onError(() => this.#mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)));
   });
 
@@ -1066,7 +1082,8 @@ function runResults(messages: readonly ConversationMessage[]): ConversationMessa
   let room: number = TASK_RESULT_FILES;
   for (const message of run.toReversed()) {
     if (room === 0) break;
-    if (message.author !== "assistant" || chatVisualReply(message) || chatBackdropPage(message)) continue;
+    if (message.author !== "assistant" || message.status !== "completed") continue;
+    if (chatVisualReply(message) || chatBackdropPage(message)) continue;
     const attachments = (message.attachments ?? []).slice(-room);
     if (attachments.length === 0) continue;
     files.set(message.id, attachments);
