@@ -7,7 +7,7 @@ import { SidebarSectionDraft } from "./SidebarSectionEditor";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 import { useSidebarScope } from "./sidebar-scope";
 
-export function SidebarAgentSection(sectionProps: { sectionId: string; depth: number }) {
+export function SidebarAgentSection(sectionProps: { sectionId: string; depth: number; stickyLevel: number }) {
   const {
     customSectionById,
     dragOffset,
@@ -41,6 +41,7 @@ export function SidebarAgentSection(sectionProps: { sectionId: string; depth: nu
         aria-label={custom() ? sectionLabel(sectionId()) : name()}
         data-section-id={sectionId()}
         data-depth={custom() ? String(sectionProps.depth) : undefined}
+        data-sticky-level={custom() && headed() ? String(sectionProps.stickyLevel) : undefined}
       >
         <Show when={headed()}>
           <SidebarSectionHeader sectionId={sectionId()} name={name()} depth={sectionProps.depth} />
@@ -65,7 +66,13 @@ export function SidebarAgentSection(sectionProps: { sectionId: string; depth: nu
               )}
             </For>
             <For each={children()}>
-              {(childId) => <SidebarAgentSection sectionId={childId} depth={sectionProps.depth + 1} />}
+              {(childId) => (
+                <SidebarAgentSection
+                  sectionId={childId}
+                  depth={sectionProps.depth + 1}
+                  stickyLevel={headed() ? sectionProps.stickyLevel + 1 : sectionProps.stickyLevel}
+                />
+              )}
             </For>
             <Show when={custom()}>
               <SidebarSectionDraft parentId={sectionId()} />

@@ -1984,12 +1984,12 @@ textarea {
   background: var(--openbot-bg-sidebar);
 }
 
-.sidebar:not(.sidebar-compact) .sidebar-folder[data-depth="1"] > header {
+.sidebar:not(.sidebar-compact) .sidebar-folder[data-sticky-level="1"] > header {
   top: calc(-4px + 32px);
   z-index: 3;
 }
 
-.sidebar:not(.sidebar-compact) .sidebar-folder[data-depth="2"] > header {
+.sidebar:not(.sidebar-compact) .sidebar-folder[data-sticky-level="2"] > header {
   top: calc(-4px + 64px);
   z-index: 4;
 }
