@@ -21,6 +21,7 @@ interface TeamWebRtcBridgeEvents {
   hostWaiting: [peerId: string];
   signalHeld: [peerId: string, retryInMs: number];
   signalClosed: [peerId: string, code: string, terminal: boolean];
+  signalGoAway: [peerId: string, withinMs: number];
   incoming: [
     peerId: string,
     connection: {
@@ -92,6 +93,7 @@ const bridgeMessageSchema = z
     remoteFingerprint: z.string().min(1).max(256).optional(),
     iceServers: z.array(iceServerSchema).optional(),
     retryInMs: z.number().nonnegative().optional(),
+    withinMs: z.number().int().nonnegative().optional(),
   })
   .loose();
 type BridgeMessage = z.infer<typeof bridgeMessageSchema>;
@@ -108,6 +110,7 @@ type BridgeCommand =
       waitForHost?: boolean;
     }
   | { type: "prepare-signal"; peerId: string; signalUrl: string }
+  | { type: "move-signal"; peerId: string; signalUrl: string; token: string }
   | { type: "set-private-network"; peerId: string; privateNetwork: boolean }
   | {
       type:
@@ -176,6 +179,14 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     yield* this.start();
     this.#peers.add(input.peerId);
     yield* this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
+  }).bind(this);
+
+  readonly moveSignal = Effect.fn("TeamWebRtcBridge.moveSignal")(function* (
+    this: TeamWebRtcBridge,
+    input: { peerId: string; signalUrl: string; token: string },
+  ) {
+    yield* this.start();
+    yield* this.#command({ type: "move-signal", ...input });
   }).bind(this);
 
   readonly setPrivateNetwork = Effect.fn("TeamWebRtcBridge.setPrivateNetwork")(function* (
@@ -467,6 +478,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       this.emit("signalHeld", message.peerId, message.retryInMs);
     else if (message.type === "signal-closed" && message.code)
       this.emit("signalClosed", message.peerId, message.code, message.terminal === true);
+    else if (message.type === "signal-go-away" && message.withinMs !== undefined)
+      this.emit("signalGoAway", message.peerId, message.withinMs);
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)
       this.emit("connected", message.peerId, {
         localFingerprint: message.localFingerprint,
