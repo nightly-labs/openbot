@@ -87,6 +87,7 @@ import {
 } from "./remote-agent-decoding";
 import { decodeConversationPageFromHost, decodeConversationReadStates } from "./remote-conversation-decoding";
 import { decodeRemoteBody } from "./remote-server-http";
+import { addRemotePreviewUrls } from "./remote-server-urls";
 
 const logger = createOpenBotLogger("remote-sync");
 
@@ -132,6 +133,10 @@ interface HttpRow {
 
 function decodeAsHttp<Body>(row: HttpRow, decode: (value: unknown) => Body): Body {
   return decodeRemoteBody(row.method, row.path, 200, row.body, SYNC_HOST_PROTOCOL, SYNC_HOST_CAPABILITIES, decode);
+}
+
+function withRemotePreviewUrls<Entity>(spec: SyncCollectionSpec<Entity>, serverId: string): SyncCollectionSpec<Entity> {
+  return { ...spec, decode: (row) => addRemotePreviewUrls(spec.decode(row), serverId) };
 }
 
 function single<Entity>(list: readonly Entity[]): Entity {
@@ -213,7 +218,7 @@ class RemoteSyncedList<Entity> implements RemoteSyncRegistration {
 
   open(serverId: string, client: SyncClient, changed: (name: string) => void): void {
     const spec = this.#spec(serverId);
-    const handle = client.collection(spec);
+    const handle = client.collection(withRemotePreviewUrls(spec, serverId));
     handle.subscribe(() => {
       const status = handle.status();
       if (status === "unavailable") this.#order?.forget(serverId);
@@ -312,7 +317,7 @@ class RemoteSyncedScopes<Entity> implements RemoteSyncRegistration {
   }
 
   #subscribe(serverId: string, server: ScopedServer<Entity>, param: string): SyncCollection<Entity> {
-    const handle = server.client.collection(this.#spec(serverId, param), param);
+    const handle = server.client.collection(withRemotePreviewUrls(this.#spec(serverId, param), serverId), param);
     handle.subscribe(() => {
       if (handle.status() !== "synced") return;
       for (const listener of this.#listeners) listener(serverId, param, handle.values());
@@ -412,7 +417,7 @@ class RemoteSyncedPages<Row, Meta, Page> implements RemoteSyncRegistration {
         scope.page = null;
         return;
       }
-      const page = this.#build(param, log, snapshot);
+      const page = this.#build(serverId, param, log, snapshot);
       if (page === null) return;
       scope.page = page;
       for (const listener of this.#listeners) listener(serverId, param, page);
@@ -423,9 +428,9 @@ class RemoteSyncedPages<Row, Meta, Page> implements RemoteSyncRegistration {
     return scope;
   }
 
-  #build(param: string, log: SyncLog<Row>, meta: Meta): Page | null {
+  #build(serverId: string, param: string, log: SyncLog<Row>, meta: Meta): Page | null {
     try {
-      return this.#options.build(param, log, meta);
+      return addRemotePreviewUrls(this.#options.build(param, log, meta), serverId);
     } catch (error) {
       logger.warn("Remote sync could not rebuild a page:", toLogValue(error));
       return null;
