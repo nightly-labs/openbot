@@ -731,7 +731,12 @@ function MarkdownInline(props: {
               return <RichText body={item.semanticTag} content={props.content} streamingTailAfter={after()} />;
             }
             const url = safeBrowserUrl(token.href);
-            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(writtenLinkTarget(token));
+            const written = writtenLinkTarget(token);
+            const linked = withoutLinkFragment(written);
+            const linkedAsWritten = linked === written ? undefined : written;
+            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(linked);
+            const openShared = props.content.onOpenSharedFile;
+            const openWorkspace = props.content.onOpenWorkspaceFile;
             return url ? (
               <MessageLink
                 url={url}
@@ -750,19 +755,19 @@ function MarkdownInline(props: {
                   />
                 )}
               </MessageLink>
-            ) : sharedPath && props.content.onOpenSharedFile ? (
+            ) : sharedPath && openShared ? (
               <LocalFileLink
                 path={sharedPath}
                 label={markdownInlinePlainText(token.tokens) || token.text}
                 kind="shared"
-                onOpen={props.content.onOpenSharedFile}
+                onOpen={(path) => openShared(path, linkedAsWritten)}
               />
-            ) : workspacePath && props.content.onOpenWorkspaceFile ? (
+            ) : workspacePath && openWorkspace ? (
               <LocalFileLink
                 path={workspacePath}
                 label={markdownInlinePlainText(token.tokens) || token.text}
                 kind="workspace"
-                onOpen={props.content.onOpenWorkspaceFile}
+                onOpen={(path) => openWorkspace(path, linkedAsWritten)}
               />
             ) : (
               <RichText body={token.text} content={props.content} streamingTailAfter={after()} />
@@ -1419,6 +1424,12 @@ function writtenLinkTarget(token: { raw: string; href: string }): string {
     return written.slice(2).includes("\\\\") ? href : written;
   }
   return href;
+}
+
+function withoutLinkFragment(href: string): string {
+  const fragment = href.indexOf("#");
+  if (fragment <= 0 || /[./\\]/u.test(href.slice(fragment + 1))) return href;
+  return href.slice(0, fragment);
 }
 
 function linkFileTargets(href: string): { shared: string | null; workspace: string | null } {
