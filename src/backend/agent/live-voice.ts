@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
+import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import type {
   AgentEvent,
+  AgentProviderId,
   AgentReasoningEffort,
   AgentSummary,
   CodexLiveVoice,
   ConversationMessageSender,
+  ConversationSnapshot,
   VoiceLiveEvent,
   VoiceLiveSession,
   VoiceLiveStart,
@@ -149,6 +152,7 @@ export interface LiveVoiceHooks {
     sender: ConversationMessageSender | undefined,
   ): Effect.Effect<string, { readonly cause: unknown }>;
   reply(agentId: string, deliveryId: string): LiveVoiceReply | null;
+  turn(deliveryId: string): string | null;
   busy(agentId: string): boolean;
   answer(agentId: string, threadId: string, turnId: string): string | null;
   summarize(agentId: string, prompt: string): Effect.Effect<string, { readonly cause: unknown }>;
@@ -162,9 +166,17 @@ interface OpenUserLine {
   readonly done: Deferred.Deferred<void>;
 }
 
+interface DeliveryUpdates {
+  turnId: string | null;
+  skipEarlier: boolean;
+  readonly ids: Set<string>;
+  readonly texts: Set<string>;
+}
+
 interface LiveSession {
   readonly id: string;
   readonly agentId: string;
+  readonly provider: AgentProviderId;
   readonly owner: LiveVoiceOwner | null;
   readonly client: AgentClient;
   readonly cwd: string;
@@ -183,6 +195,8 @@ interface LiveSession {
   readonly speech: Semaphore.Semaphore;
   readonly answeredTurns: Set<string>;
   readonly speaking: Set<Fiber.Fiber<void>>;
+  readonly updates: Map<string, DeliveryUpdates>;
+  readonly updateSpeech: Set<Fiber.Fiber<void>>;
 }
 
 interface SentAsk {
@@ -232,6 +246,7 @@ export class LiveVoice {
     const session: LiveSession = {
       id: randomUUID(),
       agentId: agent.id,
+      provider: agent.provider,
       owner,
       client: relay.client,
       cwd,
@@ -250,6 +265,8 @@ export class LiveVoice {
       speech: Semaphore.makeUnsafe(1),
       answeredTurns: new Set(),
       speaking: new Set(),
+      updates: new Map(),
+      updateSpeech: new Set(),
     };
     this.#sessions.set(session.id, session);
     relay.client.on("notification", session.onNotification);
@@ -349,6 +366,7 @@ export class LiveVoice {
 
   observe(event: AgentEvent): void {
     if (this.#sessions.size === 0) return;
+    if (event.type === "conversation") this.#sayUpdates(event.snapshot);
     if (event.type === "queue-changed" || event.type === "turn-completed") this.#answerSettled();
     if (event.type !== "turn-completed" || event.status !== "completed" || event.quiet || event.continues) return;
     for (const session of this.#sessions.values()) {
@@ -470,6 +488,7 @@ export class LiveVoice {
         onSuccess: (deliveryId) => {
           if (!this.#sessions.has(session.id)) return;
           session.lastAsk = { words: requestWords(text), userLines: session.userLines, deliveryId };
+          session.updates.set(deliveryId, { turnId: null, skipEarlier: waits, ids: new Set(), texts: new Set() });
           const ask = this.#wait(session, request, deliveryId);
           if (waits && ask && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
         },
@@ -507,12 +526,46 @@ export class LiveVoice {
       const reply = this.#hooks.reply(ask.session.agentId, ask.deliveryId);
       if (!reply) continue;
       this.#asks.delete(ask);
+      this.#dropUpdates(ask.session, ask.deliveryId);
       const repeat = reply.turnId !== undefined && ask.session.answeredTurns.has(reply.turnId);
       if (reply.turnId) ask.session.answeredTurns.add(reply.turnId);
       if (ask.requestId !== null)
         this.#respond(ask.session, ask.requestId, repeat ? { success: true, text: SAME_TURN_REPLY } : reply);
       else if (!repeat) this.#say(ask.session, this.#speech(ask.session.agentId, reply.text));
     }
+  }
+
+  #sayUpdates(snapshot: ConversationSnapshot): void {
+    for (const session of this.#sessions.values()) {
+      if (session.agentId !== snapshot.agentId) continue;
+      for (const [deliveryId, updates] of session.updates) {
+        updates.turnId ??= this.#hooks.turn(deliveryId);
+        if (!updates.turnId) continue;
+        const earlier = updates.skipEarlier;
+        updates.skipEarlier = false;
+        for (const message of snapshot.messages) {
+          if (
+            message.turnId !== updates.turnId ||
+            message.author !== "assistant" ||
+            message.itemType !== "commentary" ||
+            message.status !== "completed" ||
+            updates.ids.has(message.id) ||
+            !isNarrationItemId(message.id, session.provider)
+          )
+            continue;
+          updates.ids.add(message.id);
+          if (!showsNarration(message.text, updates.texts) || earlier) continue;
+          const fiber = this.#say(session, this.#speech(session.agentId, message.text));
+          session.updateSpeech.add(fiber);
+          fiber.addObserver(() => session.updateSpeech.delete(fiber));
+        }
+      }
+    }
+  }
+
+  #dropUpdates(session: LiveSession, deliveryId: string): void {
+    session.updates.delete(deliveryId);
+    for (const fiber of session.updateSpeech) Effect.runFork(Fiber.interrupt(fiber));
   }
 
   #respond(session: LiveSession, requestId: AppServerRequest["id"], reply: LiveVoiceReply): void {
@@ -534,7 +587,7 @@ export class LiveVoice {
     );
   }
 
-  #say(session: LiveSession, text: Effect.Effect<string>, ordered = true): void {
+  #say(session: LiveSession, text: Effect.Effect<string>, ordered = true): Fiber.Fiber<void> {
     const say = text.pipe(
       Effect.flatMap((speech) => {
         const threadId = session.threadId;
@@ -551,6 +604,7 @@ export class LiveVoice {
     const fiber = Effect.runFork(ordered ? session.speech.withPermit(say) : say);
     session.speaking.add(fiber);
     fiber.addObserver(() => session.speaking.delete(fiber));
+    return fiber;
   }
 
   #relayFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
