@@ -143,6 +143,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "חיפוש באינטרנט דורש התחברות ל-Codex עם חשבון ChatGPT.",
   "error.agent.webSearchBusy": "פועלים יותר מדי חיפושים ושאלות צד. נסו שוב בעוד רגע.",
   "error.agent.webSearchFailed": "החיפוש באינטרנט לא הסתיים. נסו שוב.",
+  "error.agent.webSearchAccount":
+    "החשבון הזה של {provider} לא יכול להשתמש בחיפוש באינטרנט. בדקו את התוכנית שלו, או התחברו ל-{provider} עם חשבון אחר.",
+  "error.agent.webSearchProviderBusy": "{provider} עסוק. המתינו כמה דקות, ואז חפשו שוב.",
+  "error.agent.webSearchOffline":
+    "OpenBot לא הצליח להתחבר ל-{provider} לחיפוש באינטרנט. בדקו את החיבור לאינטרנט, ואז חפשו שוב.",
+  "error.agent.webSearchUnavailable": "{provider} לא הצליח לבצע את החיפוש באינטרנט.",
   "error.agent.busyMessageModeLocalOnly": "אפשר להגדיר מה קורה להודעות בזמן שהסוכן עובד רק במחשב שמריץ את הסוכן.",
   "error.agent.backupModelsLocalOnly": "אפשר להגדיר מודלי גיבוי רק במחשב שמריץ את הסוכן.",
   "error.agent.backupModelsAtLimit":

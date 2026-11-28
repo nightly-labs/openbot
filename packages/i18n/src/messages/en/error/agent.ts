@@ -152,6 +152,12 @@ export const messages = defineMessages("error.agent", {
   "error.agent.webSearchSignIn": "Web search needs a Codex sign-in with a ChatGPT account.",
   "error.agent.webSearchBusy": "Too many searches and side questions are running. Try again shortly.",
   "error.agent.webSearchFailed": "The web search did not finish. Try again.",
+  "error.agent.webSearchAccount":
+    "This {provider} account cannot use web search. Check its plan, or sign in to {provider} with a different account.",
+  "error.agent.webSearchProviderBusy": "{provider} is busy. Wait a few minutes, then search again.",
+  "error.agent.webSearchOffline":
+    "OpenBot could not reach {provider} for the web search. Check the internet connection, then search again.",
+  "error.agent.webSearchUnavailable": "{provider} could not do the web search.",
   "error.agent.busyMessageModeLocalOnly":
     "What messages do while the agent works can only be set on the computer that runs the agent.",
   "error.agent.backupModelsLocalOnly": "Backup models can only be set on the computer that runs the agent.",

@@ -164,6 +164,12 @@ export const messages = {
   "error.agent.webSearchBusy":
     "Hay demasiadas búsquedas y preguntas secundarias en curso. Inténtalo de nuevo en breve.",
   "error.agent.webSearchFailed": "La búsqueda web no terminó. Inténtalo de nuevo.",
+  "error.agent.webSearchAccount":
+    "Esta cuenta de {provider} no puede usar la búsqueda web. Revisa su plan o inicia sesión en {provider} con otra cuenta.",
+  "error.agent.webSearchProviderBusy": "{provider} está ocupado. Espera unos minutos y vuelve a buscar.",
+  "error.agent.webSearchOffline":
+    "OpenBot no pudo conectarse a {provider} para la búsqueda web. Revisa la conexión a internet y vuelve a buscar.",
+  "error.agent.webSearchUnavailable": "{provider} no pudo hacer la búsqueda web.",
   "error.agent.busyMessageModeLocalOnly":
     "El comportamiento de los mensajes mientras trabaja el agente solo se puede configurar en el equipo que lo ejecuta.",
   "error.agent.backupModelsLocalOnly":

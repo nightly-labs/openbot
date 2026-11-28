@@ -170,6 +170,12 @@ export const messages = {
   "error.agent.webSearchSignIn": "La recherche web nécessite une connexion à Codex avec un compte ChatGPT.",
   "error.agent.webSearchBusy": "Trop de recherches et de questions annexes sont en cours. Réessayez dans un instant.",
   "error.agent.webSearchFailed": "La recherche web n’a pas abouti. Réessayez.",
+  "error.agent.webSearchAccount":
+    "Ce compte {provider} ne peut pas utiliser la recherche web. Vérifiez son forfait, ou connectez-vous à {provider} avec un autre compte.",
+  "error.agent.webSearchProviderBusy": "{provider} est occupé. Attendez quelques minutes, puis relancez la recherche.",
+  "error.agent.webSearchOffline":
+    "OpenBot n’a pas pu se connecter à {provider} pour la recherche web. Vérifiez la connexion internet, puis relancez la recherche.",
+  "error.agent.webSearchUnavailable": "{provider} n’a pas pu faire la recherche web.",
   "error.agent.busyMessageModeLocalOnly":
     "Le comportement des messages pendant le travail de l’agent ne peut être réglé que sur l’ordinateur qui exécute l’agent.",
   "error.agent.backupModelsLocalOnly":
