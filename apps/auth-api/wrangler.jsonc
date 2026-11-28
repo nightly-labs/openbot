@@ -93,6 +93,7 @@
       "allowed_sender_addresses": ["no_reply@openbot.run"]
     }
   ],
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "d1_databases": [
     {
       "binding": "DB",
@@ -195,6 +196,7 @@
         "CF_ACCESS_TEAM_DOMAIN": "",
         "CF_ACCESS_ADMIN_AUD": ""
       },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "d1_databases": [
         {
           "binding": "DB",
@@ -305,6 +307,7 @@
         "APNS_TEAM_ID": "8A47NKRZSJ",
         "APNS_TOPIC": "run.openbot.mobile"
       },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "d1_databases": [
         {
           "binding": "DB",
