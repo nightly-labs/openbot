@@ -177,13 +177,15 @@ export function geminiSavedKeyLimitFailure(text: string, error?: unknown): strin
   );
 }
 
-function geminiRequestFailure(error: unknown, detail: string): string {
+function geminiRequestFailure(error: unknown, detail: string, log: (text: string) => void): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   if (GEMINI_VERIFICATION_REQUIRED.test(reason)) return sourceText("error.provider.geminiVerificationRequired");
   if (GEMINI_UNREADABLE_HISTORY.test(reason)) return detail;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
-  return key ? geminiRequestFailureText(key, reason) : detail;
+  if (!key) return detail;
+  if (key === "error.provider.antigravityToolFormatRefused") log(`Gemini turn failed: ${reason}`);
+  return geminiRequestFailureText(key, reason);
 }
 
 export function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
@@ -445,7 +447,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     if (error.code === -32603) return error.data.details === `Session not found: ${sessionId}`;
     return error.code === -32002 && (error.data.sessionId === sessionId || error.data.uri === `session ${sessionId}`);
   },
-  turnFailure: (error, detail) => geminiRequestFailure(error, detail),
+  turnFailure: (error, detail, _redact, log) => geminiRequestFailure(error, detail, log),
   authRequiredSignsOut: true,
   failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
   sdkHarness: {

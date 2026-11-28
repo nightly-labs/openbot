@@ -540,12 +540,16 @@ try {
   }
   const blankDrops: McpServerDrop[] = [];
   const blankClient = coordinateClient("blank", blankDrops);
+  const blankDiagnostics: string[] = [];
+  blankClient.on("diagnostic", (message: string) => blankDiagnostics.push(message));
   const blankWorkspace = join(root, "blank-workspace");
   await mkdir(blankWorkspace, { recursive: true });
   for (const [name, text] of [
     ["googleRefusedUnknownTool", "Reply with OK only."],
     ["googleRefusedUnknownToolAnswer", "CODE_400 Reply with OK only."],
+    ["googleRefusedUnknownToolReply", "RPC_400 Reply with OK only."],
   ] as const) {
+    blankDiagnostics.length = 0;
     const blankThread = await startThread(blankClient, { cwd: blankWorkspace });
     const blankTurn = await runTurn(blankClient, blankThread, { text, timeoutMs: 30_000 });
     report.turns[name] = blankTurn;
@@ -553,6 +557,10 @@ try {
       blankTurn.error,
       sourceText("error.provider.antigravityToolFormatRefused"),
       "A refused tool format that OpenBot cannot find gives the plain message, not Google's text.",
+    );
+    assert.ok(
+      blankDiagnostics.some((message) => message.includes("properties[coordinate].items: missing field")),
+      "Google's text goes to the log.",
     );
   }
   assert.deepEqual(blankDrops, [], "No server is left out when OpenBot cannot find the refused tool.");

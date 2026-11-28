@@ -183,6 +183,12 @@ serveFakeAcpAgent({
     if (own !== undefined) {
       if (own) log(`E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: ${own}`);
       peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
+    } else if (googleRefused && text.includes("RPC_400")) {
+      peer.fail(request, {
+        code: -32603,
+        message: `Internal error: INVALID_ARGUMENT (code 400): ${GOOGLE_REFUSALS[googleRefused]}`,
+      });
+      return;
     } else if (googleRefused && text.includes("CODE_400"))
       peer.say(sessionId, `\n⚠ INVALID_ARGUMENT (code 400): ${GOOGLE_REFUSALS[googleRefused]}\n`);
     else if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
