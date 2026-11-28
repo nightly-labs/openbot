@@ -161,7 +161,8 @@ The host sends a client with the capability a `routine-thread-turn-completed` ev
 the thread, the task, the turn and its status, and the client changes it back to
 `thread-turn-completed`. The desktop then notifies as for the host's own routine thread, and reads
 the preview from the task through `/v1/agent-tasks/read`. The web client notifies the turn as a
-`turn-completed`. A host does not send the event of another side thread, and a client without the
+`turn-completed`. The phone app also gets the event and ignores it, because the host's push already
+tells the phone. A host does not send the event of another side thread, and a client without the
 capability gets nothing, as before.
 
 The notification data has the thread of the event, not a task id, and the phone does not know the

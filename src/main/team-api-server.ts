@@ -2120,7 +2120,7 @@ export class TeamApiServer {
         if (
           agentId !== null &&
           (blocked.has(agentId) ||
-            (requiredCapability === AGENT_TASKS_CAPABILITY
+            (requiredCapability === AGENT_TASKS_CAPABILITY || requiredCapability === ROUTINE_THREAD_TURN_CAPABILITY
               ? taskHiddenFor(connection.capabilities)
               : providerHiddenFor(protocol)
             ).has(agentId))

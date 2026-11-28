@@ -1,4 +1,5 @@
 import type { AgentEvent } from "../ipc-agent-events";
+import { isIdentifier } from "../ipc-bounded-values";
 import { isDynamicRecord, isString } from "../runtime-values";
 
 export const ROUTINE_THREAD_TURN_CAPABILITY = "routine-thread-turn-v1";
@@ -24,7 +25,7 @@ export function routineThreadTurnEvent(value: unknown): RoutineThreadTurnComplet
   if (
     !isString(value.agentId) ||
     !isString(value.threadId) ||
-    !isString(value.taskId) ||
+    !isIdentifier(value.taskId) ||
     !isString(value.turnId) ||
     !isString(value.status) ||
     (value.origin !== undefined && !isTurnOrigin(value.origin))
