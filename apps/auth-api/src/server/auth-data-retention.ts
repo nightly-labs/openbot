@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { REMOTE_AUTH_EVENT_DELIVERED, REMOTE_AUTH_EVENT_RETENTION_MS } from "./remote-control-plane";
+import { SESSION_CHANGES_RETENTION_MS } from "./session-cache";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60_000;
 const CREDIT_CODE_LIMIT_WINDOW_MS = 60 * 60_000;
@@ -17,6 +18,7 @@ export interface AuthRetentionResult {
   mobileConnectLinks: number;
   serverClaims: number;
   companySignIn: number;
+  sessionChanges: number;
   remoteAuthEvents: number;
 }
 
@@ -99,6 +101,11 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       cutoff: now,
     },
     {
+      name: "sessionChanges",
+      sql: "DELETE FROM auth_session_changes WHERE changed_at <= ?",
+      cutoff: now - SESSION_CHANGES_RETENTION_MS,
+    },
+    {
       name: "remoteAuthEvents",
       sql: `DELETE FROM remote_auth_events WHERE next_attempt_at = ${REMOTE_AUTH_EVENT_DELIVERED} AND created_at <= ?`,
       cutoff: now - REMOTE_AUTH_EVENT_RETENTION_MS,
@@ -132,6 +139,7 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
     mobileConnectLinks: 0,
     serverClaims: 0,
     companySignIn: 0,
+    sessionChanges: 0,
     remoteAuthEvents: 0,
   };
   for (const [index, operation] of operations.entries()) {
