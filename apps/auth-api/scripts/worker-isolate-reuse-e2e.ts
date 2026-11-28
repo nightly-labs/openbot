@@ -18,7 +18,7 @@ const TOKEN = "account-session-token-0001";
 const MACHINE_TOKEN = "host-machine-token-0001";
 const SESSION = "remote-session-1";
 const WRITE_SQL = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/iu;
-const AUTH_SQL = /\b(auth_sessions|users)\b/u;
+const AUTH_SQL = /\b(auth_sessions|auth_session_changes|users)\b/u;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
 function check(name: string, passed: boolean, detail?: unknown) {
@@ -392,7 +392,7 @@ async function send(path: string, init: RequestInit): Promise<Outcome> {
 }
 
 function bearer(bookmark: string | null = null): Record<string, string> {
-  return { Authorization: `Bearer ${TOKEN}`, ...(bookmark ? { [ACCOUNT_BOOKMARK_HEADER]: bookmark } : {}) };
+  return { Authorization: `Bearer ${accountToken}`, ...(bookmark ? { [ACCOUNT_BOOKMARK_HEADER]: bookmark } : {}) };
 }
 
 function creditsRequest(bookmark: string | null = null) {
@@ -416,14 +416,19 @@ function hostRouteRequest(kind: "slack" | "discord") {
 }
 
 function browserRequest(path: string) {
-  return send(`/api/browser/${path}`, { headers: { Cookie: `__Host-openbot-web=${TOKEN}` } });
+  return send(`/api/browser/${path}`, { headers: { Cookie: `__Host-openbot-web=${accountToken}` } });
 }
 
 interface Seed {
   welcome?: boolean;
 }
 
+let accountToken = TOKEN;
+let accountCount = 0;
+
 function seededWorld(seed: Seed = {}): World {
+  accountCount += 1;
+  accountToken = `${TOKEN}-${accountCount}`;
   const next = new World();
   next.both(
     "INSERT INTO users(id, identity_key, email, name, created_at, updated_at) VALUES ('user', 'email:user', 'user@example.test', 'User', 1, 1)",
@@ -433,7 +438,7 @@ function seededWorld(seed: Seed = {}): World {
   );
   next.both(
     "INSERT INTO auth_sessions(id, user_id, token_hash, expires_at, created_at, last_used_at) VALUES ('auth-1', 'user', ?, ?, ?, ?)",
-    tokenHash(TOKEN),
+    tokenHash(accountToken),
     NOW + DAY_MS,
     NOW,
     NOW,
@@ -449,7 +454,7 @@ function seededWorld(seed: Seed = {}): World {
     "INSERT INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at, auth_session_hash) VALUES (?, 'host-1', 'user', 'membership-1', 1, ?, ?)",
     SESSION,
     NOW + DAY_MS,
-    tokenHash(TOKEN),
+    tokenHash(accountToken),
   );
   const ledger =
     "INSERT INTO credit_ledger(entry_id, user_id, server_id, amount_tenths, kind, reference, created_at) VALUES (?, ?, ?, ?, ?, ?, 1)";

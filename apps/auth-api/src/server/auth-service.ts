@@ -12,6 +12,7 @@ import {
   validateProfileName,
 } from "@openbot/contracts/validation";
 import { Context, Effect, Layer, Result, Schema } from "effect";
+import { type AccessTokenCheck, checkAccessToken, type IssuedAccessToken, issueAccessToken } from "./access-tokens";
 import { type AccountAnalytics, type AccountSurface, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import type { AccountAttribution } from "./account-attribution";
 import { randomToken, sha256 } from "./crypto";
@@ -57,6 +58,7 @@ interface AuthServiceOptions {
   attribution?: AccountAttribution;
   referrals?: Referrals;
   usesCompanySignIn?: (email: string) => Effect.Effect<boolean, AuthOperationError>;
+  accessTokenSecret?: string | undefined;
 }
 
 export interface StoreReviewSignIn {
@@ -92,6 +94,7 @@ class AuthDependencies extends Context.Service<
     attribution: AccountAttribution | null;
     referrals: Referrals | null;
     usesCompanySignIn: (email: string) => Effect.Effect<boolean, AuthOperationError>;
+    accessTokenSecret: string | null;
   }
 >()("@openbot/auth-api/AuthDependencies") {}
 
@@ -126,6 +129,7 @@ export function ownAccountReadsFor(request: Request): SessionReads {
 export class AuthService {
   readonly #layer: Layer.Layer<AuthDependencies>;
   readonly #configured: boolean;
+  readonly #issuesAccessTokens: boolean;
 
   constructor(options: AuthServiceOptions) {
     this.#configured = options.delivery !== null || (options.exposeDevelopmentCode ?? false);
@@ -141,11 +145,17 @@ export class AuthService {
       attribution: options.attribution ?? null,
       referrals: options.referrals ?? null,
       usesCompanySignIn: options.usesCompanySignIn ?? (() => Effect.succeed(false)),
+      accessTokenSecret: options.accessTokenSecret || null,
     });
+    this.#issuesAccessTokens = Boolean(options.accessTokenSecret);
   }
 
   get configured(): boolean {
     return this.#configured;
+  }
+
+  get issuesAccessTokens(): boolean {
+    return this.#issuesAccessTokens;
   }
 
   readonly startEmailSignIn = Effect.fn("AuthService.startEmailSignIn")(
@@ -415,9 +425,59 @@ export class AuthService {
     function* (
       this: AuthService,
       sessionToken: string,
+      reads: SessionReads = "primary",
     ): Effect.fn.Return<AuthUser | null, AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
-      return yield* dependencies.repository.authenticateDesktopSession(sessionToken, dependencies.now());
+      return yield* dependencies.repository.authenticateDesktopSession(sessionToken, dependencies.now(), reads);
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly checkAccessToken = Effect.fn("AuthService.checkAccessToken")(
+    function* (this: AuthService, accessToken: string): Effect.fn.Return<AccessTokenCheck, never, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      if (!dependencies.accessTokenSecret) return { status: "invalid" } satisfies AccessTokenCheck;
+      return yield* checkAccessToken(dependencies.accessTokenSecret, accessToken, dependencies.now());
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly authenticateAccessToken = Effect.fn("AuthService.authenticateAccessToken")(
+    function* (
+      this: AuthService,
+      accessToken: string,
+      reads: SessionReads = "primary",
+    ): Effect.fn.Return<AuthUser | null, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const check = yield* this.checkAccessToken(accessToken);
+      if (check.status !== "valid") return null;
+      return yield* dependencies.repository.authenticateSessionId(
+        check.sessionId,
+        check.userId,
+        dependencies.now(),
+        reads,
+      );
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly issueAccessToken = Effect.fn("AuthService.issueAccessToken")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+    ): Effect.fn.Return<IssuedAccessToken, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      if (!dependencies.accessTokenSecret) {
+        return yield* new AuthServiceError(404, "not_found", "The route was not found.");
+      }
+      const now = dependencies.now();
+      const session = yield* dependencies.repository.sessionForToken(sessionToken, now);
+      if (!session) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
+      return yield* issueAccessToken(
+        dependencies.accessTokenSecret,
+        { sessionId: session.sessionId, userId: session.user.id, expiresAt: session.expiresAt },
+        now,
+      ).pipe(Effect.mapError(() => new AuthOperationError({ message: "Account operation failed." })));
     },
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
@@ -813,7 +873,7 @@ export class AuthService {
       if (hostId !== null && !MOBILE_CONNECT_HOST_ID_PATTERN.test(hostId)) {
         return yield* new AuthServiceError(400, "invalid_mobile_host", "The Mobile Connect host ID is invalid.");
       }
-      const user = yield* this.authenticate(sessionToken);
+      const user = yield* this.authenticate(sessionToken, "strict");
       if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
       return yield* dependencies.repository.listMobileAuthDevices(user.id, dependencies.now(), hostId);
     },
@@ -841,7 +901,7 @@ export class AuthService {
       if (!isUuidV4(sessionId)) {
         return yield* new AuthServiceError(400, "invalid_mobile_session", "The mobile session ID is invalid.");
       }
-      const user = yield* this.authenticate(sessionToken);
+      const user = yield* this.authenticate(sessionToken, "strict");
       if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
       yield* dependencies.repository.revokeMobileAuthDevice(user.id, sessionId, dependencies.now());
       yield* dependencies.flushSessionRevocations();
@@ -859,7 +919,7 @@ export class AuthService {
       AuthDependencies
     > {
       const dependencies = yield* AuthDependencies;
-      const user = yield* this.authenticate(sessionToken);
+      const user = yield* this.authenticate(sessionToken, "strict");
       if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
       return yield* dependencies.repository.listAccountSessions(user.id, sessionToken, dependencies.now());
     },
@@ -875,9 +935,9 @@ export class AuthService {
       const dependencies = yield* AuthDependencies;
       if (!isUuidV4(sessionId))
         return yield* new AuthServiceError(400, "invalid_session", "The session ID is invalid.");
-      const user = yield* this.authenticate(sessionToken);
+      const user = yield* this.authenticate(sessionToken, "strict");
       if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
-      if (!(yield* this.authenticateDesktopSession(sessionToken))) {
+      if (!(yield* this.authenticateDesktopSession(sessionToken, "strict"))) {
         const sessions = yield* dependencies.repository.listAccountSessions(user.id, sessionToken, dependencies.now());
         if (sessions.some((session) => session.sessionId === sessionId && session.kind === "desktop")) {
           return yield* new AuthServiceError(
@@ -889,6 +949,14 @@ export class AuthService {
       }
       yield* dependencies.repository.revokeAccountSession(user.id, sessionId, dependencies.now());
       yield* dependencies.flushSessionRevocations();
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly sessionEnded = Effect.fn("AuthService.sessionEnded")(
+    function* (this: AuthService, sessionToken: string): Effect.fn.Return<void, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      yield* dependencies.repository.forgetSessionToken(sessionToken, dependencies.now());
     },
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
