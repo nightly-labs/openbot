@@ -25,6 +25,11 @@ import { type OpenBotCreditsEvent, openBotCreditsEvent } from "./openbot-credits
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
 import { type RemoteChatContentEvent, remoteChatContentEvent } from "./remote-chat-content-v1";
 import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
+import {
+  type RoutineThreadTurnCompletedEvent,
+  routineThreadTurnEvent,
+  routineThreadTurnToCurrent,
+} from "./routine-thread-turn-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
 import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
 import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
@@ -62,6 +67,7 @@ export type OptionalTeamEvent =
   | SidebarFoldersEvent
   | SkillsEvent
   | QuietTurnCompletedEvent
+  | RoutineThreadTurnCompletedEvent
   | RoutineFlowsEvent
   | UsageCreditsEvent
   | VaultEvent
@@ -103,6 +109,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     sidebarFoldersEvent(value) ??
     skillsEvent(value) ??
     quietTurnEvent(value) ??
+    routineThreadTurnEvent(value) ??
     routineFlowsEvent(value) ??
     usageCreditsEvent(value) ??
     vaultEvent(value) ??
@@ -116,6 +123,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
 export function optionalTeamEventToCurrent(event: OptionalTeamEvent) {
   if (event.type === "sidebar-folders-changed")
     return { type: "sidebar-layout-changed" as const, layout: event.layout };
+  if (event.type === "routine-thread-turn-completed") return routineThreadTurnToCurrent(event);
   return event.type === "quiet-turn-completed"
     ? { ...event, type: "turn-completed" as const, quiet: true as const }
     : event;
