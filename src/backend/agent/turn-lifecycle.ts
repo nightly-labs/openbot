@@ -2566,7 +2566,7 @@ export class TurnLifecycle {
       if (refused) yield* this.#hooks.dropRefusedSession(agentId, threadId);
       if (refused || safetyBlock !== null) {
         const context =
-          safetyBlock === null
+          safetyBlock === null || blockedProvider === undefined
             ? undefined
             : { causeCode: "content_blocked" as const, provider: blockedProvider, model, turnId };
         if (laneTaskId !== null && failure !== undefined) {
