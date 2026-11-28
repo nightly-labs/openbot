@@ -2866,18 +2866,17 @@ export class RemoteControlPlane {
       const membership = yield* remoteCall(() =>
         dependencies.database
           .prepare(
-            `SELECT m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch, h.signal_home
+            `SELECT m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
          WHERE m.host_id = ? AND m.user_id = ? AND m.status = 'active' LIMIT 1`,
           )
           .bind(input.hostId, input.userId)
-          .first<RemoteMembershipRow & { auth_epoch: number; signal_home: string | null }>(),
+          .first<RemoteMembershipRow & { auth_epoch: number }>(),
       );
       const member = yield* remoteValidate(() => this.#assertRole(membership, ["owner", "admin", "member"]));
       const signal = dependencies.signal;
       if (!signal) return yield* remoteSignalNotConfigured();
-      const home = configuredSignalHome(signal, member.signal_home);
       const issued = yield* dependencies.signer.issueWatch({
         claims: {
           watchSessionId: input.watchSessionId,
@@ -2887,12 +2886,11 @@ export class RemoteControlPlane {
           role: member.role,
           authEpoch: member.auth_epoch,
           clientPublicKey: input.clientPublicKey,
-          ...(home ? { signal: home.id } : {}),
         },
         sessionExpiresAt: input.sessionExpiresAt,
         now: dependencies.now(),
       });
-      return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
+      return { ...issued, signalUrl: signal.entryUrl };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
