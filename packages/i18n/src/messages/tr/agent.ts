@@ -92,6 +92,7 @@ export const messages = {
   "agent.error.continueFailed": "Ajan devam edemedi. Tekrar deneyin.",
   "agent.error.copyDetails": "Ayrıntıları kopyala",
   "agent.error.mcpNotStarted": "MCP sunucusu başlatılmadı",
+  "agent.error.mcpNotStartedSeveral": "MCP sunucuları başlatılmadı",
   "agent.error.openMarketplace": "Pazaryerini aç",
   "agent.error.provider": "Sağlayıcı hatası",
   "agent.error.run": "{provider} · {model}",

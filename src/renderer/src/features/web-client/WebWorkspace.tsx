@@ -271,6 +271,7 @@ import {
 } from "../agents/agent-error-text";
 import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
+import { showMcpStartFailureToast } from "../agents/mcp-start-failure-toast";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import type { ServerBrowserProfilesOptions } from "../browser/ServerBrowserProfilesPanel";
 import { createBrowserProfilesStore } from "../browser/stores/browser-profiles-store";
@@ -2271,8 +2272,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const description = readableAgentError(remoteAgentError(event.message));
       if (!claimErrorToast(description)) return;
       if (event.code === "mcp_server_not_started") {
-        toast.error(t("agent.error.mcpNotStarted"), {
-          ...{ description },
+        showMcpStartFailureToast(server()?.id ?? "", description, {
           ...(serverCanManageMcp(server())
             ? { action: { label: t("agent.error.openMarketplace"), onClick: openMarketplace } }
             : {}),

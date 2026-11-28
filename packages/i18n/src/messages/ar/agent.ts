@@ -96,6 +96,7 @@ export const messages = {
   "agent.error.continueFailed": "تعذّر على الوكيل المتابعة. أعد المحاولة.",
   "agent.error.copyDetails": "نسخ التفاصيل",
   "agent.error.mcpNotStarted": "لم يبدأ خادم MCP",
+  "agent.error.mcpNotStartedSeveral": "لم تبدأ خوادم MCP",
   "agent.error.openMarketplace": "فتح المتجر",
   "agent.error.provider": "خطأ في المزوّد",
   "agent.error.run": "{provider} · {model}",

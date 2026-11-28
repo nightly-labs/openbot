@@ -96,6 +96,7 @@ export const messages = {
   "agent.error.continueFailed": "Agent nie mógł kontynuować. Spróbuj ponownie.",
   "agent.error.copyDetails": "Kopiuj szczegóły",
   "agent.error.mcpNotStarted": "Serwer MCP nie został uruchomiony",
+  "agent.error.mcpNotStartedSeveral": "Serwery MCP nie zostały uruchomione",
   "agent.error.openMarketplace": "Otwórz Marketplace",
   "agent.error.provider": "Błąd dostawcy",
   "agent.error.run": "{provider} · {model}",

@@ -90,6 +90,7 @@ export const messages = defineMessages("agent", {
   "agent.error.continueFailed": "The agent could not continue. Try again.",
   "agent.error.copyDetails": "Copy details",
   "agent.error.mcpNotStarted": "MCP server not started",
+  "agent.error.mcpNotStartedSeveral": "MCP servers not started",
   "agent.error.openMarketplace": "Open Marketplace",
   "agent.error.provider": "Provider error",
   "agent.error.run": "{provider} · {model}",
