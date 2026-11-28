@@ -261,7 +261,9 @@ export interface ConversationProps {
   onStop: () => void;
 }
 
-export type SendMessageResult = { messageId: string } | { error: string; reference?: string | null };
+export type AgentSendMessageResult = { messageId: string } | { error: string; reference?: string | null };
+
+export type SendMessageResult = AgentSendMessageResult | { unconfirmed: true };
 
 export interface ComposerDraft {
   text: string;

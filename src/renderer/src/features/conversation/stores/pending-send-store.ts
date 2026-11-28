@@ -82,6 +82,9 @@ export function createPendingSendStore() {
               next.starting = false;
               publish(key);
             }, START_GRACE_MS);
+        } else if ("unconfirmed" in result) {
+          next.state = "failed";
+          next.retrySafe = false;
         } else {
           next.state = "failed";
           next.error = result.error;
