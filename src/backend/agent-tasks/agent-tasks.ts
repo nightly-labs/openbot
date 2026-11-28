@@ -137,6 +137,7 @@ export class AgentTasks implements TaskLanes {
   readonly #progress = new Map<string, string>();
   readonly #stoppedTurns = new Map<string, string>();
   readonly #userStops = new Map<string, string>();
+  readonly #reportsWithResults = new Map<string, Set<string>>();
   readonly #progressPublish = new Map<string, NodeJS.Timeout>();
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   readonly #pendingReports = new Map<string, number>();
@@ -281,7 +282,7 @@ export class AgentTasks implements TaskLanes {
     return this.#store.task(thread.taskId) ?? thread;
   }
 
-  taskReport(taskId: string): TaskReportState | null {
+  taskReport(taskId: string, messageId: string): TaskReportState | null {
     const task = this.#store.task(taskId);
     if (!task || !isStartedTask(task)) return null;
     const stillRunning = this.#store
@@ -297,7 +298,7 @@ export class AgentTasks implements TaskLanes {
       outcome,
       closed: task.closedAt !== null,
       stillRunning,
-      resultsShown: this.#resultsInChat(task),
+      resultsShown: this.#reportsWithResults.get(task.taskId)?.has(messageId) === true || this.#resultsInChat(task),
     };
   }
 
@@ -422,6 +423,7 @@ export class AgentTasks implements TaskLanes {
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
     this.#userStops.delete(task.taskId);
+    this.#reportsWithResults.delete(task.taskId);
     this.#turnEndWaiters.delete(task.taskId);
     this.#store.delete(task.taskId);
     this.changed(task.agentId);
@@ -531,6 +533,7 @@ export class AgentTasks implements TaskLanes {
       this.#progress.delete(taskId);
       this.#stoppedTurns.delete(taskId);
       this.#userStops.delete(taskId);
+      this.#reportsWithResults.delete(taskId);
     }
     this.#store.deleteForAgent(agentId);
   }
@@ -898,6 +901,7 @@ export class AgentTasks implements TaskLanes {
           ),
         ),
       );
+    const resultsShown = event.status === "completed" && this.#resultsInChat(task);
     const text = taskReportText(task, event.status, this.#hooks.turnAnswer(task.agentId, task.threadId, event.turnId));
     const queued = yield* this.#mailbox
       .enqueue({
@@ -912,6 +916,9 @@ export class AgentTasks implements TaskLanes {
         idempotencyKey: `task-report:${event.turnId}`,
       })
       .pipe(
+        Effect.tap((receipt) =>
+          Effect.sync(() => resultsShown && this.#rememberReportWithResults(task, receipt.messageId)),
+        ),
         Effect.as(true),
         Effect.catch((failure) =>
           Effect.sync(() => {
@@ -986,6 +993,12 @@ export class AgentTasks implements TaskLanes {
       this.#conversation.publishConversation(chat);
     }).pipe(Effect.onError(() => this.#mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)));
   });
+
+  #rememberReportWithResults(task: AgentThreadRecord, messageId: string): void {
+    const reports = this.#reportsWithResults.get(task.taskId) ?? new Set<string>();
+    reports.add(messageId);
+    this.#reportsWithResults.set(task.taskId, reports);
+  }
 
   #resultsInChat(task: AgentThreadRecord): boolean {
     const threadId = this.#hooks.agent(task.agentId)?.threadId;
