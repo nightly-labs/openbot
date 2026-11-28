@@ -342,6 +342,8 @@ export const messages = {
     "Usługa Gemini od Google nie ukończyła żądania. Spróbuj ponownie za kilka minut.\n{detail}",
   "error.provider.antigravitySignInRefused":
     "Google nie zaakceptował logowania do Gemini dla tego żądania. Wyślij wiadomość ponownie. Jeśli błąd się powtarza, połącz ponownie Gemini w Ustawieniach.\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "Gemini nie może odczytać formatu danych wejściowych narzędzia z jednej z Twoich aplikacji, więc ten agent nie odpowiedział. W Marketplace, Aplikacje wyłączaj po jednej aplikacji i wysyłaj wiadomość ponownie albo wybierz model innego dostawcy.",
   "error.provider.antigravityRequestRejected":
     "Gemini odrzucił to żądanie. Wybierz inny model i wyślij wiadomość ponownie. Jeśli znów się nie uda, rozpocznij nowy czat.\n{detail}",
   "error.provider.antigravityNetwork": "Gemini utracił połączenie z Google. Wyślij wiadomość ponownie. ({cause})",

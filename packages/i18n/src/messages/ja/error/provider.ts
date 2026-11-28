@@ -358,6 +358,8 @@ export const messages = {
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
   "error.provider.antigravitySignInRefused":
     "Google はこのリクエストの Gemini サインインを受け付けませんでした。メッセージをもう一度送信してください。エラーが続く場合は、設定で Gemini を再接続してください。\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "Gemini がいずれかのアプリのツールの入力形式を読み取れないため、このエージェントは回答しませんでした。マーケットプレイスの［アプリ］でアプリを 1 つずつオフにしてメッセージをもう一度送信するか、別のプロバイダーのモデルを選んでください。",
   "error.provider.antigravityRequestRejected":
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
   "error.provider.antigravityNetwork":

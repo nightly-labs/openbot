@@ -303,6 +303,8 @@ export const messages = {
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
   "error.provider.antigravitySignInRefused":
     "Google 未接受此请求的 Gemini 登录。请重新发送你的消息；若错误持续，请在设置中重新连接 Gemini。\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "Gemini 无法读取你某个应用中一个工具的输入格式，因此此智能体没有回答。请在“市场”的“应用”中一次关闭一个应用并重新发送消息，或选择其他提供商的模型。",
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
   "error.provider.antigravityNetwork": "Gemini 与 Google 的连接已断开。请重新发送消息。({cause})",

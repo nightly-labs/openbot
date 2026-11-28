@@ -500,6 +500,63 @@ try {
     );
   }
 
+  const coordinateClient = (server: string, drops: McpServerDrop[]) => {
+    const client = requireProviderDriver("antigravity").createClient(
+      { executable: googleExecutable, version: "1.5.6", source: "managed" },
+      20_000,
+      {
+        apiKey: () => null,
+        customProviders: () => [],
+        mcpServers: () => [
+          httpServer("atlas", "atlas", "https://atlas.example/mcp"),
+          httpServer(server, server, `https://${server}.example/mcp`),
+        ],
+        reportMcpDrops: (_provider, dropped) => drops.push(...dropped),
+      },
+    );
+    clients.push(client);
+    client.start();
+    return client;
+  };
+  for (const [name, server, text, tool] of [
+    ["googleRefusedTupleItems", "desktop", "CODE_400 Reply with OK only.", /computer/u],
+    ["googleRefusedUnionItems", "pointer", "Reply with OK only.", /move_pointer/u],
+  ] as const) {
+    const drops: McpServerDrop[] = [];
+    const client = coordinateClient(server, drops);
+    const workspace = join(root, `${server}-workspace`);
+    await mkdir(workspace, { recursive: true });
+    const thread = await startThread(client, { cwd: workspace });
+    const turn = await runTurn(client, thread, { text, timeoutMs: 30_000 });
+    report.turns[name] = turn;
+    assert.equal(turn.error, null, "The turn that Google refused for a list field with no item type has no error.");
+    assert.equal(turn.reply, "OK", "The turn answers without the server.");
+    assert.deepEqual(
+      drops.map((drop) => drop.name),
+      [server],
+      "Only this server is left out, not the server whose list field has a typed item.",
+    );
+    assert.match(drops[0]?.detail ?? "", tool, "The report names the tool.");
+  }
+  const blankDrops: McpServerDrop[] = [];
+  const blankClient = coordinateClient("blank", blankDrops);
+  const blankWorkspace = join(root, "blank-workspace");
+  await mkdir(blankWorkspace, { recursive: true });
+  for (const [name, text] of [
+    ["googleRefusedUnknownTool", "Reply with OK only."],
+    ["googleRefusedUnknownToolAnswer", "CODE_400 Reply with OK only."],
+  ] as const) {
+    const blankThread = await startThread(blankClient, { cwd: blankWorkspace });
+    const blankTurn = await runTurn(blankClient, blankThread, { text, timeoutMs: 30_000 });
+    report.turns[name] = blankTurn;
+    assert.equal(
+      blankTurn.error,
+      sourceText("error.provider.antigravityToolFormatRefused"),
+      "A refused tool format that OpenBot cannot find gives the plain message, not Google's text.",
+    );
+  }
+  assert.deepEqual(blankDrops, [], "No server is left out when OpenBot cannot find the refused tool.");
+
   const listCauses = new Map<string, string | null>();
   const listAgent = async (name: string, env: Record<string, string>) => {
     const executable = join(root, `agy-list-${name}`, "bin", "antigravity");

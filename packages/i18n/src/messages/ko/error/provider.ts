@@ -344,6 +344,8 @@ export const messages = {
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravitySignInRefused":
     "Google이 이 요청의 Gemini 로그인을 받아들이지 않았어요. 메시지를 다시 보내 주세요. 오류가 계속되면 설정에서 Gemini를 다시 연결하세요.\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "Gemini가 앱 중 하나에 있는 도구의 입력 형식을 읽을 수 없어 이 에이전트가 답하지 않았어요. 마켓플레이스의 앱에서 앱을 하나씩 끄고 메시지를 다시 보내거나, 다른 제공업체의 모델을 선택해 주세요.",
   "error.provider.antigravityRequestRejected":
     "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
   "error.provider.antigravityNetwork": "Gemini와 Google의 연결이 끊겼어요. 메시지를 다시 보내 주세요. ({cause})",

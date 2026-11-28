@@ -2,6 +2,7 @@ import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } fr
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
@@ -96,6 +97,10 @@ const GEMINI_REQUEST_FAILURES = [
     /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
   ],
   ["error.provider.antigravitySignInRefused", GEMINI_INVALID_CREDENTIALS],
+  [
+    "error.provider.antigravityToolFormatRefused",
+    /\bGenerateContentRequest\.tools\[\d+\]\.function_declarations\[\d+\]\.parameters\b|`[^`]+` functionDeclaration\b/u,
+  ],
   ["error.provider.antigravityRequestRejected", GEMINI_INVALID_ARGUMENT],
   ["error.provider.antigravityNetwork", GEMINI_NETWORK_FAILURE],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
@@ -113,6 +118,7 @@ const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>>
 function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string, fullText = text): string {
   if (key === "error.provider.antigravityNetwork")
     return sourceText(key, { cause: GEMINI_NETWORK_FAILURE.exec(text)?.[0] ?? "" });
+  if (key === "error.provider.antigravityToolFormatRefused") return sourceText(key);
   const detail = shownFailureDetail(text);
   const resets = Array.from(fullText.matchAll(GOOGLE_RESET_FIELDS), ([field]) => field).filter(
     (field) => !detail.includes(field),
@@ -331,7 +337,24 @@ function folderNames(folder: string): string[] {
 }
 
 function hasNoItemType(items: unknown): boolean {
-  return items === undefined || items === true || (isRecord(items) && !Object.hasOwn(items, "type"));
+  return (
+    items === undefined ||
+    typeof items === "boolean" ||
+    Array.isArray(items) ||
+    (isRecord(items) && !Object.hasOwn(items, "type"))
+  );
+}
+
+function isArrayType(node: DynamicRecord): boolean {
+  return node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+}
+
+function isUntypedArray(node: unknown): boolean {
+  return isRecord(node) && isArrayType(node) && hasNoItemType(node.items);
+}
+
+function unionBranches(node: DynamicRecord): unknown[] {
+  return [node.anyOf, node.oneOf].flatMap((branches) => (Array.isArray(branches) ? branches : []));
 }
 
 function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
@@ -356,7 +379,7 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     const value = Object.hasOwn(node, last.key) ? node[last.key] : undefined;
     if (last.key !== "items") return value === undefined;
     if (!hasNoItemType(value)) return false;
-    return node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+    return isArrayType(node) || unionBranches(node).some(isUntypedArray);
   }
   if (type) {
     if (last.index !== undefined || !isRecord(node) || !Object.hasOwn(node, last.key)) return false;

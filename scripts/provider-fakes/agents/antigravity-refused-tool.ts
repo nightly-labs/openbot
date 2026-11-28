@@ -48,8 +48,43 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
       parameters: { type: "object", properties: { presentation: { enum: ["slides", "video"] } } },
     },
   ],
+  desktop: [
+    {
+      name: "computer",
+      parameters: {
+        type: "object",
+        properties: {
+          coordinate: { type: "array", minItems: 2, maxItems: 2, items: [{ type: "number" }, { type: "number" }] },
+        },
+      },
+    },
+  ],
+  pointer: [
+    {
+      name: "move_pointer",
+      parameters: {
+        type: "object",
+        properties: {
+          coordinate: {
+            anyOf: [{ type: "array", prefixItems: [{ type: "integer" }, { type: "integer" }] }, { type: "null" }],
+          },
+        },
+      },
+    },
+  ],
   atlas: [
     { name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } },
+    {
+      name: "pick_point",
+      parameters: { type: "object", properties: { coordinate: { type: "array", items: { type: "number" } } } },
+    },
+    {
+      name: "pick_area",
+      parameters: {
+        type: "object",
+        properties: { coordinate: { anyOf: [{ type: "array", items: { type: "number" } }, { type: "null" }] } },
+      },
+    },
     {
       name: "receivables",
       parameters: { type: "object", properties: { situacoes: { type: "array", items: { type: "integer" } } } },
@@ -65,7 +100,12 @@ const FAILURES: Record<string, string> = {
   OTHER: "creating trajectory: unexpected step state 7",
   QUIET: "",
 };
+const COORDINATE_REFUSAL =
+  "GenerateContentRequest.tools[0].function_declarations[108].parameters.properties[coordinate].items: missing field.";
 const GOOGLE_REFUSALS: Partial<Record<string, string>> = {
+  desktop: COORDINATE_REFUSAL,
+  pointer: COORDINATE_REFUSAL,
+  blank: COORDINATE_REFUSAL,
   ticktick: [
     "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[tags].items: missing field.",
     "* GenerateContentRequest.tools[21].function_declarations[0].parameters.properties[status].enum[1]: cannot be empty",
@@ -143,7 +183,9 @@ serveFakeAcpAgent({
     if (own !== undefined) {
       if (own) log(`E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: ${own}`);
       peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
-    } else if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
+    } else if (googleRefused && text.includes("CODE_400"))
+      peer.say(sessionId, `\n⚠ INVALID_ARGUMENT (code 400): ${GOOGLE_REFUSALS[googleRefused]}\n`);
+    else if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
     else if (refused || googleRefused) {
       log(`E1111 00:00:00.200000     294 errorreport.go:273] ${failure}`);
       peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");

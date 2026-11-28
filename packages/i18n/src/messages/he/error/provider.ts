@@ -324,6 +324,8 @@ export const messages = {
     "השירות Gemini של Google לא השלים את הבקשה. יש לנסות שוב בעוד כמה דקות.\n{detail}",
   "error.provider.antigravitySignInRefused":
     "Google לא קיבלה את ההתחברות ל-Gemini עבור הבקשה הזו. יש לשלוח את ההודעה שוב. אם השגיאה נמשכת, יש לחבר מחדש את Gemini בהגדרות.\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "Gemini לא יכול לקרוא את פורמט הקלט של כלי מאחת האפליקציות שלך, ולכן הסוכן הזה לא ענה. בחנות, אפליקציות, יש לכבות אפליקציה אחת בכל פעם ולשלוח את ההודעה שוב, או לבחור מודל מספק אחר.",
   "error.provider.antigravityRequestRejected":
     "Gemini דחה את הבקשה הזו. יש לבחור מודל אחר ולשלוח את ההודעה שוב. אם זה נכשל שוב, יש להתחיל צ'אט חדש.\n{detail}",
   "error.provider.antigravityNetwork": "Gemini איבד את החיבור ל-Google. יש לשלוח שוב את ההודעה. ({cause})",
