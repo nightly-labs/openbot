@@ -31,9 +31,9 @@ class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("Control
 }) {}
 
 const RESUME_CHECK_CONCURRENCY = 64;
-const RESUME_CHECK_DEADLINE = "7 seconds";
+const RESUME_CHECK_DEADLINE = "15 seconds";
 const RESUME_BATCH_WAIT = "25 millis";
-const RESUME_BATCH_CONCURRENCY = 8;
+const RESUME_BATCH_CONCURRENCY = 128;
 const RESUME_BATCH_RETRY_AFTER_MILLISECONDS = 10 * 60_000;
 const HOST_WAKE_DEADLINE_MILLISECONDS = 10_000;
 
