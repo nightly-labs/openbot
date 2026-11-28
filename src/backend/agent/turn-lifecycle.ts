@@ -83,7 +83,7 @@ import { markIncompleteMediaGeneration } from "./image-generation";
 import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
-import { type FinishCheckMode, type PlanContinuation, promisesWork, waitsForUser } from "./plan-continuation";
+import { type FinishCheckMode, leavesWorkUndone, type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { codexAppNeedsAutoReview } from "./prompts";
 import {
@@ -2637,7 +2637,7 @@ export class TurnLifecycle {
       const finishCheck: FinishCheckMode =
         latestAssistant === undefined ||
         this.#hooks.checkFinish === undefined ||
-        (toolSteps.length === 0 && !promisesWork(latestAssistant.text) && !awaitsEarlierRequest)
+        (toolSteps.length === 0 && !leavesWorkUndone(latestAssistant.text) && !awaitsEarlierRequest)
           ? "no"
           : continueMode;
       const proposed =

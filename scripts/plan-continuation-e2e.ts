@@ -1445,6 +1445,33 @@ try {
       { answer: "Let me know if you need anything else.", verdict: { verdict: "continue", missing: "Do more." } },
       { answer: "I will not delete the files.", verdict: { verdict: "continue", missing: "Do more." } },
       { answer: "Não vou apagar isso.", verdict: { verdict: "continue", missing: "Do more." } },
+      { answer: "You are right. I did not apply the fix yet.", verdict: { verdict: "continue", missing: "Apply it." } },
+      { answer: "Ainda não apliquei a correção.", verdict: { verdict: "continue", missing: "Aplique." } },
+      {
+        answer: "I will apply the fix now. The audit found two problems.",
+        verdict: { verdict: "continue", missing: "Fix both problems." },
+      },
+      {
+        answer: "Next I will:\n- fix the build path\n- add the release check",
+        verdict: { verdict: "continue", missing: "Fix the build path." },
+      },
+      {
+        answer: `${"The audit found a wrong path in the build step and a missing check in the release script. ".repeat(5)}I will apply the fix now.`,
+        verdict: { verdict: "continue", missing: "Fix the release script." },
+      },
+      {
+        answer: "I fixed the build path and added the release check.",
+        verdict: { verdict: "continue", missing: "Do more." },
+      },
+      { answer: "I did not find any problem in the audit.", verdict: { verdict: "continue", missing: "Do more." } },
+      {
+        answer: "Next I will:\n* fix the build path\n* add the release check",
+        verdict: { verdict: "continue", missing: "Add the release check." },
+      },
+      {
+        answer: "Let me explain how this works. The parser reads tokens and builds a tree.",
+        verdict: { verdict: "continue", missing: "Do more." },
+      },
     ] satisfies { answer: string; verdict: Verdict }[];
     const results = [];
     for (const item of cases) {
@@ -1473,8 +1500,36 @@ try {
         [1, 0],
         [1, 0],
         [1, 0],
+        [2, 2],
+        [2, 2],
+        [2, 2],
+        [2, 2],
+        [2, 2],
+        [1, 0],
+        [1, 0],
+        [2, 2],
+        [1, 0],
       ],
-      "A promise continues on a continue verdict, ends on done, and a closing or a refusal gets no check.",
+      "A promise or an admission of undone work continues on a continue verdict, ends on done, and a closing, a refusal or a report gets no check.",
+    );
+    const mark = loggedTurns().length;
+    const checks = loggedChecks().length;
+    const id = await send(
+      agent.id,
+      `Fix the problem from the audit. ${verdicts(
+        { verdict: "continue", missing: "Apply the fix." },
+        { verdict: "done" },
+      )} ${plan(
+        { steps: [], commands: [], answer: "I will apply the fix now." },
+        { steps: [], commands: [], answer: "I have not applied the fix yet." },
+        { steps: [], commands: ["edit"], answer: "I applied the fix." },
+      )}`,
+    );
+    assert.equal(await settled(id), "completed");
+    assert.deepEqual(
+      [turnsSince(mark).length, loggedChecks().length - checks],
+      [3, 2],
+      "An admission after a continuation gets a check and continues again.",
     );
     return { results };
   });
