@@ -35,7 +35,7 @@ export const messages = defineMessages("error.voice", {
   "error.voice.live.disconnected": "Live voice disconnected.",
   "error.voice.live.connectionLost": "Live voice lost its connection. Unmute the microphone to start it again.",
   "error.voice.live.startFailed":
-    "Live voice could not start. Update Codex and sign in with ChatGPT on the computer that runs the agent, then try again. Reason: {reason}",
+    "Live voice could not start. Try again later, or turn off live voice in Settings to talk by voice. Reason: {reason}",
   "error.voice.live.hostFailed":
     "Codex on the server could not start live voice. Ask its owner to update Codex on that computer and sign in with ChatGPT, then try again.",
   "error.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",

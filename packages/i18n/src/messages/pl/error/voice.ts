@@ -36,7 +36,7 @@ export const messages = {
   "error.voice.live.connectionLost":
     "Głos na żywo utracił połączenie. Wyłącz wyciszenie mikrofonu, aby uruchomić go ponownie.",
   "error.voice.live.startFailed":
-    "Nie udało się uruchomić głosu na żywo. Zaktualizuj Codex i zaloguj się przez ChatGPT na komputerze, na którym działa agent, a potem spróbuj ponownie. Powód: {reason}",
+    "Nie udało się uruchomić głosu na żywo. Spróbuj ponownie później albo wyłącz głos na żywo w Ustawieniach, aby rozmawiać głosem. Powód: {reason}",
   "error.voice.live.hostFailed":
     "Codex na serwerze nie mógł uruchomić głosu na żywo. Poproś właściciela, aby zaktualizował Codex na tym komputerze i zalogował się przez ChatGPT, a potem spróbuj ponownie.",
   "error.voice.live.signIn": "Zaloguj się do Codex kontem ChatGPT, aby używać głosu na żywo.",

@@ -37,7 +37,7 @@ export const messages = {
   "error.voice.live.connectionLost":
     "La voz en directo perdió la conexión. Activa el micrófono para iniciarla de nuevo.",
   "error.voice.live.startFailed":
-    "La voz en directo no pudo iniciarse. Actualiza Codex e inicia sesión con ChatGPT en el ordenador que ejecuta el agente, y vuelve a intentarlo. Motivo: {reason}",
+    "La voz en directo no pudo iniciarse. Inténtalo de nuevo más tarde o desactiva la voz en directo en Ajustes para hablar por voz. Motivo: {reason}",
   "error.voice.live.hostFailed":
     "Codex en el servidor no pudo iniciar la voz en directo. Pide a su propietario que actualice Codex en ese ordenador e inicie sesión con ChatGPT, y vuelve a intentarlo.",
   "error.voice.live.signIn": "Inicia sesión en Codex con tu cuenta de ChatGPT para usar la voz en directo.",

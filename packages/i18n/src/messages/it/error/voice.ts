@@ -37,7 +37,7 @@ export const messages = {
   "error.voice.live.connectionLost":
     "La voce dal vivo ha perso la connessione. Riattiva il microfono per avviarla di nuovo.",
   "error.voice.live.startFailed":
-    "Non è stato possibile avviare la voce dal vivo. Aggiorna Codex e accedi con ChatGPT sul computer che esegue l’agente, poi riprova. Motivo: {reason}",
+    "Non è stato possibile avviare la voce dal vivo. Riprova più tardi, oppure disattiva la voce dal vivo in Impostazioni per parlare a voce. Motivo: {reason}",
   "error.voice.live.hostFailed":
     "Codex sul server non è riuscito ad avviare la voce dal vivo. Chiedi al proprietario di aggiornare Codex su quel computer e di accedere con ChatGPT, poi riprova.",
   "error.voice.live.signIn": "Accedi a Codex con il tuo account ChatGPT per usare la voce dal vivo.",
