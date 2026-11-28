@@ -1510,7 +1510,13 @@ export function createConversationViewScope(props: ConversationProps) {
         chatGlideFrame = undefined;
         return;
       }
-      element.scrollTop = current + left * (1 - Math.exp(-elapsed / CHAT_GLIDE_TIME_CONSTANT_MS));
+      const glide = left * (1 - Math.exp(-elapsed / CHAT_GLIDE_TIME_CONSTANT_MS));
+      element.scrollTop = current + Math.max(glide, Math.min(left, 1));
+      if (element.scrollTop === current) {
+        followConversationBottom(element);
+        chatGlideFrame = undefined;
+        return;
+      }
       chatGlideFrame = requestAnimationFrame(step);
     };
     chatGlideFrame = requestAnimationFrame(step);
