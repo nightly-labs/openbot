@@ -5133,6 +5133,61 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "joinbot",
+    name: "JoinBot",
+    tagline: "Join meetings and answer out loud",
+    description:
+      "JoinBot lets an agent join Zoom, Google Meet and Microsoft Teams calls as a named participant that answers out loud when someone says its name, posts links to the meeting chat and reads the transcript afterwards. Sign in with a JoinBot account, or paste a workspace connect key.",
+    category: "productivity",
+    creatorName: "JoinBot",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-connect", text: "Connect to JoinBot as Atlas." },
+      {
+        id: "prompt-join",
+        text: "Join this Google Meet and answer questions about our roadmap: https://meet.google.com/abc-defg-hij",
+      },
+      { id: "prompt-summary", text: "Summarise the meeting you just left and list the action items." },
+    ],
+    websiteUrl: "https://usejoinbot.com",
+    privacyPolicyUrl: "https://usejoinbot.com/privacy",
+    termsUrl: "https://usejoinbot.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-joinbot-mcp",
+        name: "JoinBot",
+        description:
+          "Meeting join, live listening, spoken answers, meeting chat and transcripts, over JoinBot's MCP server.",
+        server: {
+          name: "joinbot",
+          transport: "http",
+          url: "https://usejoinbot.com/api/mcp",
+          auth: [
+            { id: "joinbot-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "joinbot-key",
+              kind: "key",
+              label: "Connect key",
+              fields: [
+                {
+                  id: "token",
+                  label: "Workspace connect key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "jb_…",
+                  hint: "JoinBot → Bots → Connect a bot",
+                },
+              ],
+              docsUrl: "https://github.com/engmsaleh/joinbot-plugin#readme",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "kajabi",
     name: "Kajabi",
     tagline: "Courses and creator business",

@@ -885,6 +885,12 @@
       "detailSha256": "b99a68f6c4df2aafb4bae71ba276139b1903cba217595e18fddc8561cbdcd603"
     },
     {
+      "slug": "joinbot",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "6db1593f64bf6f469dc40aae492b476f3aa37c574b0285bda22d8a68c34dffa4"
+    },
+    {
       "slug": "kajabi",
       "version": "1.0.0",
       "featured": false,

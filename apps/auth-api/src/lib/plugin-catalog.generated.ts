@@ -903,6 +903,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "b99a68f6c4df2aafb4bae71ba276139b1903cba217595e18fddc8561cbdcd603",
     },
     {
+      slug: "joinbot",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "6db1593f64bf6f469dc40aae492b476f3aa37c574b0285bda22d8a68c34dffa4",
+    },
+    {
       slug: "kajabi",
       version: "1.0.0",
       featured: false,
@@ -6991,6 +6997,63 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.jobtread.com",
     privacyPolicyUrl: "https://www.jobtread.com/privacy-policy",
     termsUrl: "https://www.jobtread.com/terms",
+    skills: [],
+  },
+  joinbot: {
+    slug: "joinbot",
+    name: "JoinBot",
+    tagline: "Join meetings and answer out loud",
+    description:
+      "JoinBot lets an agent join Zoom, Google Meet and Microsoft Teams calls as a named participant that answers out loud when someone says its name, posts links to the meeting chat and reads the transcript afterwards. Sign in with a JoinBot account, or paste a workspace connect key.",
+    category: "productivity",
+    creatorName: "JoinBot",
+    iconUrl: "https://usejoinbot.com/icon.svg",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-connect", text: "Connect to JoinBot as Atlas." },
+      {
+        id: "prompt-join",
+        text: "Join this Google Meet and answer questions about our roadmap: https://meet.google.com/abc-defg-hij",
+      },
+      { id: "prompt-summary", text: "Summarise the meeting you just left and list the action items." },
+    ],
+    apps: [
+      {
+        id: "app-joinbot-mcp",
+        name: "JoinBot",
+        description:
+          "Meeting join, live listening, spoken answers, meeting chat and transcripts, over JoinBot's MCP server.",
+        iconUrl: "https://usejoinbot.com/icon.svg",
+        server: {
+          name: "joinbot",
+          transport: "http",
+          url: "https://usejoinbot.com/api/mcp",
+          auth: [
+            { id: "joinbot-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "joinbot-key",
+              kind: "key",
+              label: "Connect key",
+              fields: [
+                {
+                  id: "token",
+                  label: "Workspace connect key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "jb_…",
+                  hint: "JoinBot → Bots → Connect a bot",
+                },
+              ],
+              docsUrl: "https://github.com/engmsaleh/joinbot-plugin#readme",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://usejoinbot.com",
+    privacyPolicyUrl: "https://usejoinbot.com/privacy",
+    termsUrl: "https://usejoinbot.com/terms",
     skills: [],
   },
   kajabi: {
