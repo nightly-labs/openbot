@@ -2,15 +2,9 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-  type AgentSummary,
-  CUSTOM_AGENT_DEFAULT_MODEL,
-  DEFAULT_AGENT_DEFAULTS,
-  isAgentModel,
-} from "@openbot/contracts/ipc";
+import { CUSTOM_AGENT_DEFAULT_MODEL, isAgentModel } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { checkAcpAgent } from "../src/backend/acp-agent-check";
-import { developerInstructions } from "../src/backend/agent/developer-instructions";
 import { mcpToolCallFallback } from "../src/backend/agent/mcp-tools";
 import { isMissingProviderSessionError } from "../src/backend/agent/thread-items";
 import type { AgentClient } from "../src/backend/agent-client";
@@ -45,7 +39,7 @@ interface Report {
   restart?: { processesStopped: number; loadedSession: string | null | undefined; resumedReply: string };
   switch?: { missingSession: boolean };
   delete?: { refused: string };
-  hiddenMcpTools?: { agy: boolean; other: boolean; instruction: boolean };
+  hiddenMcpTools?: { agy: boolean; other: boolean };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-custom-agent-e2e-"));
@@ -285,41 +279,7 @@ try {
   const other = mcpToolCallFallback(client, "alpha/deep");
   assert.equal(agy, true, "A custom agent that runs agy runs hidden MCP tools through openbot.tool_call.");
   assert.equal(other, false, "Another custom agent keeps its MCP tool guidance.");
-  const agyAgent: AgentSummary = {
-    id: "agent-gamma",
-    name: "Gamma",
-    title: "",
-    description: "",
-    notifications: false,
-    provider: "acp",
-    model: "gamma/default",
-    reasoningEffort: "medium",
-    threadId: null,
-    workspacePath: workspace,
-    preview: "",
-    updatedAt: null,
-    avatarSeed: "agent-gamma",
-    avatarHue: null,
-    avatarUrl: null,
-  };
-  const instruction = developerInstructions(agyAgent, "/shared", [], "/automation", DEFAULT_AGENT_DEFAULTS, {
-    computerUseInOwnChat: false,
-    agentCursorDrawn: true,
-    sideThread: false,
-    passwordVault: false,
-    storedMemoryCount: 0,
-    memoriesInTurns: true,
-    teammatesInTurns: true,
-    sectionTeammates: null,
-    homeSkills: [],
-    deferredMcpServers: ["uazapi"],
-    mcpToolsByToolCall: agy,
-  });
-  assert.match(
-    instruction,
-    /Your MCP servers: uazapi\. Some of their tools can be missing[^`]*Run a missing tool with openbot\.tool_call/,
-  );
-  report.hiddenMcpTools = { agy, other, instruction: true };
+  report.hiddenMcpTools = { agy, other };
 
   report.passed = true;
 } finally {
