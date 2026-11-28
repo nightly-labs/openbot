@@ -909,6 +909,55 @@ try {
       await mode(settings.busyMessageMode);
     }
   });
+
+  await step("a thread's attached file shows in the own chat", async (details) => {
+    const title = `Smoke file ${run}`;
+    const name = `task-file-${run}.txt`;
+    const filed = `FILED${run}`;
+    const fileRow = (m: ConversationMessage) =>
+      m.author === "assistant" && (m.attachments ?? []).some((attachment) => attachment.name === name);
+    await bridge.send(
+      from,
+      `Call openbot.start_task with the title "${title}" and the brief "Write the text ${filed} to the file ${name} in your working directory, attach it with openbot.attach_files_to_response, then reply with the single word ${filed}." Then reply with the single word STARTED.`,
+    );
+    const created = await waitFor(
+      page,
+      "the thread starts",
+      async () => (await bridge.tasks(from)).find((entry) => entry.title === title),
+      Boolean,
+      TURN_MS,
+    );
+    assert.ok(created);
+    started.push({ agentId: from, taskId: created.id });
+    const thread = await waitFor(
+      page,
+      "the thread attaches the file",
+      () => bridge.side(from, created.id),
+      (s) => idle(s) && has(s, fileRow) && has(s, answerWith(filed)),
+      TURN_MS,
+    );
+    const main = await waitFor(
+      page,
+      "the own chat gets the report and ends its turn",
+      () => bridge.main(from),
+      (s) => idle(s) && has(s, (m) => m.exchange?.senderTaskId === created.id),
+      TURN_MS,
+    );
+    const copies = main.messages.filter(fileRow);
+    const reportIndex = main.messages.findIndex((m) => m.exchange?.senderTaskId === created.id);
+    const copyIndex = main.messages.findIndex(fileRow);
+    details.threadFileRows = count(thread, fileRow);
+    details.ownChatFileRows = copies.length;
+    details.copyBeforeReport = copyIndex >= 0 && copyIndex < reportIndex;
+    details.copyHasOwnFile = copies.every((copy) =>
+      (copy.attachments ?? []).every((attachment) =>
+        thread.messages.every((m) => (m.attachments ?? []).every((source) => source.id !== attachment.id)),
+      ),
+    );
+    assert.equal(details.ownChatFileRows, 1, "The own chat does not show the thread's file once.");
+    assert.equal(details.copyBeforeReport, true, "The file copy is not before the task report.");
+    assert.equal(details.copyHasOwnFile, true, "The own chat shows the thread's file, not a copy.");
+  });
   report.passed = report.steps.every((entry) => entry.passed);
 } finally {
   for (const { agentId, taskId } of started.reverse()) {
