@@ -358,10 +358,10 @@ function tickHostedServers(
   bindings: RemoteAuthEventBindings & Partial<Pick<WorkerBindings, HostedServerTickBindingKey>>,
   now: number,
 ) {
-  let authEvents: Effect.Effect<void, RemoteFailure> | null = null;
+  const authEvents: Effect.Effect<void, RemoteFailure>[] = [];
   const remote = new RemoteControlPlane(bindings, {
     schedule: (delivery) => {
-      authEvents = delivery;
+      authEvents.push(delivery);
     },
   });
   const sends: Effect.Effect<void>[] = [];
@@ -379,8 +379,13 @@ function tickHostedServers(
         Effect.all(
           [
             ...sends,
-            (authEvents ?? Effect.void).pipe(
-              Effect.catch(() => Effect.sync(() => console.warn("Remote auth event delivery failed."))),
+            Effect.forEach(
+              authEvents,
+              (delivery) =>
+                delivery.pipe(
+                  Effect.catch(() => Effect.sync(() => console.warn("Remote auth event delivery failed."))),
+                ),
+              { discard: true },
             ),
           ],
           { concurrency: "unbounded", discard: true },

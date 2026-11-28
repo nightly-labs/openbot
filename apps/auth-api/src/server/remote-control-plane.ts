@@ -722,6 +722,7 @@ export class RemoteControlPlane {
 
   readonly #database: D1Database;
   readonly #signer: RemoteTicketSigner;
+  #leasedAuthEventIds: string[] = [];
 
   constructor(
     bindings: Pick<
@@ -3943,8 +3944,14 @@ export class RemoteControlPlane {
     return row !== null;
   });
 
+  #leaseAuthEvent(now: number): { eventId: string; until: number } {
+    const eventId = crypto.randomUUID();
+    this.#leasedAuthEventIds.push(eventId);
+    return { eventId, until: now + AUTH_EVENT_CLAIM_MS };
+  }
+
   #authEventStatement(event: RemoteAuthEvent, now: number, condition?: SqlCondition): D1PreparedStatement {
-    return authEventStatement(this.#database, event, now, condition);
+    return authEventStatement(this.#database, event, now, condition, this.#leaseAuthEvent(now));
   }
 
   #authEpochEventStatement(
@@ -3953,6 +3960,7 @@ export class RemoteControlPlane {
     ownerUserId?: string,
     condition?: SqlCondition,
   ): D1PreparedStatement {
+    const lease = this.#leaseAuthEvent(now);
     return this.#database
       .prepare(
         `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
@@ -3960,9 +3968,9 @@ export class RemoteControlPlane {
          FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)${condition ? ` AND ${condition.sql}` : ""}`,
       )
       .bind(
-        crypto.randomUUID(),
+        lease.eventId,
         now,
-        now,
+        lease.until,
         hostId,
         ownerUserId ?? null,
         ownerUserId ?? null,
@@ -3974,6 +3982,7 @@ export class RemoteControlPlane {
     this: RemoteControlPlane,
   ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
+    const leasedEventIds = this.#leasedAuthEventIds.splice(0);
     const delivery = Effect.suspend(() =>
       deliverRemoteAuthEvents({
         database: dependencies.database,
@@ -3981,6 +3990,7 @@ export class RemoteControlPlane {
         webhookSecret: dependencies.webhookSecret,
         fetch: dependencies.fetch,
         now: dependencies.now(),
+        leasedEventIds,
       }),
     );
     if (!dependencies.schedule) return yield* delivery;
@@ -4005,13 +4015,14 @@ export function authEventStatement(
   event: RemoteAuthEvent,
   now: number,
   condition?: SqlCondition,
+  lease: { eventId: string; until: number } = { eventId: crypto.randomUUID(), until: now },
 ): D1PreparedStatement {
   return database
     .prepare(
       `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
        SELECT ?, ?, ?, 0, ?${condition ? ` WHERE ${condition.sql}` : ""}`,
     )
-    .bind(crypto.randomUUID(), JSON.stringify(event), now, now, ...(condition?.binds ?? []));
+    .bind(lease.eventId, JSON.stringify(event), now, lease.until, ...(condition?.binds ?? []));
 }
 
 function remoteSignalNotConfigured(): RemoteControlPlaneError {
@@ -4260,19 +4271,44 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
   webhookSecret: string | null;
   fetch: RemoteFetch;
   now: number;
+  leasedEventIds?: readonly string[];
 }) {
   const { webhookUrls, webhookSecret } = input;
   if (webhookUrls.length === 0 || !webhookSecret) return;
-  const result = yield* remoteCall(() =>
-    input.database
-      .prepare(
-        `UPDATE remote_auth_events SET next_attempt_at = ?
-         WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
-         RETURNING event_id, payload, attempts, pending_targets`,
-      )
-      .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
-      .all<RemoteAuthEventRow>(),
-  );
+  const leasedEventIds = input.leasedEventIds ?? [];
+  const leased =
+    leasedEventIds.length === 0
+      ? []
+      : ((yield* remoteCall(() =>
+          input.database
+            .prepare(
+              `SELECT event_id, payload, attempts, pending_targets, created_at FROM remote_auth_events
+               WHERE event_id IN (SELECT value FROM json_each(?)) ORDER BY created_at`,
+            )
+            .bind(JSON.stringify(leasedEventIds))
+            .all<RemoteAuthEventRow & { created_at: number }>(),
+        )).results ?? []);
+  const due =
+    leasedEventIds.length === 0 ||
+    (yield* remoteCall(() =>
+      replicaD1(input.database)
+        .prepare("SELECT 1 FROM remote_auth_events WHERE next_attempt_at <= ? LIMIT 1")
+        .bind(input.now)
+        .first(),
+    )) !== null;
+  const claimed = due
+    ? ((yield* remoteCall(() =>
+        input.database
+          .prepare(
+            `UPDATE remote_auth_events SET next_attempt_at = ?
+             WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
+             RETURNING event_id, payload, attempts, pending_targets, created_at`,
+          )
+          .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
+          .all<RemoteAuthEventRow & { created_at: number }>(),
+      )).results ?? [])
+    : [];
+  const events = [...claimed, ...leased].sort((left, right) => left.created_at - right.created_at);
   const send = Effect.fn("RemoteControlPlane.sendAuthEvent")(function* (url: string, payload: string) {
     const timestamp = Math.floor(input.now / 1_000).toString();
     const signature = yield* hmacSha256(webhookSecret, `${timestamp}.${payload}`).pipe(
@@ -4295,7 +4331,7 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
     if (!response.ok) return yield* new RemoteOperationError({});
   });
   yield* Effect.forEach(
-    result.results ?? [],
+    events,
     (event) =>
       Effect.gen(function* () {
         const targets = pendingAuthEventTargets(event.pending_targets, webhookUrls);
