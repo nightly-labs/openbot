@@ -334,7 +334,8 @@ export class McpGateway {
     }
     const outcome = yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
     yield* this.#refreshForTestedTools(config, outcome);
-    const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
+    const refused =
+      (outcome.error === null || outcome.needs === "sign_in") && (yield* this.signInOffer(config)) === "refused";
     const error = refused
       ? sourceText("error.backend.mcpSignInAppNeeded")
       : outcome.error === null && this.#awaitsSignIn(config)

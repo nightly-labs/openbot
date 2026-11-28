@@ -314,7 +314,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
           toolCount: outcome.toolCount,
           tools: outcome.tools,
           error: sourceText("error.backend.mcpSignInAppNeeded"),
-          next: "The tools that need a sign-in fail until the user adds a sign-in app to this server. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in before the sign-in app is there.",
+          next: SIGN_IN_APP_NEXT,
         });
       if (offer === "offered") {
         yield* call.requestSignIn(config);
@@ -416,6 +416,24 @@ const findServer = (servers: AgentMcpServers, name: string) => {
 const SIGN_IN_NEXT =
   "A Sign in card is in this conversation. Only the user sees it: do not check it, and do not test again in this turn. Tell the user to press Sign in on it, end your turn, and test again when the user says it is done. Another needs_sign_in means only that the sign-in is not done; it is not an OpenBot fault. If the user sees no card, tell them to sign in from Marketplace, Apps, the server's page, and end your turn. Do not send openbot.send_feedback about the card unless the user asks for it, or says that the sign-in there failed too.";
 
+const SIGN_IN_APP_NEXT =
+  "The tools that need a sign-in fail until the user adds a sign-in app to this server. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in before the sign-in app is there.";
+
+const signInAppNeeded = Effect.fnUntraced(function* (
+  servers: AgentMcpServers,
+  config: McpServerConfig,
+  outcome: McpProbeOutcome,
+  when = "",
+) {
+  if (outcome.needs !== "sign_in" || (yield* servers.signInOffer(config)) !== "refused") return null;
+  return {
+    status: "error",
+    server: describeServer(config, servers.signIns()),
+    error: sourceText("error.backend.mcpSignInAppNeeded"),
+    next: `${when}${SIGN_IN_APP_NEXT}`,
+  };
+});
+
 function signInNeeded(servers: AgentMcpServers, config: McpServerConfig, when = "") {
   const failure = servers.signInFailure(config);
   if (failure === null) return { next: `${when}${SIGN_IN_NEXT}` };
@@ -441,6 +459,13 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
       Effect.gen(function* () {
         const outcome = yield* servers.inspect(config);
         if (outcome.needs !== "sign_in" && !(outcome.error === null && awaitsSignIn(servers, config))) return null;
+        const appNeeded = yield* signInAppNeeded(
+          servers,
+          config,
+          outcome,
+          "When the user's request needs this server: ",
+        );
+        if (appNeeded) return appNeeded;
         yield* requestSignIn(config);
         return {
           status: "needs_sign_in",
@@ -471,6 +496,8 @@ const report = Effect.fnUntraced(function* (
       ...(justSaved ? { appliesFrom: "the next turn of each agent" } : {}),
     });
   if (outcome.error === null || outcome.needs === "sign_in") {
+    const appNeeded = yield* signInAppNeeded(servers, saved, outcome);
+    if (appNeeded) return openBotToolResult(appNeeded);
     yield* call.requestSignIn(saved);
     return openBotToolResult({
       status: "needs_sign_in",
