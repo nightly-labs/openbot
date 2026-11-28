@@ -5,10 +5,10 @@ import type {
   ClientAgentModelOption,
   UpdateAgentAdminSettingsInput,
 } from "@openbot/contracts/ipc";
-import { toAgentProfile } from "@openbot/ui/features/agents/agent-profile";
 import AgentSettingsPanel from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createStore, onSettled, Show } from "solid-js";
+import { lookProfile } from "./agent-look";
 import type { AgentSettingsApi } from "./agent-settings";
 import type { Workspace } from "./workspace";
 
@@ -36,9 +36,7 @@ export function AgentSettingsScreen(props: {
   const summary = createMemo(() => props.workspace.state.agents.find((agent) => agent.id === props.agentId));
   const profile = createMemo(() => {
     const agent = summary();
-    if (!agent) return undefined;
-    const color = props.workspace.state.colors[agent.id];
-    return toAgentProfile({ ...agent, avatarColor: color ?? null });
+    return agent ? lookProfile(agent, props.workspace.state) : undefined;
   });
   const autoApprove = createMemo(() =>
     state.admin ? state.admin.autoApprove || state.admin.autoApproveLocked : undefined,

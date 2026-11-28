@@ -1,7 +1,6 @@
 import type { ChannelMessage, ChannelSummary } from "@openbot/contracts/ipc";
 import { ArrowLeft } from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
-import { toAgentProfile } from "@openbot/ui/features/agents/agent-profile";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
@@ -9,7 +8,7 @@ import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownM
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, For, onSettled, Show } from "solid-js";
-import { avatarAgent, bubbleColors, composerAgents } from "./agent-look";
+import { avatarAgent, bubbleColors, composerAgents, lookProfile } from "./agent-look";
 import { ChatComposer } from "./ChatComposer";
 import { stickToBottom } from "./stick-to-bottom";
 import { isChatMessage, type OpenChannel, type Workspace } from "./workspace";
@@ -40,7 +39,7 @@ function ChannelView(props: {
   const { t } = useText();
   let list: HTMLDivElement | undefined;
   const state = () => props.workspace.state;
-  const agents = createMemo(() => composerAgents(state().agents, state().colors));
+  const agents = createMemo(() => composerAgents(state().agents, state()));
   const colors = createMemo(() => {
     const lead =
       state().agents.find((agent) => agent.id === props.channel.leadAgentId) ??
@@ -66,9 +65,7 @@ function ChannelView(props: {
       owners.add(props.channel.leadAgentId);
     return [...owners].flatMap((id) => {
       const agent = state().agents.find((entry) => entry.id === id);
-      return agent
-        ? [{ id, name: agent.name, agent: toAgentProfile({ ...agent, avatarColor: state().colors[id] ?? null }) }]
-        : [];
+      return agent ? [{ id, name: agent.name, agent: lookProfile(agent, state()) }] : [];
     });
   });
   function openLink(url: string) {
@@ -133,11 +130,7 @@ function ChannelView(props: {
                     >
                       <Show when={agent()}>
                         {(found) => (
-                          <AgentAvatar
-                            agent={avatarAgent(found(), state().colors[found().id])}
-                            motion="idle"
-                            class="ch-author-mark"
-                          />
+                          <AgentAvatar agent={avatarAgent(found(), state())} motion="idle" class="ch-author-mark" />
                         )}
                       </Show>
                       <span>{agent()?.name ?? entry().author.name}</span>

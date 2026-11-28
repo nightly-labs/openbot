@@ -2,14 +2,13 @@ import type { ClientAgentSummary } from "@openbot/contracts/ipc";
 import { ArrowLeft, Check, ChevronDown, Plus, Settings } from "@openbot/ui";
 import { QuestionPromptBubble } from "@openbot/ui/components/QuestionPromptBubble";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
-import { toAgentProfile } from "@openbot/ui/features/agents/agent-profile";
 import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
-import { avatarAgent, bubbleColors, composerAgents } from "./agent-look";
+import { avatarAgent, bubbleColors, composerAgents, lookProfile } from "./agent-look";
 import { ChatComposer } from "./ChatComposer";
 import { createMenuPresence } from "./menu-presence";
 import { stickToBottom } from "./stick-to-bottom";
@@ -68,12 +67,12 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
     const last = props.chat.messages.at(-1);
     return !(last && last.author !== "user" && last.status === "streaming");
   };
-  const profile = createMemo(() => toAgentProfile({ ...props.agent, avatarColor: color() ?? null }));
+  const profile = createMemo(() => lookProfile(props.agent, state()));
   const activityLabel = createMemo(() => {
     void props.chat.activeTurnId;
     return nextAgentActivityLabel();
   });
-  const mentionAgents = createMemo(() => composerAgents(state().agents, state().colors));
+  const mentionAgents = createMemo(() => composerAgents(state().agents, state()));
   function openLink(url: string) {
     const safe = safeBrowserUrl(url);
     if (safe) window.open(safe, "_blank", "noopener");
@@ -121,7 +120,7 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
           disabled={!props.workspace.threadsAvailable()}
           onClick={() => setMenuOpen((open) => !open)}
         >
-          <AgentAvatar agent={avatarAgent(props.agent, color())} motion="idle" class="ch-title-mark" />
+          <AgentAvatar agent={avatarAgent(props.agent, state())} motion="idle" class="ch-title-mark" />
           <span class="ch-title-name" dir="auto">
             {props.agent.name}
           </span>
@@ -208,7 +207,7 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
           fallback={
             <div class="ch-empty">
               <AgentAvatar
-                agent={avatarAgent(props.agent, color())}
+                agent={avatarAgent(props.agent, state())}
                 motion="hover"
                 style={{ width: "72px", height: "72px" }}
               />

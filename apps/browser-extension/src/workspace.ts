@@ -73,6 +73,7 @@ import { createAgentInitialMessage } from "@openbot/ui/features/agents/agent-ini
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { currentText } from "@openbot/ui/text";
 import { createStore, flush } from "solid-js";
+import { type AgentPicture, createAgentPictures } from "./agent-pictures";
 import { createAgentSettingsApi } from "./agent-settings";
 import { track, withResult } from "./analytics";
 import { createAttachmentMedia, type HostFile } from "./attachment-media";
@@ -118,6 +119,7 @@ export interface WorkspaceState {
   error: string | null;
   agents: ClientAgentSummary[];
   colors: Record<string, AvatarColor>;
+  pictures: Record<string, AgentPicture>;
   pins: SidebarPin[];
   unread: Record<string, number>;
   threads: Record<string, AgentTask[]>;
@@ -173,6 +175,7 @@ export function createWorkspace(
     error: null,
     agents: [],
     colors: {},
+    pictures: {},
     pins: [],
     unread: {},
     threads: {},
@@ -184,6 +187,11 @@ export function createWorkspace(
     chat: null,
     prompts: [],
   });
+  const pictures = createAgentPictures(request, (agentId, picture) =>
+    setState((draft) => {
+      draft.pictures[agentId] = picture;
+    }),
+  );
   const has = (capability: string) => capabilities.includes(capability);
   const sync = syncLink
     ? createClientSync({
@@ -476,6 +484,7 @@ export function createWorkspace(
         draft.pins = pins.map((pin) => ({ kind: pin.kind, id: pin.id }));
         draft.status = "ready";
       });
+      pictures.load(agents);
     } catch (error) {
       setState((draft) => {
         draft.status = "failed";
@@ -741,6 +750,7 @@ export function createWorkspace(
     setState((draft) => {
       if (!draft.agents.some((entry) => entry.id === agent.id)) draft.agents.push(agent);
     });
+    pictures.load([agent]);
     const color = draft.avatarColor;
     if (color && has(AGENT_COLORS_CAPABILITY))
       await runTeamEffect(setAgentColor(request, { agentId: agent.id, color })).then(
@@ -829,6 +839,7 @@ export function createWorkspace(
         setState((draft) => {
           draft.agents = event.agents;
         });
+        pictures.load(event.agents);
         return;
       case "agent-colors-changed":
         setState((draft) => {
@@ -943,6 +954,7 @@ export function createWorkspace(
     media,
     dispose: () => {
       media.dispose();
+      pictures.dispose();
       if (readsTimer) clearTimeout(readsTimer);
       if (channelTimer) clearTimeout(channelTimer);
       chatGeneration += 1;
