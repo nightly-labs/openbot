@@ -14,6 +14,7 @@ import {
 } from "./web-extension-connect";
 
 const PRODUCT_NAME = "OpenBot";
+const EXTENSION_NOT_LISTED = "browser_extension_not_allowed";
 
 interface WebExtensionConnectProps {
   variant: AppVariant;
@@ -26,7 +27,7 @@ interface WebExtensionConnectProps {
 export function WebExtensionConnect(props: WebExtensionConnectProps) {
   const { t, sourceText } = useText();
   const [pending, setPending] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
+  const [error, setError] = createSignal<{ text: string; canRetry: boolean } | null>(null);
   const [done, setDone] = createSignal(false);
 
   async function allow() {
@@ -42,11 +43,11 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
       });
       const value = await response.json().catch(() => null);
       if (!response.ok || !isDynamicRecord(value) || !isString(value.code)) {
-        const refusal =
-          isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.message)
-            ? sourceText(value.error.message)
-            : t("webClient.extension.failed");
-        setError(refusal);
+        const failure = isDynamicRecord(value) && isDynamicRecord(value.error) ? value.error : null;
+        setError({
+          text: failure && isString(failure.message) ? sourceText(failure.message) : t("webClient.extension.failed"),
+          canRetry: failure?.code !== EXTENSION_NOT_LISTED,
+        });
         setPending(false);
         return;
       }
@@ -58,11 +59,11 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
       }
       if (await answerExtensionTab(props.request, { code: value.code })) setDone(true);
       else {
-        setError(t("webClient.extension.failed"));
+        setError({ text: t("webClient.extension.failed"), canRetry: true });
         setPending(false);
       }
     } catch {
-      setError(t("webClient.extension.failed"));
+      setError({ text: t("webClient.extension.failed"), canRetry: true });
       setPending(false);
     }
   }
@@ -117,21 +118,23 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
           >
             <div class="account-login-form">
               <Show when={error()}>
-                {(text) => (
+                {(failure) => (
                   <p class="account-login-error" role="alert">
-                    {text()}
+                    {failure().text}
                   </p>
                 )}
               </Show>
-              <Button
-                variant="default"
-                type="button"
-                class="account-login-primary"
-                disabled={pending()}
-                onClick={() => void allow()}
-              >
-                {t("webClient.extension.allow")}
-              </Button>
+              <Show when={error()?.canRetry !== false}>
+                <Button
+                  variant="default"
+                  type="button"
+                  class="account-login-primary"
+                  disabled={pending()}
+                  onClick={() => void allow()}
+                >
+                  {t("webClient.extension.allow")}
+                </Button>
+              </Show>
               <Button variant="ghost" type="button" disabled={pending()} onClick={cancel}>
                 {t("common.cancel")}
               </Button>

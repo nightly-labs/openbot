@@ -40,4 +40,6 @@ export const messages = defineMessages("error.auth", {
   "error.auth.companySignInProviderUnreachable": "The company sign-in provider did not answer.",
   "error.auth.companySignInDomainTaken": "One of these domains already signs in through another server.",
   "error.auth.companySignInNoServer": "Start this server before you set up company sign-in.",
+  "error.auth.browserExtensionNotListed":
+    "This copy of the OpenBot extension cannot sign in here. Click Cancel, then choose Use an email code instead in the extension.",
 });
