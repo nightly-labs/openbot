@@ -251,6 +251,7 @@ interface AcpTurn {
   providerError: string | null;
   signInLost: boolean;
   failureCause: CauseCode | null;
+  needsFreshSession: boolean;
   accountLink: string | null;
   accountVerification: boolean;
   sessionLost: boolean;
@@ -2669,6 +2670,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       providerError: null,
       signInLost: false,
       failureCause: null,
+      needsFreshSession: false,
       accountLink: null,
       accountVerification: false,
       sessionLost: false,
@@ -3189,6 +3191,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
         thread.needsResume = true;
         turn.failureCause = "stalled";
+        turn.needsFreshSession = true;
         return Result.fail(
           providerFailure(
             sourceText("error.agent.turnStalled", {
@@ -4478,6 +4481,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           message,
           causeCode,
           ...(turn.accountLink ? { link: turn.accountLink } : {}),
+          ...(turn.needsFreshSession ? { freshSession: true } : {}),
         },
       });
     }
