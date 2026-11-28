@@ -15,6 +15,7 @@ const home = join(root, "home");
 const fakeGrok = join(root, "grok");
 const logPath = join(root, "grok.jsonl");
 const controlPath = join(root, "control.json");
+const accountsRoot = join(root, "provider-accounts");
 const MODEL = "grok-4.7";
 const FALLBACK = "grok-4.6";
 
@@ -24,6 +25,7 @@ mkdirSync(home, { recursive: true });
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
+const { ProviderAccountStore } = await import("../src/backend/agent/provider-account-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
@@ -32,6 +34,7 @@ interface SetupLine {
   event: string;
   pid: number;
   setup: number;
+  account: string | null;
   models: string[];
 }
 
@@ -73,11 +76,21 @@ const report: {
   restartDuringWait?: { setups: string[][]; model: string | undefined };
   oneStartWithoutModel?: { setups: string[][]; model: string | undefined };
   restartWithoutModel?: { setups: string[][]; model: string | undefined };
+  accountMoveDuringWait?: { listed: string[]; movedTo: string; setups: string[][]; model: string | undefined };
+  accountMoveWithoutModel?: { listed: string[]; movedTo: string; setups: string[][]; model: string | undefined };
   error?: string;
 } = { passed: false };
 
 writeFileSync(controlPath, JSON.stringify({ partial: 0 }));
-await installFakeAgent(fakeGrok, "grok-partial-list", { FAKE_LOG: logPath, FAKE_CONTROL: controlPath });
+await installFakeAgent(fakeGrok, "grok-partial-list", {
+  FAKE_LOG: logPath,
+  FAKE_CONTROL: controlPath,
+  FAKE_ACCOUNTS: accountsRoot,
+});
+const accounts = new ProviderAccountStore(join(userData, "openbot-provider-accounts-v1.json"), accountsRoot);
+await runCauseEffect(accounts.load());
+const secondAccount = await runCauseEffect(accounts.create("grok"));
+assert.ok(secondAccount, "The second Grok account was not created.");
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -85,6 +98,7 @@ const agents = new AgentService({
   store,
   mailbox,
   browser,
+  providerAccounts: accounts,
   preferredProvider: "grok",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "grok"),
 });
@@ -92,7 +106,15 @@ const agents = new AgentService({
 const modelOf = (agentId: string) => store.list().find((agent) => agent.id === agentId)?.model;
 const idle = (agentId: string) =>
   !agents.listQueue(agentId).deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
-const setups = async () => (await readJsonl<SetupLine>(logPath)).filter((line) => line.event === "setup");
+const setups = async () =>
+  (await readJsonl<SetupLine>(logPath)).filter((line) => line.event === "setup" && line.account === null);
+const grokModels = () =>
+  agents
+    .listModels()
+    .filter((model) => model.provider === "grok")
+    .map((model) => model.id);
+const setAccount = async (agentId: string, providerAccountId: string | null) =>
+  (await runCauseEffect(agents.updateAgent({ agentId, providerAccountId }))).model;
 
 async function restartGrok(partial: number, markLists = false): Promise<Set<number>> {
   const before = new Set((await setups()).map((line) => line.pid));
@@ -166,6 +188,59 @@ try {
   report.restartWithoutModel = { setups: goneLists, model: modelOf(agent.id) };
   assert.equal(report.restartWithoutModel.model, FALLBACK, "A model that two starts lack still moves.");
   assert.ok(report.restartWithoutModel.setups.length >= 2, "The agent moves only after Grok is asked again.");
+
+  const whole = await restartGrok(0);
+  await listsAfter("a full list", whole, hasModel);
+  await runCauseEffect(agents.updateAgent({ agentId: agent.id, model: MODEL }));
+  await waitFor("the second account to connect", async () =>
+    agents
+      .getStatus()
+      .providers?.find((row) => row.id === "grok")
+      ?.accounts?.some((account) => account.id === secondAccount.id && account.state === "connected"),
+  );
+  assert.equal(await setAccount(agent.id, secondAccount.id), MODEL, "The second account serves the model.");
+  const shortStart = await restartGrok(2);
+  const listedDuringWait = grokModels();
+  assert.ok(!listedDuringWait.includes(MODEL), "The first account's list lacks the model during the wait.");
+  const movedTo = await setAccount(agent.id, null);
+  const accountLists = await listsAfter(
+    "a list with the model after the account move",
+    shortStart,
+    (fresh) => modelOf(agent.id) !== MODEL || hasModel(fresh),
+  );
+  report.accountMoveDuringWait = {
+    listed: listedDuringWait,
+    movedTo,
+    setups: accountLists,
+    model: modelOf(agent.id),
+  };
+  assert.equal(movedTo, MODEL, "An account move during the wait keeps the model.");
+  assert.equal(report.accountMoveDuringWait.model, MODEL, "The agent keeps its model after the full list.");
+
+  assert.equal(await setAccount(agent.id, secondAccount.id), MODEL, "The second account serves the model.");
+  const shortOnly = await restartGrok(Number.MAX_SAFE_INTEGER);
+  const listedWithout = grokModels();
+  assert.ok(!listedWithout.includes(MODEL), "The first account's list lacks the model.");
+  const movedWithout = await setAccount(agent.id, null);
+  await listsAfter("two short lists after the account move", shortOnly, (fresh) => fresh.length >= 2);
+  const shortAgain = await restartGrok(Number.MAX_SAFE_INTEGER);
+  const withoutLists = await listsAfter(
+    "the agent to move after the account move",
+    shortAgain,
+    () => modelOf(agent.id) !== MODEL,
+  );
+  report.accountMoveWithoutModel = {
+    listed: listedWithout,
+    movedTo: movedWithout,
+    setups: withoutLists,
+    model: modelOf(agent.id),
+  };
+  assert.equal(movedWithout, MODEL, "An account move during the wait keeps the model.");
+  assert.equal(
+    report.accountMoveWithoutModel.model,
+    FALLBACK,
+    "A model that the first account lacks still moves at a later start.",
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

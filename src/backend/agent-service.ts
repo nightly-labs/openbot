@@ -653,6 +653,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #settlingStaleTaskTurns = new Set<string>();
   readonly signInWaits = new ProviderSignInWaits((agentId) => this.#store.get(agentId) !== undefined);
   #signInProviders: ReadonlySet<AgentProvider> = new Set();
+  readonly #listRechecks = new Map<AgentProvider, number>();
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
   readonly #poolReads = new Map<AgentProvider, number>();
   readonly #poolReading = new Set<AgentProvider>();
@@ -1121,8 +1122,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               (catalog.relistAfterStart || this.#endpoints.hasAgentsOffList(provider))
             ) {
               const client = this.#providers.currentClient(provider);
-              yield* Effect.sleep(PARTIAL_LIST_RECHECK_MS);
-              const fresh = yield* this.#providers.refreshModels();
+              this.#listRechecks.set(provider, (this.#listRechecks.get(provider) ?? 0) + 1);
+              const fresh = yield* Effect.sleep(PARTIAL_LIST_RECHECK_MS).pipe(
+                Effect.andThen(this.#providers.refreshModels()),
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    const waiting = (this.#listRechecks.get(provider) ?? 1) - 1;
+                    if (waiting > 0) this.#listRechecks.set(provider, waiting);
+                    else this.#listRechecks.delete(provider);
+                  }),
+                ),
+              );
               listConfirmed = fresh.has(provider) && this.#providers.currentClient(provider) === client;
             }
             yield* this.#endpoints.runExclusive(() =>
@@ -3953,6 +3963,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       models.some((model) => model.provider === choice.provider && model.id === choice.model);
     const models = this.#agentModels({ provider: choice.provider, providerAccountId: accountId });
     if (lists(models) || !lists(this.#providers.accountModels(choice.provider, choice.providerAccountId))) return null;
+    if (this.#listRechecks.has(choice.provider)) return null;
     const model = startingModel(choice.provider, models, this.#preference());
     if (!model) return null;
     return {
