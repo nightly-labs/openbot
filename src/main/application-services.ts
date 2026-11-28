@@ -2080,6 +2080,7 @@ export async function createApplicationServices({
           ownPid: process.pid,
           ownCoveringWindowIds: computerUseCoveringWindowIds(),
           previous,
+          pointer: cuaDriver.lastPointer(COMPUTER_USE_ACTION_MAX_AGE_MS),
           toDesktop: computerUseDesktopRect,
         });
       }),

@@ -159,8 +159,12 @@ function readTarget(tool: string, args: DynamicRecord, at: number): ObservedActi
   const target: DynamicRecord = isDynamicRecord(args.target) ? args.target : {};
   const pid = numberIn(args.pid) ?? numberIn(target.pid);
   const windowId = numberIn(args.window_id) ?? numberIn(target.window_id);
-  if (pid === null && windowId === null) return null;
+  if (pid === null && windowId === null) return namesWindowByText(args) ? { tool, pid, windowId, at } : null;
   return { tool, pid, windowId, at };
+}
+
+function namesWindowByText(args: DynamicRecord): boolean {
+  return typeof args.app === "string" || typeof args.window === "string";
 }
 
 function readPointer(
@@ -185,7 +189,7 @@ function pointerWindow(tool: string, args: DynamicRecord): number | null | undef
   const target: DynamicRecord = isDynamicRecord(args.target) ? args.target : {};
   if (args.scope === "desktop" || args.coordinate_frame === "desktop" || target.kind === "desktop") return null;
   const windowId = numberIn(args.window_id) ?? numberIn(target.window_id);
-  if (windowId === null && (typeof args.app === "string" || typeof args.window === "string")) return undefined;
+  if (windowId === null && namesWindowByText(args)) return undefined;
   if (windowId === null && numberIn(args.pid) === null && numberIn(target.pid) === null) return null;
   if (windowId === null || args.from_zoom === true) return undefined;
   return windowId;

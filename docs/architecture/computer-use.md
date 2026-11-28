@@ -86,6 +86,19 @@ window only by `app` or `window` title removes the cursor, because only the driv
 The driver skips the reads between the steps of a batch and does one read at the end. The tap keeps
 the `screenshot_width` of that end read (`observation.state` in the answer) as of a direct read.
 
+The rim (`chooseTarget` in `computer-use-target-window.ts`) marks only a window that the agent
+named in the past 60 s: the `window_id` of its last call, or the top window under its last desktop
+point (a desktop-scope click or `move_cursor`), which is the window that the driver clicks. When
+that window is too small to mark, such as a menu, or the call named only a `pid`, the rim marks the
+only window of that app, or the window that it marked before when the app has more windows. A
+desktop point over no window, or over an OpenBot window, takes the rim down, as does a call that
+names its window only by `app` or `window` title, because only the driver resolves it. When the agent names
+nothing, as with the driver's `browser_*`
+tools, which name only a tab, the rim stays on the window that it marked before, while the driver
+session is live. When the agent has named no window yet, no rim shows. OpenBot never marks the
+front window as a guess: on a shared desktop that is often the user's own window, also on another
+display (#17288).
+
 On macOS, driver 0.52.9 keeps no screenshot frame after a read that ends in
 `ax_window_unresolved`: the window exists, but no accessibility window claims it, as with Premiere
 Pro. Every pixel action on that window is then refused as `window_never_read`, also in the
