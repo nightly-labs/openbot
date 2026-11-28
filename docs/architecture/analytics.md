@@ -262,4 +262,6 @@ is stored by the account service or Signal service.
 
 The desktop chart adapts Zaidan's chart and interactive area composition. The pinned
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
-Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
+Solid runtime. The patch also sets delegated event handlers on the Solid 2 key (`_$$mousemove`,
+not the Solid 1 `$$mousemove`); with the old key, `@solidjs/web` never calls them, and the tooltip
+follows only `mouseenter`. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.

@@ -25,6 +25,9 @@ index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2
 diff --git a/node_modules/solid-recharts/.bun-tag-83b7321533f89656 b/.bun-tag-83b7321533f89656
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/solid-recharts/.bun-tag-a65b580c5b9e124d b/.bun-tag-a65b580c5b9e124d
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/node_modules/solid-recharts/.bun-tag-af6537c3f163b96a b/.bun-tag-af6537c3f163b96a
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
@@ -249,7 +252,7 @@ index 4c198a495b603783ac088d8ec61e69e51ca40665..6242da0f05140569e3549e63ace5bd3b
  //#region src/cartesian/Brush.d.ts
  type BrushTickFormatter = (value: unknown, index: number) => string | number;
 diff --git a/dist/browser/cartesian/Brush.js b/dist/browser/cartesian/Brush.js
-index 68dc5dae13c6707c5d7ff0df10e6ec427e7fb5a2..c7e2486a27c7be7b999dd3a88088ed0fe5cb2d9c 100644
+index 68dc5dae13c6707c5d7ff0df10e6ec427e7fb5a2..f1982be4ec4eb4bc16ecb83f60b984a1ca1c7d19 100644
 --- a/dist/browser/cartesian/Brush.js
 +++ b/dist/browser/cartesian/Brush.js
 @@ -8,8 +8,8 @@ import { RootSurface } from "../container/RootSurface.js";
@@ -263,6 +266,17 @@ index 68dc5dae13c6707c5d7ff0df10e6ec427e7fb5a2..c7e2486a27c7be7b999dd3a88088ed0f
  import { scalePoint } from "d3-scale";
  //#region src/cartesian/Brush.tsx
  var _tmpl$ = /*#__PURE__*/ template(`<svg><rect stroke=none></svg>`, false, true, false), _tmpl$2 = /*#__PURE__*/ template(`<svg><line fill=none stroke=#fff></svg>`, false, true, false), _tmpl$3 = /*#__PURE__*/ template(`<svg><rect></svg>`, false, true, false), _tmpl$4 = /*#__PURE__*/ template(`<svg><rect class=recharts-brush-slide stroke=none fill-opacity=0.2 style=cursor:move></svg>`, false, true, false);
+@@ -382,8 +382,8 @@ const Brush = (props) => {
+ 						}),
+ 						(() => {
+ 							var _el$5 = getNextElement(_tmpl$4);
+-							_el$5.$$touchstart = (e) => startSlideDrag(e);
+-							_el$5.$$mousedown = (e) => startSlideDrag(e);
++							_el$5._$$touchstart = (e) => startSlideDrag(e);
++							_el$5._$$mousedown = (e) => startSlideDrag(e);
+ 							_el$5.addEventListener("mouseleave", () => setIsTextActive(false));
+ 							_el$5.addEventListener("mouseenter", () => setIsTextActive(true));
+ 							effect((_p$) => {
 diff --git a/dist/browser/cartesian/CartesianAxis.d.ts b/dist/browser/cartesian/CartesianAxis.d.ts
 index c76297a3a13a42133f9f51cf79fb32a5ad6674d1..2fd008132a4e01b150438c3cb26a11442c6103b0 100644
 --- a/dist/browser/cartesian/CartesianAxis.d.ts
@@ -991,7 +1005,7 @@ index ca6601923b6702dcb8fffc797b6f44dd135d2723..9f87e97420e0d4268ab379f2af1ba06a
  	});
  }
 diff --git a/dist/browser/chart/RechartsWrapper.js b/dist/browser/chart/RechartsWrapper.js
-index 3f8922408322d57e768d300235eaefd709c852aa..1097fbaa7e966960776c4a1108210f3839749599 100644
+index 3f8922408322d57e768d300235eaefd709c852aa..4a325151f2034382849daf1a65d3d7872ca620e5 100644
 --- a/dist/browser/chart/RechartsWrapper.js
 +++ b/dist/browser/chart/RechartsWrapper.js
 @@ -13,8 +13,8 @@ import { dispatchKeyDown, handleBlurEvent, handleFocusEvent } from "../state/key
@@ -1005,6 +1019,37 @@ index 3f8922408322d57e768d300235eaefd709c852aa..1097fbaa7e966960776c4a1108210f38
  //#region src/chart/RechartsWrapper.tsx
  var _tmpl$ = /*#__PURE__*/ template(`<div tabindex=0>`);
  function styleDimension(value) {
+@@ -268,19 +268,19 @@ const RechartsWrapper = (props) => {
+ 						var _el$ = getNextElement(_tmpl$);
+ 						_el$.addEventListener("blur", onBlur);
+ 						_el$.addEventListener("focus", onFocus);
+-						_el$.$$keydown = handleKeyDown;
+-						_el$.$$touchend = handleTouchEnd;
+-						_el$.$$touchmove = handleTouchMove;
+-						_el$.$$touchstart = handleTouchStart;
+-						_el$.$$mouseup = handleMouseUp;
++						_el$._$$keydown = handleKeyDown;
++						_el$._$$touchend = handleTouchEnd;
++						_el$._$$touchmove = handleTouchMove;
++						_el$._$$touchstart = handleTouchStart;
++						_el$._$$mouseup = handleMouseUp;
+ 						_el$.addEventListener("mouseleave", handleMouseLeave);
+-						_el$.$$mouseout = handleMouseOut;
+-						_el$.$$mousemove = handleMouseMove;
++						_el$._$$mouseout = handleMouseOut;
++						_el$._$$mousemove = handleMouseMove;
+ 						_el$.addEventListener("mouseenter", handleMouseEnter);
+-						_el$.$$mousedown = handleMouseDown;
+-						_el$.$$dblclick = handleDoubleClick;
+-						_el$.$$contextmenu = handleContextMenu;
+-						_el$.$$click = handleClick;
++						_el$._$$mousedown = handleMouseDown;
++						_el$._$$dblclick = handleDoubleClick;
++						_el$._$$contextmenu = handleContextMenu;
++						_el$._$$click = handleClick;
+ 						use((el) => {
+ 							setWrapperRef(el);
+ 							attachWrapperListeners(el);
 diff --git a/dist/browser/chart/Sankey.d.ts b/dist/browser/chart/Sankey.d.ts
 index a7e7c73da305eba4b7f5e2679e3751a0f7be2331..363aafa351c7667279a57f1d7e38e0aed0dbfe4a 100644
 --- a/dist/browser/chart/Sankey.d.ts
@@ -1018,7 +1063,7 @@ index a7e7c73da305eba4b7f5e2679e3751a0f7be2331..363aafa351c7667279a57f1d7e38e0ae
  //#region src/chart/Sankey.d.ts
  interface LinkDataItem {
 diff --git a/dist/browser/chart/Sankey.js b/dist/browser/chart/Sankey.js
-index f6c87d3036e754a3a7d1932a8df25352088f1307..afbeb3c672e2da1a3fcaa532bc5ee1b17544c428 100644
+index f6c87d3036e754a3a7d1932a8df25352088f1307..d52a23ce2328f5b8e5a632cf36eb3c16ffe3d057 100644
 --- a/dist/browser/chart/Sankey.js
 +++ b/dist/browser/chart/Sankey.js
 @@ -10,8 +10,8 @@ import { Layer } from "../container/Layer.js";
@@ -1032,6 +1077,33 @@ index f6c87d3036e754a3a7d1932a8df25352088f1307..afbeb3c672e2da1a3fcaa532bc5ee1b1
  //#region src/chart/Sankey.tsx
  var _tmpl$ = /*#__PURE__*/ template(`<svg><g class=recharts-sankey-link></svg>`, false, true, false), _tmpl$2 = /*#__PURE__*/ template(`<svg><path class=recharts-sankey-link fill=none stroke=#333 stroke-opacity=0.2></svg>`, false, true, false), _tmpl$3 = /*#__PURE__*/ template(`<svg><g class=recharts-sankey-node></svg>`, false, true, false);
  const isObj = (v) => typeof v === "object" && v != null;
+@@ -529,7 +529,7 @@ const SankeyImpl = (props) => {
+ 											};
+ 											return typeof merged.link === "function" ? (() => {
+ 												var _el$ = getNextElement(_tmpl$);
+-												_el$.$$click = onClick;
++												_el$._$$click = onClick;
+ 												_el$.addEventListener("mouseleave", onMouseLeave);
+ 												_el$.addEventListener("mouseenter", onMouseEnter);
+ 												insert(_el$, () => merged.link(lp));
+@@ -537,7 +537,7 @@ const SankeyImpl = (props) => {
+ 												return _el$;
+ 											})() : (() => {
+ 												var _el$2 = getNextElement(_tmpl$2);
+-												_el$2.$$click = onClick;
++												_el$2._$$click = onClick;
+ 												_el$2.addEventListener("mouseleave", onMouseLeave);
+ 												_el$2.addEventListener("mouseenter", onMouseEnter);
+ 												effect((_p$) => {
+@@ -581,7 +581,7 @@ const SankeyImpl = (props) => {
+ 											};
+ 											return typeof merged.node === "function" ? (() => {
+ 												var _el$3 = getNextElement(_tmpl$3);
+-												_el$3.$$click = onClick;
++												_el$3._$$click = onClick;
+ 												_el$3.addEventListener("mouseleave", onMouseLeave);
+ 												_el$3.addEventListener("mouseenter", onMouseEnter);
+ 												insert(_el$3, () => merged.node(np));
 diff --git a/dist/browser/chart/ScatterChart.d.ts b/dist/browser/chart/ScatterChart.d.ts
 index 3eaed23586e88525dc868a7d5c111e22d49405a3..b32b851dbb2b0a6e4ca3d3048b406cebfd05a954 100644
 --- a/dist/browser/chart/ScatterChart.d.ts
@@ -1107,7 +1179,7 @@ index ed18ed1b12ab0307fe5c810dca823eef3e14c2fe..0427c156742f622104f85dc45714753d
  //#region src/chart/Treemap.d.ts
  interface TreemapDataType {
 diff --git a/dist/browser/chart/Treemap.js b/dist/browser/chart/Treemap.js
-index 8594efbf9ea7dc8c9b100fb91efb8e186c1d5ed8..8a0cb5b1872eb6ad4d48278fd7007a9bcddecb36 100644
+index 8594efbf9ea7dc8c9b100fb91efb8e186c1d5ed8..5fc01a05bd723230f9d2fc131ff2f5ec20cb8c89 100644
 --- a/dist/browser/chart/Treemap.js
 +++ b/dist/browser/chart/Treemap.js
 @@ -13,8 +13,8 @@ import { useUniqueId } from "../util/useUniqueId.js";
@@ -1121,6 +1193,15 @@ index 8594efbf9ea7dc8c9b100fb91efb8e186c1d5ed8..8a0cb5b1872eb6ad4d48278fd7007a9b
  //#region src/chart/Treemap.tsx
  var _tmpl$ = /*#__PURE__*/ template(`<svg><text font-size=14></svg>`, false, true, false), _tmpl$2 = /*#__PURE__*/ template(`<div class=recharts-treemap-nest-index-wrapper style=margin-top:8px;text-align:center>`), _tmpl$3 = /*#__PURE__*/ template(`<div class=recharts-treemap-nest-index-box style="cursor:pointer;display:inline-block;padding:0 7px;background:#000;color:#fff;margin-right:3px">`);
  const NODE_VALUE_KEY = "value";
+@@ -550,7 +550,7 @@ const TreemapImpl = (props) => {
+ 				},
+ 				children: (item, i) => (() => {
+ 					var _el$3 = getNextElement(_tmpl$3);
+-					_el$3.$$click = () => onNestIndexClick(i());
++					_el$3._$$click = () => onNestIndexClick(i());
+ 					insert(_el$3, () => nestIndexContent ? nestIndexContent(item, i()) : item.name || "root");
+ 					runHydrationEvents();
+ 					return _el$3;
 diff --git a/dist/browser/component/ActivePoints.js b/dist/browser/component/ActivePoints.js
 index 878b53fe93bc81aef650a99935dd8b2df5e666b8..a541ad008d8677c24b89c0d9a8eecff5f6e61501 100644
 --- a/dist/browser/component/ActivePoints.js
@@ -1197,7 +1278,7 @@ index 0efc1a91b7e8dcf4f4ebb9d10edc009cc3837fae..634a0dd7dcf64e775354644f2f3a67bc
  //#region src/component/DefaultLegendContent.d.ts
  type Element = JSX.Element;
 diff --git a/dist/browser/component/DefaultLegendContent.js b/dist/browser/component/DefaultLegendContent.js
-index 182ebfff24bd7e5abab7a8ddea42500c1bebce0c..a97901203b0422cdef6285659d80347865d5fd24 100644
+index 182ebfff24bd7e5abab7a8ddea42500c1bebce0c..aad31b27794617add52806012f21208a18119e08 100644
 --- a/dist/browser/component/DefaultLegendContent.js
 +++ b/dist/browser/component/DefaultLegendContent.js
 @@ -1,7 +1,7 @@
@@ -1210,6 +1291,15 @@ index 182ebfff24bd7e5abab7a8ddea42500c1bebce0c..a97901203b0422cdef6285659d803478
  //#region src/component/DefaultLegendContent.tsx
  var _tmpl$ = /*#__PURE__*/ template(`<svg><line stroke-width=4 fill=none x1=0 y1=16 x2=32 y2=16 class=recharts-legend-icon></svg>`, false, true, false), _tmpl$2 = /*#__PURE__*/ template(`<svg><path stroke-width=4 fill=none d=M0,16h10.666666666666666A5.333333333333333,5.333333333333333,0,1,1,21.333333333333332,16H32M21.333333333333332,16A5.333333333333333,5.333333333333333,0,1,1,10.666666666666666,16 class=recharts-legend-icon></svg>`, false, true, false), _tmpl$3 = /*#__PURE__*/ template(`<svg><path stroke=none d=M0,4h32v24h-32z class=recharts-legend-icon></svg>`, false, true, false), _tmpl$4 = /*#__PURE__*/ template(`<ul class=recharts-default-legend>`), _tmpl$5 = /*#__PURE__*/ template(`<li><!$><!/><span class=recharts-legend-item-text>`);
  const SIZE = 32;
+@@ -98,7 +98,7 @@ const DefaultLegendContent = (props) => {
+ 						var _el$5 = getNextElement(_tmpl$5), _el$7 = _el$5.firstChild, [_el$8, _co$] = getNextMarker(_el$7.nextSibling), _el$6 = _el$8.nextSibling;
+ 						_el$5.addEventListener("mouseleave", (event) => merged.onMouseLeave?.(entry, i(), event));
+ 						_el$5.addEventListener("mouseenter", (event) => merged.onMouseEnter?.(entry, i(), event));
+-						_el$5.$$click = (event) => merged.onClick?.(entry, i(), event);
++						_el$5._$$click = (event) => merged.onClick?.(entry, i(), event);
+ 						insert(_el$5, createComponent(Surface, {
+ 							get width() {
+ 								return merged.iconSize;
 diff --git a/dist/browser/component/DefaultTooltipContent.d.ts b/dist/browser/component/DefaultTooltipContent.d.ts
 index 9bc84c95f82b490466f88924313cb592918f0f23..1098d3e2338451184cad7c07745f5017912b742b 100644
 --- a/dist/browser/component/DefaultTooltipContent.d.ts
@@ -4183,7 +4273,7 @@ index 0000000000000000000000000000000000000000..6c83e0ffb1f9258a9e2eead2d5c670a5
 +
 diff --git a/node_modules/solid-recharts/dist/solid2.js b/dist/solid2.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..89948a25bc993728c9608060640f1ffcbbfccc62
+index 0000000000000000000000000000000000000000..16c66b4e6e87b4a359a362c332824a193ebef93e
 --- /dev/null
 +++ b/dist/solid2.js
 @@ -0,0 +1,65 @@
