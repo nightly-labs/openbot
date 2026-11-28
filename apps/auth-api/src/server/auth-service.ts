@@ -116,12 +116,9 @@ export function readChatColor(body: DynamicRecord): AvatarColor | null | undefin
   return isAvatarColor(body.chatColor) ? body.chatColor : undefined;
 }
 
-export function sessionReadsFor(request: Request): SessionReads {
-  return request.method === "GET" || request.method === "HEAD" ? "replica" : "primary";
-}
-
 export function ownAccountReadsFor(request: Request): SessionReads {
-  return sessionReadsFor(request) === "replica" && isAccountBookmark(request.headers.get(ACCOUNT_BOOKMARK_HEADER))
+  return (request.method === "GET" || request.method === "HEAD") &&
+    isAccountBookmark(request.headers.get(ACCOUNT_BOOKMARK_HEADER))
     ? "replica"
     : "primary";
 }

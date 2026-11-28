@@ -29,7 +29,6 @@ import {
   ownAccountReadsFor,
   readAnalyticsAnswer,
   readChatColor,
-  sessionReadsFor,
 } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
@@ -335,10 +334,7 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     );
   }
   const user = token
-    ? yield* services.auth.authenticate(
-        token,
-        path === "session" ? ownAccountReadsFor(request) : sessionReadsFor(request),
-      )
+    ? yield* services.auth.authenticate(token, path === "session" ? ownAccountReadsFor(request) : "replica")
     : null;
   if (path === "logout" && request.method === "POST") {
     if (token && user) yield* services.remote.endAccountSession(user.id, yield* sha256(token));

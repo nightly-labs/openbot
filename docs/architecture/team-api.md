@@ -332,6 +332,17 @@ consume, invitation redeem and owner transfer accept still read the primary: Sig
 token until it expires, and after a restart it does not know the revocations that it had before.
 The pool machine writes its `seen_at` only when the primary value is more than 60 s old, so a late
 replica does not add writes. `apps/auth-api/scripts/host-replica-reads-e2e.ts` counts the queries for each check.
+One rule in `apps/auth-api/src/server/d1-request-session.ts` sets the D1 session of each request. A GET
+or HEAD reads the replica: from the request bookmark when the client sends one, otherwise
+`first-unconstrained`. When that GET answers 403 or 404 after a replica read that found no row, the
+Worker runs it once more on a `first-primary` session and sends that answer, so a row that the replica
+does not have yet does not cause a refusal. A refusal from an upstream service, after replica reads that
+found their rows, is sent at once and does not call that service again. Other methods use a `first-primary` session. In them, the bearer check of the session and the
+checks above read the replica first, and read the primary when the replica has no row. The own account
+(`/v1/me` and the browser session) without a bookmark, the bearer check of billing, license, credits
+and checkout writes, sign-in codes, host tickets, credit holds and charges, invitation and owner transfer accept, and Stripe webhook dedupe still read the primary.
+`apps/auth-api/scripts/d1-replica-reads-all-e2e.ts` counts primary and replica statements for each
+request type.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.

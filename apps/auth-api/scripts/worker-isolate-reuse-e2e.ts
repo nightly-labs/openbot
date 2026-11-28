@@ -332,6 +332,7 @@ interface Counts {
 interface Outcome {
   status: number;
   code: string | null;
+  bookmark: string | null;
   ticket: boolean;
   credits: {
     available: boolean | null;
@@ -361,6 +362,7 @@ async function send(path: string, init: RequestInit): Promise<Outcome> {
   return {
     status: response.status,
     code: body.error?.code ?? null,
+    bookmark: response.headers.get(ACCOUNT_BOOKMARK_HEADER),
     ticket: typeof body.ticket === "string" && body.ticket.split(".").length === 3,
     credits:
       body.balance === undefined
@@ -534,13 +536,22 @@ async function creditCases() {
     creditsAre(first, { balance: 65, welcome: 10, servers: SERVER }) && first.counts.primaryWrites === 2,
     first,
   );
-  const second = record("credits: second visit after the welcome grant", await creditsRequest());
+  const second = record("credits: second visit after the welcome grant", await creditsRequest(first.bookmark));
   check(
-    "credits: the next visit writes nothing and uses one account round trip",
-    creditsAre(second, { balance: 65, welcome: 10, servers: SERVER }) &&
+    "credits: the next visit with the returned bookmark writes nothing and uses one account round trip",
+    first.bookmark !== null &&
+      creditsAre(second, { balance: 65, welcome: 10, servers: SERVER }) &&
       second.counts.primaryWrites === 0 &&
       second.counts.accountRoundTrips === 1,
     second,
+  );
+  const noBookmark = record("credits: next visit with no bookmark on a stale replica", await creditsRequest());
+  check(
+    "credits: the next visit with no bookmark on a stale replica shows the welcome grant once and adds no grant",
+    creditsAre(noBookmark, { balance: 65, welcome: 10, servers: SERVER }) &&
+      world.primary.prepare("SELECT COUNT(*) AS count FROM credit_ledger WHERE reference = 'welcome:user'").get()
+        ?.count === 1,
+    noBookmark,
   );
 
   world = seededWorld();

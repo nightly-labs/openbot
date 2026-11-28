@@ -3,8 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { ACCOUNT_BOOKMARK_HEADER } from "@openbot/contracts/account-bookmark";
 import { Effect } from "effect";
-import { sessionReadsFor } from "../src/server/auth-service";
+import { ownAccountReadsFor } from "../src/server/auth-service";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
 import { observedD1 } from "../src/server/observed-d1";
 import { sqliteD1 } from "./sqlite-d1";
@@ -15,6 +16,7 @@ const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const NOW = Date.parse("2026-11-27T13:00:00Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
 const AFTER_ACTIVITY_INTERVAL = NOW + 61 * 60_000;
+const OWN_BOOKMARK = `00000002-00000000-00000000-${"0".repeat(32)}`;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
 function check(name: string, passed: boolean, detail?: unknown) {
@@ -94,18 +96,24 @@ async function main() {
     },
   );
 
+  const ownAccountReads = (method: string, bookmark: string | null) =>
+    ownAccountReadsFor(
+      new Request("https://openbot.test/v1/me", {
+        method,
+        headers: bookmark ? { [ACCOUNT_BOOKMARK_HEADER]: bookmark } : {},
+      }),
+    );
   const reads = Object.fromEntries(
-    ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].map((method) => [
-      method,
-      sessionReadsFor(new Request("https://openbot.test/v1/me", { method })),
-    ]),
+    ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].map((method) => [method, ownAccountReads(method, OWN_BOOKMARK)]),
   );
+  const withoutBookmark = ownAccountReads("GET", null);
   check(
-    "only a GET or HEAD request picks the replica for its session lookup",
+    "only a GET or HEAD of the own account with a bookmark picks the replica for its session lookup",
     reads.GET === "replica" &&
       reads.HEAD === "replica" &&
+      withoutBookmark === "primary" &&
       ["POST", "PUT", "PATCH", "DELETE"].every((method) => reads[method] === "primary"),
-    reads,
+    { ...reads, withoutBookmark },
   );
 
   const primaryRead = await Effect.runPromise(repository.authenticate("old-token", NOW + 60_000));
