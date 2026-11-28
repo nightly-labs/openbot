@@ -34,8 +34,13 @@ The object has 2 tables: `host_state(generation)` and `host_copy(key, value, che
 | Key | Slice | Value | Read by |
 | --- | --- | --- | --- |
 | `v1:credential` | 1 | Host row: token hash, `auth_epoch`, owner, device key, `signal_home`, name, logo | `authenticateHost`, `assertHostCredential`, host claims in validate-batch |
-| `v1:session:<id>` | 2 | Session, membership and host columns, and `auth_live` (the sign-in session was live at `checked_at`) | Session ticket, `validateResumeClaims`, validate-batch, `sessionOpen` |
+| `v1:session:<id>` | 2 | Session, membership and host columns, and `auth_live` (the sign-in session was live at `checked_at`) | `validateResumeClaims`, validate-batch, `sessionOpen` |
 | `v1:listing` | 3 | Key handovers, owner licenses, custom member limit, plan entitlements (the 4 JSON parts of `listHosts`) | `GET /v2/remote/hosts/` |
+
+The session ticket routes (`POST /v2/remote/sessions/<id>/ticket` and the browser ticket route) do not
+read the object. They call `findSignedInSession`: one joined query on the replica that checks the
+caller's sign-in and the remote session together. The object does not know the caller's sign-in, so
+a copy saves no query on this route.
 
 Users, sign-in sessions, licenses, billing, hosted servers, invitations and transfers stay in D1
 only. The host list still reads name, role, `hidden_at` and the hosted server columns from D1 on
@@ -130,13 +135,12 @@ protocol. The E2E compares the answers of mode `read` with mode `off`.
 
 | Case | Mode `off`: primary queries, rows read | Mode `read`: primary queries, rows read |
 | --- | ---: | ---: |
-| 100 session tickets, 10 sessions on one host, 30 min (1 ticket each 3 min for each session) | 100, 400 | 30, 180 |
+| 100 session tickets on the production route, 10 sessions on one host, 30 min (object not read) | 100 replica | 100 replica |
 | Host list of a member of 5 hosts, 10 calls in 5 min | 10, 590 | 11, 218 |
 | validate-batch of 27 claims (7 host, 20 session), 10 calls in 5 min | 20, 1,410 | 6 (+10 replica), 411 |
 | Host authentication, 20 requests on one host (slice 1) | 20 | 1 |
 
-The ticket fills come from the 10 min recheck: each session reads D1 once each 10 min. The host list
-makes 1 more query on a fill, but each query reads 63% fewer rows. The 10 replica queries in
+The host list makes 1 more query on a fill, but each query reads 63% fewer rows. The 10 replica queries in
 validate-batch find the host of sessions that the isolate did not start.
 
 ## D1 primary queries a minute (estimate)
@@ -144,10 +148,9 @@ validate-batch find the host of sessions that the isolate did not start.
 | Change | Primary queries a day | A minute |
 | --- | ---: | ---: |
 | Today, normal load | about 13M | about 9,000 |
-| Session tickets: −70% of 2.1M | −1.47M | −1,020 |
 | validate-batch: about 459k calls, 2 primary queries each, −70% | −0.64M | −445 |
 | Host credential (slice 1, upper limit) | −1.82M | −1,264 |
-| After slices 1 to 3 | about 9.1M | about 6,300 |
+| After slices 1 to 3 | about 10.5M | about 7,300 |
 
 The host list removes no queries, but it removes about 63% of its rows read and its JSON work.
 
@@ -168,33 +171,32 @@ Object requests a day:
 
 | Source | Arithmetic | Requests a day |
 | --- | --- | ---: |
-| Session tickets | 2.1M reads + 0.3 × 2.1M fills | 2.73M |
 | Host list | 1.04M calls × 2 hosts (estimate) reads + 10% fills | 2.29M |
 | validate-batch | 459k calls × 2 hosts (estimate) | 0.92M |
 | Host authentication (slice 1) | 1.82M reads + 10% fills | 2.0M |
 | Invalidations | 0.21M host writes + 0.1M session and membership writes (estimate) | 0.31M |
-| Total | | about 8.25M a day, 248M a month |
+| Total | | about 5.52M a day, 166M a month |
 
-SQLite rows written a day: session fills 0.63M + listing fills 0.52M (1.04M × 5 hosts × 10%, upper
+SQLite rows written a day: listing fills 0.52M (1.04M × 5 hosts × 10%, upper
 limit) + credential fills 0.53M (3,650 active hosts × 144 fills, estimate) + invalidations 0.93M
-(0.31M × 3 rows) = 2.6M a day, 78M a month.
+(0.31M × 3 rows) = 1.97M a day, 59M a month.
 
 | Item | Arithmetic | A month |
 | --- | --- | ---: |
-| Requests | (248M − 1M) × $0.15 / 1M | $37 |
-| Duration | 248M × 5 ms × 0.128 GB = 159k GB-s, less than 400k included | $0 |
-| Rows written | 78M × $1.00 / 1M | $78 |
+| Requests | (166M − 1M) × $0.15 / 1M | $25 |
+| Duration | 166M × 5 ms × 0.128 GB = 106k GB-s, less than 400k included | $0 |
+| Rows written | 59M × $1.00 / 1M | $59 |
 | Rows read | less than 1B × $0.001 / 1M | less than $1 |
 | Storage | less than 1 GB | less than $1 |
-| Total at 1x | | about $116 |
+| Total at 1x | | about $85 |
 
-At 100x this model gives about $11,600 a month. Most of it is rows written by fills. To lower it, keep
+At 100x this model gives about $8,500 a month. Most of it is rows written by fills. To lower it, keep
 the recheck at 10 min or longer, and fill only the keys that a request needs (the code does this).
 
 ## Problems (numbers)
 
-1. **100x needs the sign-in session read to leave D1.** Slices 1 to 3 remove at most about 4M of
-   26.9M queries a day (15%). The sign-in session read (29.4%) stays. The plan for it is signed
+1. **100x needs the sign-in session read to leave D1.** Slices 1 to 3 remove at most about 2.5M of
+   26.9M queries a day (9%). The sign-in session read (29.4%) stays. The plan for it is signed
    access tokens.
 2. **Rollback barrier.** After production gets the `new_sqlite_classes` migration, a rollback to a
    Worker version before it may be refused (not confirmed). So the binding and the migration tag ship

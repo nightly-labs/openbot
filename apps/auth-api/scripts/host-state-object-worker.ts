@@ -3,7 +3,6 @@ import { decodeJwt } from "jose";
 import { type HostStateStore, hostStateStore } from "../src/server/host-state";
 import { HostState, type HostStateSnapshot } from "../src/server/host-state-object";
 import {
-  deliverPendingRemoteAuthEvents,
   RemoteControlPlane,
   type RemoteResumeClaims,
   retryPendingHostStateInvalidations,
@@ -54,7 +53,7 @@ export type ProbeRequest =
   | { op: "host-state-retry" }
   | { op: "minute-cron" }
   | { op: "session-start"; userId: string; hostId: string; authSessionHash: string }
-  | { op: "session-ticket"; userId: string; sessionId: string; signedInTokenHash: string }
+  | { op: "session-ticket"; sessionId: string; signedInTokenHash: string }
   | { op: "end-session"; userId: string; sessionId: string }
   | { op: "revoke-sign-in"; tokenHash: string; at: number }
   | { op: "validate-batch"; claims: RemoteResumeClaims[] }
@@ -252,15 +251,16 @@ async function run(
       return result.ok ? { ok: true, sessionId: result.value.sessionId, expiresAt: result.value.expiresAt } : result;
     }
     case "session-ticket": {
-      const result = await outcome(
-        plane.issueSessionTicket(
-          request.userId,
-          request.sessionId,
-          "probe-client-public-key",
-          undefined,
-          request.signedInTokenHash,
-        ),
+      const signedIn = await outcome(
+        plane.findSignedInSession({
+          authSessionHash: request.signedInTokenHash,
+          sessionId: request.sessionId,
+          boundToAuthSession: false,
+        }),
       );
+      if (!signedIn.ok) return signedIn;
+      if (!signedIn.value) return { ok: false, code: "unauthorized", status: 401 };
+      const result = await outcome(plane.issueSignedInSessionTicket(signedIn.value, "probe-client-public-key"));
       return result.ok ? { ok: true, authEpoch: ticketEpoch(result.value.ticket) } : result;
     }
     case "end-session": {
@@ -303,7 +303,7 @@ async function run(
     }
     case "host-state-retry": {
       const result = await outcome(
-        deliverPendingRemoteAuthEvents(
+        retryPendingHostStateInvalidations(
           { DB: database, ...(env.HOST_STATE ? { HOST_STATE: env.HOST_STATE } : {}), HOST_STATE_MODE: options.mode },
           options.clock,
         ),

@@ -140,6 +140,7 @@ function check(name: string, passed: boolean, detail?: unknown) {
 }
 
 const signInToken = (userId: string) => `signin-${userId}`;
+const otherBrowserToken = (userId: string) => `signin-other-${userId}`;
 const hostToken = (hostId: string) => `token-${hostId}`;
 const revocationHost = (mode: Mode) => `h-rev-${mode}`;
 const revocationUser = (mode: Mode) => `r-${mode}`;
@@ -157,6 +158,7 @@ function seedSql(start: number, periodEnd: number): string {
   const rows = users.flatMap((userId) => [
     `INSERT INTO users(id, identity_key, email, name, created_at, updated_at) VALUES (${quote(userId)}, ${quote(`email:${userId}@example.test`)}, ${quote(`${userId}@example.test`)}, ${quote(userId)}, 1, 1);`,
     `INSERT INTO auth_sessions(id, user_id, token_hash, expires_at, created_at, last_used_at, revoked_at) VALUES (${quote(`auth-${userId}`)}, ${quote(userId)}, ${quote(tokenHash(signInToken(userId)))}, ${FAR_FUTURE}, 1, 1, NULL);`,
+    `INSERT INTO auth_sessions(id, user_id, token_hash, expires_at, created_at, last_used_at, revoked_at) VALUES (${quote(`auth-other-${userId}`)}, ${quote(userId)}, ${quote(tokenHash(otherBrowserToken(userId)))}, ${FAR_FUTURE}, 1, 1, NULL);`,
   ]);
   for (const hostId of hosts) {
     rows.push(
@@ -284,12 +286,7 @@ try {
     session: StartedSession,
     callerHash = tokenHash(signInToken(session.userId)),
     broken = false,
-  ) =>
-    call(
-      mode,
-      { op: "session-ticket", userId: session.userId, sessionId: session.sessionId, signedInTokenHash: callerHash },
-      broken,
-    );
+  ) => call(mode, { op: "session-ticket", sessionId: session.sessionId, signedInTokenHash: callerHash }, broken);
   const sessionClaims = (session: StartedSession, authEpoch: number): RemoteResumeClaims => ({
     sessionId: session.sessionId,
     hostId: session.hostId,
@@ -339,11 +336,11 @@ try {
     ...ticketCounts,
   };
   check(
-    "100 session tickets over 30 min: flag read makes fewer D1 primary queries than flag off, and every ticket is issued",
+    "100 session tickets over 30 min on the production ticket route: every ticket is issued, and flag read adds no D1 primary query",
     ticketFailures.length === 0 &&
       ticketCounts.off.calls === 100 &&
       ticketCounts.read.calls === 100 &&
-      ticketCounts.read.primary < ticketCounts.off.primary,
+      ticketCounts.read.primary <= ticketCounts.off.primary,
     { ...ticketCounts, failures: ticketFailures },
   );
 
@@ -435,7 +432,7 @@ try {
 
     const revokedAt = clock.now;
     await call(mode, { op: "revoke-sign-in", tokenHash: tokenHash(signInToken(signedOut.userId)), at: revokedAt });
-    const otherCaller = tokenHash("signin-other-browser");
+    const otherCaller = tokenHash(otherBrowserToken(signedOut.userId));
     const signInAtOnce = await ticket(mode, signedOut, otherCaller);
     clock.now = revokedAt + SIGN_IN_LIMIT_MS;
     const signInTicket = await ticket(mode, signedOut, otherCaller);
