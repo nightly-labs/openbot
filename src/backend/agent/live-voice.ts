@@ -168,7 +168,6 @@ interface OpenUserLine {
 
 interface DeliveryUpdates {
   readonly since: number;
-  readonly ids: Set<string>;
   readonly texts: Set<string>;
   readonly speech: Set<Fiber.Fiber<void>>;
 }
@@ -196,6 +195,7 @@ interface LiveSession {
   readonly answeredTurns: Set<string>;
   readonly speaking: Set<Fiber.Fiber<void>>;
   readonly updates: Map<string, DeliveryUpdates>;
+  readonly readUpdates: Set<string>;
 }
 
 interface SentAsk {
@@ -265,6 +265,7 @@ export class LiveVoice {
       answeredTurns: new Set(),
       speaking: new Set(),
       updates: new Map(),
+      readUpdates: new Set(),
     };
     this.#sessions.set(session.id, session);
     relay.client.on("notification", session.onNotification);
@@ -487,7 +488,7 @@ export class LiveVoice {
         onSuccess: (deliveryId) => {
           if (!this.#sessions.has(session.id)) return;
           session.lastAsk = { words: requestWords(text), userLines: session.userLines, deliveryId };
-          session.updates.set(deliveryId, { since, ids: new Set(), texts: new Set(), speech: new Set() });
+          session.updates.set(deliveryId, { since, texts: new Set(), speech: new Set() });
           const ask = this.#wait(session, request, deliveryId);
           if (waits && ask && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
         },
@@ -546,11 +547,11 @@ export class LiveVoice {
             message.author !== "assistant" ||
             message.itemType !== "commentary" ||
             message.status !== "completed" ||
-            updates.ids.has(message.id) ||
+            session.readUpdates.has(message.id) ||
             !isNarrationItemId(message.id, session.provider)
           )
             continue;
-          updates.ids.add(message.id);
+          session.readUpdates.add(message.id);
           if (Date.parse(message.createdAt) < updates.since || !showsNarration(message.text, updates.texts)) continue;
           const fiber = this.#say(session, Effect.succeed(speechTextFromMarkdown(this.#hooks.redact(message.text))));
           updates.speech.add(fiber);
