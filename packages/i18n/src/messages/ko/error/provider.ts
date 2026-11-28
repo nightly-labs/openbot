@@ -437,6 +437,10 @@ export const messages = {
     "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다: {reason} 에이전트가 이제 이 메시지를 보지 않으므로 다음 메시지는 막히지 않습니다. 다른 표현으로 요청을 다시 보내세요.",
   "error.provider.codexSafetyBlockedKept":
     "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다: {reason} {provider}이(가) 다음 메시지도 차단하면 새 채팅을 시작하세요.",
+  "error.provider.claudeSafetyBlocked":
+    "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다. 에이전트가 이제 이 메시지를 보지 않으므로 다음 메시지는 막히지 않습니다. 다른 표현으로 요청을 다시 보내세요.",
+  "error.provider.claudeSafetyBlockedKept":
+    "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다. {provider}이(가) 다음 메시지도 차단하면 새 채팅을 시작하세요.",
   "error.provider.codexAudioRefused":
     "이 모델은 오디오를 들을 수 없어서 이 채팅의 소리를 받지 않았습니다. OpenBot이 채팅 기록으로 새 Codex 세션을 시작했습니다. 계속하려면 요청을 다시 보내고 에이전트에게 소리 없이 작업하라고 요청하세요. 소리를 확인하려면 에이전트의 모델 메뉴에서 오디오를 들을 수 있는 모델을 선택하세요.",
   "error.provider.codexAccountSettingsUnreadable":

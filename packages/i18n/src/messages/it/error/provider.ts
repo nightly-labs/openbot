@@ -446,6 +446,10 @@ export const messages = {
     "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} L'agente non vede più questo messaggio, quindi non blocca i tuoi prossimi messaggi. Invia di nuovo la richiesta con parole diverse.",
   "error.provider.codexSafetyBlockedKept":
     "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} Se {provider} blocca anche i tuoi prossimi messaggi, avvia una nuova chat.",
+  "error.provider.claudeSafetyBlocked":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza. L'agente non vede più questo messaggio, quindi non blocca i tuoi prossimi messaggi. Invia di nuovo la richiesta con parole diverse.",
+  "error.provider.claudeSafetyBlockedKept":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza. Se {provider} blocca anche i tuoi prossimi messaggi, avvia una nuova chat.",
   "error.provider.codexAudioRefused":
     "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
   "error.provider.codexAccountSettingsUnreadable":
