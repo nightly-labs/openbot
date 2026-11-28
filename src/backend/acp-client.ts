@@ -2907,10 +2907,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 ? (sdkHarness.fallbackCause?.(detail, failureAt > 0 || turn.reasoned || turn.toolNames.size > 0) ??
                   rawCause)
                 : rawCause;
+            const loadFailure = this.#mcpLoadFailureMessage(thread, detail);
             turn.providerError =
-              this.#mcpLoadFailureMessage(thread, detail) ??
-              this.options.savedKeyLimitMessage?.(detail) ??
-              sdkHarness.turnFailure(detail);
+              loadFailure ?? this.options.savedKeyLimitMessage?.(detail) ?? sdkHarness.turnFailure(detail);
+            if (!logged && !loadFailure && !turn.providerError.includes(detail))
+              this.emit("diagnostic", this.#redact(`${this.#label} turn failed: ${detail}`));
             turn.sessionLost = sdkHarness.sessionLost?.test(detail) === true;
           }
         }

@@ -322,6 +322,8 @@ export const messages = {
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
   "error.provider.antigravitySignInRefused":
     "لم تقبل Google تسجيل الدخول إلى Gemini لهذا الطلب. أرسل رسالتك مرة أخرى. إذا استمر الخطأ، أعد ربط Gemini في الإعدادات.\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "لا يستطيع Gemini قراءة تنسيق الإدخال لأداة من أحد تطبيقاتك، لذلك لم يُجب هذا الوكيل. في المتجر، التطبيقات، أوقف تطبيقًا واحدًا في كل مرة وأرسل رسالتك مرة أخرى، أو اختر نموذجًا من مزوّد آخر.",
   "error.provider.antigravityRequestRejected":
     "رفض Gemini هذا الطلب. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى. إذا فشل مرة أخرى، فابدأ دردشة جديدة.\n{detail}",
   "error.provider.antigravityNetwork": "فقد Gemini الاتصال بـ Google. أرسل رسالتك مرة أخرى. ({cause})",

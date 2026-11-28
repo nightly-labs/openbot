@@ -336,6 +336,8 @@ export const messages = defineMessages("error.provider", {
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
   "error.provider.antigravitySignInRefused":
     "Google did not accept the Gemini sign-in for this request. Send your message again. If the error continues, reconnect Gemini in Settings.\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "Gemini cannot read the input format of a tool from one of your apps, so this agent did not answer. In Marketplace, Apps, turn off one app at a time and send your message again, or choose a model from another provider.",
   "error.provider.antigravityRequestRejected":
     "Gemini refused this request. Choose another model, then send your message again. If it fails again, start a new chat.\n{detail}",
   "error.provider.antigravityNetwork": "Gemini lost its connection to Google. Send your message again. ({cause})",

@@ -348,6 +348,8 @@ export const messages = {
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
   "error.provider.antigravitySignInRefused":
     "Google heeft de Gemini-aanmelding voor dit verzoek niet geaccepteerd. Stuur je bericht opnieuw. Blijft de fout, verbind Gemini dan opnieuw in Instellingen.\n{detail}",
+  "error.provider.antigravityToolFormatRefused":
+    "Gemini kan het invoerformaat van een tool uit een van je apps niet lezen, dus deze agent heeft niet geantwoord. Zet in Marktplaats, Apps steeds één app uit en stuur je bericht opnieuw, of kies een model van een andere aanbieder.",
   "error.provider.antigravityRequestRejected":
     "Gemini heeft dit verzoek geweigerd. Kies een ander model en stuur je bericht opnieuw. Mislukt het weer, start dan een nieuwe chat.\n{detail}",
   "error.provider.antigravityNetwork":
