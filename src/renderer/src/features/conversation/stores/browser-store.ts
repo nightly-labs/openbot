@@ -82,6 +82,7 @@ interface BrowserPanels {
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
   reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
+  dropBrowserPane: () => void;
 }
 
 export interface BrowserStoreDeps {
@@ -286,6 +287,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       const mode = untrack(deps.panels.activeRightPanel);
       if (untrack(() => deps.panels.paneShown("browser")) || mode === "browser-expanded" || mode === "browser-pip")
         untrack(deps.panels.closeBrowserPane);
+      else untrack(deps.panels.dropBrowserPane);
     },
   );
 
