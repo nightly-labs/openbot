@@ -43,7 +43,7 @@ interface Step {
   value?: string;
   keyring?: string;
   switches?: string[];
-  platform?: "darwin";
+  platform?: "darwin" | "win32";
 }
 
 interface StepResult extends Step {
@@ -110,6 +110,25 @@ try {
     assert.equal(write?.format, "obk1", "macOS, no Keychain: the key file encrypts");
     assert.equal(write?.keyFileMode, "600", "macOS, no Keychain: only the user reads the key file");
     assert.equal(read?.readValue, "secret-without-keychain", "macOS, no Keychain: the secret opens after a restart");
+  }
+
+  {
+    const steps = await runCase("Windows rules: no secret storage", [
+      { name: "first start writes", step: "write", value: "secret-without-dpapi", platform: "win32" },
+      { name: "restart reads", step: "read", platform: "win32" },
+    ]);
+    const [write, read] = steps;
+    assert.equal(write?.keyringAvailable, false, "Windows, no secret storage: safeStorage has no key");
+    assert.equal(write?.keyFileBeforeReady, false, "Windows, before ready: no key file is made");
+    assert.equal(write?.canPersist, true, "Windows, no secret storage: the secret can be kept");
+    assert.equal(write?.format, "obk1", "Windows, no secret storage: the key file encrypts");
+    assert.equal(write?.madeKeyFile, true, "Windows, no secret storage: the key file is made");
+    assert.equal(
+      read?.readValue,
+      "secret-without-dpapi",
+      "Windows, no secret storage: the secret opens after a restart",
+    );
+    assert.equal(read?.madeKeyFile, false, "Windows, no secret storage: a restart uses the same key file");
   }
 
   if (hasKeyring) {
@@ -179,6 +198,21 @@ try {
       },
       { name: "restart reads", step: "read", keyring: "mac-3", platform: "darwin" },
     ]);
+    const windows = await runCase("Windows rules: the secret storage works again", [
+      { name: "a start with no secret storage writes", step: "write", value: "secret-in-file", platform: "win32" },
+      { name: "the next start reads", step: "read", keyring: "win-1", platform: "win32" },
+      { name: "the next start writes", step: "write", value: "secret-in-dpapi", keyring: "win-1", platform: "win32" },
+      { name: "restart reads", step: "read", keyring: "win-1", platform: "win32" },
+      { name: "a read with another key", step: "read", keyring: "win-2", platform: "win32" },
+    ]);
+    const [winRefused, winFileRead, winWorksAgain, winReadAgain, winOtherKey] = windows;
+    assert.equal(winRefused?.format, "obk1", "Windows, no secret storage: the key file encrypts");
+    assert.equal(winFileRead?.readValue, "secret-in-file", "Windows: a key file secret opens when the storage works");
+    assert.equal(winWorksAgain?.format, "v11", "Windows: a secret storage that works again encrypts new secrets");
+    assert.equal(winReadAgain?.readValue, "secret-in-dpapi", "Windows: the system secret opens after a restart");
+    assert.ok(winOtherKey?.error, "Windows: the secret with another key does not open");
+    assert.equal(winOtherKey?.madeKeyFile, false, "Windows: a failed read makes no new key file");
+
     const [refused, worksAgain, readAgain] = macBack;
     assert.equal(refused?.format, "obk1", "macOS, no Keychain: the key file encrypts");
     assert.equal(worksAgain?.format, "v11", "macOS: a Keychain that works again encrypts new secrets");

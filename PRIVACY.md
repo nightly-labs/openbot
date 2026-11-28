@@ -590,6 +590,12 @@ with it while the Keychain cannot encrypt. Secrets that the Keychain keeps stay 
 Keychain works again, it keeps the new secrets. Delete the file only when no secret uses it; a
 secret that it encrypted then cannot be read, and you must sign in again or save it again.
 
+On Windows, that protection is the Windows data protection of your user account (DPAPI). When it is
+not available when OpenBot starts, OpenBot makes the same random key in
+`%APPDATA%\OpenBot\secret-storage.key` and encrypts new secrets with it while the Windows protection
+is not available. Only the access rights of your user folder protect that file. The same rules as on
+macOS apply when the Windows protection works again and when you delete the file.
+
 The desktop app also keeps, for each joined server, the ID of its logical remote session and the
 Signal address, so that the next start asks only for a new ticket. The file
 (`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
