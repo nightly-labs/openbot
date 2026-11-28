@@ -1375,8 +1375,8 @@ async function holdLimits() {
   clock = start + CREDIT_HOLD_START_GRACE_MS + 60_000;
   const early = await run(spending.sweep(checker));
   check(
-    "a hold whose request went to the processor stays held when no job id came back",
-    early.abandoned === 0 && (await find("job-sent"))?.status === "held" && (await balance()) === 1_800,
+    "a hold whose request went to the processor is freed after its submit lease and the start grace when no job id came back",
+    early.abandoned === 1 && (await find("job-sent"))?.outcome === "abandoned" && (await balance()) === 1_850,
     early,
   );
 
@@ -1391,10 +1391,10 @@ async function holdLimits() {
   check(
     "at the time limit the sweep checks each started job first: a completed job is charged, a running job is freed, and a job that cannot be checked stays held",
     limit.settled === 1 &&
-      limit.expired === 2 &&
+      limit.expired === 1 &&
       done?.status === "charged" &&
       running?.outcome === "expired" &&
-      sent?.outcome === "expired" &&
+      sent?.outcome === "abandoned" &&
       down?.status === "held" &&
       (await balance()) === 1_900,
     { limit, sent, done, running, down },

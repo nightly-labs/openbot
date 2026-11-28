@@ -166,8 +166,8 @@ async function serverChecks() {
   );
   const saved = await Effect.runPromise(failedSave.spending.start("job-a", "processor-late"));
   check(
-    "a late save of the processor job does not write onto a released hold",
-    saved?.status === "released" && saved.providerJobId === null,
+    "a late save of the processor job keeps the released hold released, with the late job id for a cancel",
+    saved?.status === "released" && saved.providerJobId === "processor-late" && balance(failedSave) === 155,
     saved,
   );
 

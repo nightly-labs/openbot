@@ -326,7 +326,7 @@ export class CreditSpending {
       this.#database
         .prepare(
           `UPDATE credit_holds SET provider_job_id = ?2, upstream = ?3, submit_lease_until = NULL
-            WHERE job_id = ?1 AND status = 'held' AND provider_job_id IS NULL
+            WHERE job_id = ?1 AND provider_job_id IS NULL
            ${TRACKED_HOLD_SQL}`,
         )
         .bind(jobId, providerJobId, upstream)
