@@ -645,7 +645,11 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
         agents: () => agents,
         computerUseMcpServer: () => null,
         logger: createOpenBotLogger("agent-service", (line) => logLines.push(line)),
-        hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
+        hooks: {
+          emitError: () => undefined,
+          refreshAllAgentRuntimes: () => Effect.void,
+          mcpToolsChanged: () => Effect.void,
+        },
       });
       gateways.push(gateway);
       return gateway;

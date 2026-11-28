@@ -2832,6 +2832,53 @@ export class ProviderRuntime implements ProviderPort {
     return yield* this.#restartWhenIdle(provider, false);
   }).bind(this);
 
+  restartForNewMcpTools(provider: AgentProvider, agents: readonly AgentSummary[]): Effect.Effect<void> {
+    return this.#restartForNewMcpTools(provider, agents).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() =>
+          logger.warn("Could not restart a provider CLI for new MCP tools.", { provider, error: failure.cause }),
+        ),
+      ),
+      Effect.forkIn(this.#scope),
+      Effect.asVoid,
+    );
+  }
+
+  readonly #restartForNewMcpTools = Effect.fn("ProviderRuntime.restartForNewMcpTools")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    agents: readonly AgentSummary[],
+  ) {
+    const ownProcessAgents = agents.filter((agent) => this.#ownProcessFor(agent) !== null).map((agent) => agent.id);
+    const restartShared = agents.length > ownProcessAgents.length && this.#clients.has(provider);
+    const stopOwnProcess = (agentId: string) =>
+      Effect.gen({ self: this }, function* () {
+        yield* this.#awaitConfinedStart(agentId);
+        yield* this.#stopConfinedWhenIdle(provider, agentId, this.#confined.get(agentId));
+      });
+    yield* Effect.all(
+      [
+        Effect.forEach(ownProcessAgents, stopOwnProcess, { concurrency: "unbounded", discard: true }),
+        restartShared ? this.#restartWhenIdle(provider, false) : Effect.void,
+      ],
+      { concurrency: "unbounded", discard: true },
+    );
+  });
+
+  readonly #stopConfinedWhenIdle = Effect.fn("ProviderRuntime.stopConfinedWhenIdle")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    agentId: string,
+    confined: ConfinedClient | undefined,
+  ) {
+    if (!confined || confined.client.provider !== provider) return;
+    while (this.#confined.get(agentId) === confined) {
+      if (confined.client.canReleaseProcess?.() !== false && !this.#hooks.isAgentBusy(agentId))
+        return yield* this.#stopConfined(agentId, confined);
+      yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
+    }
+  });
+
   readonly chooseInstalledCli = Effect.fn("ProviderRuntime.chooseInstalledCli")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,

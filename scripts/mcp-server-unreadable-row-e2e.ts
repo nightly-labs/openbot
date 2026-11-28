@@ -51,7 +51,11 @@ try {
     credentials: NO_PROVIDER_CREDENTIALS,
     computerUseMcpServer: () => null,
     logger: createOpenBotLogger("agent-service", () => undefined),
-    hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
+    hooks: {
+      emitError: () => undefined,
+      refreshAllAgentRuntimes: () => Effect.void,
+      mcpToolsChanged: () => Effect.void,
+    },
   });
 
   store.save(draft("alpha", { command: "node", args: ["server.js"] }));

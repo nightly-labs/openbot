@@ -73,6 +73,7 @@ export interface McpServiceSignIn {
 export interface McpGatewayHooks {
   emitError(code: string, error: unknown): void;
   refreshAllAgentRuntimes(timing: RuntimeRefreshTiming): Effect.Effect<void, McpGatewayFailed>;
+  mcpToolsChanged(mcpServerIds: readonly string[]): Effect.Effect<void>;
 }
 
 export interface GitHubConnectorSource {
@@ -380,8 +381,10 @@ export class McpGateway {
     const tools = [String(outcome.toolCount), ...[...outcome.tools].sort()].join("\u0000");
     const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
     const failedStart = (route !== null && this.#proxy.failedStart(route)) || this.#providerFailedStarts.has(config.id);
-    if (this.#testedTools.get(key) === tools && !failedStart) return;
+    const toolsChanged = this.#testedTools.get(key) !== tools;
+    if (!toolsChanged && !failedStart) return;
     yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
+    if (toolsChanged) yield* this.#hooks.mcpToolsChanged([config.id]);
     if (failedStart) {
       if (route !== null) this.#proxy.reportedFailedStart(route);
       this.#providerFailedStarts.delete(config.id);
@@ -452,11 +455,15 @@ export class McpGateway {
     });
     const resource = mcpOAuthAccountKey(input.config.url);
     const inUse =
-      resource !== null &&
-      this.#servers
-        .listEnabled()
-        .some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === resource);
-    if (result.error === null && inUse) yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
+      resource === null
+        ? []
+        : this.#servers
+            .listEnabled()
+            .filter((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === resource);
+    if (result.error === null && inUse.length > 0) {
+      yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
+      yield* this.#hooks.mcpToolsChanged(inUse.map((config) => config.id));
+    }
     if (resource !== null) {
       if (result.error === null) this.#signInFailures.delete(resource);
       else if (matchingSourceKeys(result.error)[0] !== "error.backend.mcpSignInCancelled")

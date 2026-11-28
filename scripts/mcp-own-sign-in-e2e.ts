@@ -56,7 +56,11 @@ try {
     credentials: NO_PROVIDER_CREDENTIALS,
     computerUseMcpServer: () => null,
     logger: createOpenBotLogger("mcp-gateway", () => undefined),
-    hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
+    hooks: {
+      emitError: () => undefined,
+      refreshAllAgentRuntimes: () => Effect.void,
+      mcpToolsChanged: () => Effect.void,
+    },
   });
   gateway = opened;
   const save = (config: McpServerConfig) => runCauseEffect(opened.save({ config }));
