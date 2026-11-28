@@ -177,6 +177,39 @@ async function scenario() {
     { tableReads: [...tableReads] },
   );
 
+  const signalPlane = new RemoteControlPlane({
+    DB: withStaleReplica(primary, replica, reads),
+    REMOTE_SIGNAL_URL: "wss://signal.test",
+    ...ticketKeys,
+  });
+  const hostTicketReads = async (
+    hostId: string,
+    token: string,
+    signalHome: boolean | null,
+  ): Promise<{ accepted: boolean; reads: string[] }> => {
+    reads.length = 0;
+    const exit = await Effect.runPromiseExit(
+      signalPlane.issueHostTicket(hostId, token, { signalHome, failedSignalUrl: null }),
+    );
+    return { accepted: Exit.isSuccess(exit), reads: [...reads] };
+  };
+
+  for (const signalHome of [false, true, null]) {
+    const issued = await hostTicketReads("synced", "token-synced", signalHome);
+    check(
+      `a host ticket with signalHome ${signalHome} checks the credential only on the primary`,
+      issued.accepted && issued.reads[0] === "primary" && !issued.reads.includes("replica"),
+      issued,
+    );
+  }
+
+  const ingressBefore = await hostTicketReads("rotated", "token-before", false);
+  check(
+    "an ingress host ticket with a token that only the stale replica still has is refused",
+    !ingressBefore.accepted && !ingressBefore.reads.includes("replica"),
+    ingressBefore,
+  );
+
   primary.prepare("UPDATE remote_hosts SET owner_user_id = 'next-owner' WHERE host_id = 'synced'").run();
   const insertRoute = primary.prepare(
     "INSERT INTO webhook_routes(route_id, host_id, account_id, connected_at, revoked_at) VALUES (?, 'synced', ?, ?, ?)",
