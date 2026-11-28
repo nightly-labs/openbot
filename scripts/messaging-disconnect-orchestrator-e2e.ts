@@ -276,6 +276,61 @@ try {
     step.passed = true;
   });
 
+  await boot(async ({ agents, messaging, credentials }) => {
+    const before = new Set(agents.listAgents().map((agent) => agent.id));
+    for (const [platform, workspaceId] of [
+      ["slack", "workspace-race"],
+      ["discord", "guild-race"],
+      ["telegram", "chat-race"],
+      ["whatsapp", "number-race"],
+    ] as const) {
+      const record = agents.messaging.store.ensureConnection(platform, workspaceId, workspaceId);
+      agents.messaging.store.updateConnection(record.connectionId, { enabled: true });
+      await runCauseEffect(credentials.set(record.connectionId, { workspaceId }));
+    }
+    const pairs = {
+      slack: await Promise.all(
+        [1, 2].map(() => runCauseEffect(messaging.addOrchestrator("slack", { workspaceId: "workspace-race" }))),
+      ),
+      discord: await Promise.all(
+        [1, 2].map(() => runCauseEffect(messaging.addOrchestrator("discord", { workspaceId: "guild-race" }))),
+      ),
+      telegram: await Promise.all([1, 2].map(() => runCauseEffect(messaging.addTelegramOrchestrator({})))),
+      whatsapp: await Promise.all([
+        runCauseEffect(messaging.addWhatsAppOrchestrator({})),
+        runCauseEffect(messaging.addOrchestrator("whatsapp", { workspaceId: "number-race" })),
+      ]),
+    };
+    const added = agents
+      .listAgents()
+      .map((agent) => agent.id)
+      .filter((agentId) => !before.has(agentId))
+      .sort();
+    const step: Step = {
+      name: "concurrent Add agent makes one orchestrator",
+      agents: added,
+      sectionChats: null,
+      passed: false,
+    };
+    report.steps.push(step);
+    for (const [platform, [first, second]] of Object.entries(pairs)) {
+      assert.equal(first.agentId, second.agentId, `${platform}: two concurrent adds returned different agents`);
+      const assigned = agents.messaging.store
+        .connections()
+        .filter((record) => record.platform === platform && record.workspaceId.endsWith("-race"))
+        .map((record) => record.orchestratorAgentId);
+      assert.deepEqual(assigned, [first.agentId], `${platform}: the connection names another agent`);
+    }
+    assert.deepEqual(
+      added,
+      Object.values(pairs)
+        .map(([first]) => first.agentId)
+        .sort(),
+      "concurrent adds made an extra agent",
+    );
+    step.passed = true;
+  });
+
   report.passed = true;
 } finally {
   mkdirSync(OUT, { recursive: true });
