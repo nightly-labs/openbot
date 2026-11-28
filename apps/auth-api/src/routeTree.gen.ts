@@ -138,6 +138,7 @@ import { Route as V1AgentTemplatesTemplateIdRouteImport } from './routes/v1/agen
 import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-templates/mine'
 import { Route as V1AppMinimumVersionRouteImport } from './routes/v1/app/minimum-version'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
+import { Route as V1AuthAccessTokenRouteImport } from './routes/v1/auth/access-token'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
 import { Route as V1BrowserExtensionXRulesRouteImport } from './routes/v1/browser-extension/x-rules'
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
@@ -943,6 +944,11 @@ const V1AgentTemplatesMineRoute = V1AgentTemplatesMineRouteImport.update({
 const V1AppMinimumVersionRoute = V1AppMinimumVersionRouteImport.update({
   id: '/v1/app/minimum-version',
   path: '/v1/app/minimum-version',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1AuthAccessTokenRoute = V1AuthAccessTokenRouteImport.update({
+  id: '/v1/auth/access-token',
+  path: '/v1/auth/access-token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1AuthLogoutRoute = V1AuthLogoutRouteImport.update({
@@ -1984,6 +1990,7 @@ export interface FileRoutesByFullPath {
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
+  '/v1/auth/access-token': typeof V1AuthAccessTokenRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
@@ -2277,6 +2284,7 @@ export interface FileRoutesByTo {
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
+  '/v1/auth/access-token': typeof V1AuthAccessTokenRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
@@ -2575,6 +2583,7 @@ export interface FileRoutesById {
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
+  '/v1/auth/access-token': typeof V1AuthAccessTokenRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
@@ -2870,6 +2879,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
     | '/v1/app/minimum-version'
+    | '/v1/auth/access-token'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/browser-extension/x-rules'
@@ -3163,6 +3173,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
     | '/v1/app/minimum-version'
+    | '/v1/auth/access-token'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/browser-extension/x-rules'
@@ -3460,6 +3471,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
     | '/v1/app/minimum-version'
+    | '/v1/auth/access-token'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/browser-extension/x-rules'
@@ -3698,6 +3710,7 @@ export interface RootRouteChildren {
   V1AgentTemplatesTemplateIdRoute: typeof V1AgentTemplatesTemplateIdRouteWithChildren
   V1AgentTemplatesMineRoute: typeof V1AgentTemplatesMineRoute
   V1AppMinimumVersionRoute: typeof V1AppMinimumVersionRoute
+  V1AuthAccessTokenRoute: typeof V1AuthAccessTokenRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1BrowserExtensionXRulesRoute: typeof V1BrowserExtensionXRulesRoute
@@ -4728,6 +4741,13 @@ declare module '@tanstack/solid-router' {
       path: '/v1/app/minimum-version'
       fullPath: '/v1/app/minimum-version'
       preLoaderRoute: typeof V1AppMinimumVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/auth/access-token': {
+      id: '/v1/auth/access-token'
+      path: '/v1/auth/access-token'
+      fullPath: '/v1/auth/access-token'
+      preLoaderRoute: typeof V1AuthAccessTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/auth/logout': {
@@ -6303,6 +6323,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AgentTemplatesTemplateIdRoute: V1AgentTemplatesTemplateIdRouteWithChildren,
   V1AgentTemplatesMineRoute: V1AgentTemplatesMineRoute,
   V1AppMinimumVersionRoute: V1AppMinimumVersionRoute,
+  V1AuthAccessTokenRoute: V1AuthAccessTokenRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1BrowserExtensionXRulesRoute: V1BrowserExtensionXRulesRoute,

@@ -3,6 +3,7 @@ import type { AccountSession, MobileConnectHostBinding } from "@openbot/contract
 import { Context, Effect, Layer, Schema } from "effect";
 import { sha256 } from "./crypto";
 import { primaryD1, replicaD1 } from "./observed-d1";
+import type { CachedSession, SessionCache, SessionCacheKey, SessionCacheSubject } from "./session-cache";
 import type {
   AuthRepository,
   AuthUser,
@@ -24,8 +25,39 @@ interface UserRow {
   chat_color: string | null;
 }
 
-interface AuthenticatedUserRow extends UserRow {
+interface SessionUserRow extends UserRow {
+  session_id: string;
+  expires_at: number;
   last_used_at: number;
+  mobile: number;
+}
+
+type SessionLocator = { tokenHash: string } | { sessionId: string };
+
+function sessionUserSql(locator: SessionLocator): string {
+  const match = "tokenHash" in locator ? "auth_sessions.token_hash = ?" : "auth_sessions.id = ?";
+  return `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color,
+       auth_sessions.id AS session_id, auth_sessions.expires_at, auth_sessions.last_used_at,
+       EXISTS (
+         SELECT 1 FROM mobile_auth_sessions WHERE mobile_auth_sessions.session_id = auth_sessions.id
+       ) AS mobile
+     FROM auth_sessions
+     JOIN users ON users.id = auth_sessions.user_id
+     WHERE ${match}
+       AND auth_sessions.revoked_at IS NULL
+       AND auth_sessions.expires_at > ?`;
+}
+
+function sessionCacheKey(locator: SessionLocator): SessionCacheKey {
+  return "tokenHash" in locator ? `token:${locator.tokenHash}` : `session:${locator.sessionId}`;
+}
+
+function cachedSession(row: SessionUserRow): CachedSession {
+  return { sessionId: row.session_id, user: mapUser(row), expiresAt: row.expires_at, mobile: row.mobile === 1 };
+}
+
+export interface D1AuthRepositoryOptions {
+  sessionCache?: SessionCache;
 }
 
 interface ChallengeRow {
@@ -36,10 +68,6 @@ interface ChallengeRow {
   max_attempts: number;
   consumed_at: number | null;
   delivery_state: EmailChallengeDeliveryState;
-}
-
-interface MobileSessionUserRow extends UserRow {
-  last_used_at: number;
 }
 
 interface HostBindingRow {
@@ -79,9 +107,54 @@ const selectSessionRow = Effect.fn("D1AuthRepository.selectSessionRow")(function
 });
 export class D1AuthRepository implements AuthRepository {
   readonly #layer: Layer.Layer<AuthDatabase>;
-  constructor(database: D1Database) {
+  readonly #sessionCache: SessionCache | null;
+  constructor(database: D1Database, options: D1AuthRepositoryOptions = {}) {
     this.#layer = Layer.succeed(AuthDatabase, database);
+    this.#sessionCache = options.sessionCache ?? null;
   }
+
+  readonly #readSession = Effect.fn("D1AuthRepository.readSession")(function* (
+    this: D1AuthRepository,
+    locator: SessionLocator,
+    now: number,
+    reads: SessionReads,
+  ): Effect.fn.Return<CachedSession | null, AuthStoreError, AuthDatabase> {
+    const database = yield* AuthDatabase;
+    const value = "tokenHash" in locator ? locator.tokenHash : locator.sessionId;
+    const sql = sessionUserSql(locator);
+    const cache = reads === "strict" ? null : this.#sessionCache;
+    const lookup = cache ? yield* cache.lookup(sessionCacheKey(locator), now) : null;
+    if (lookup?.cached) return lookup.cached;
+    let row = yield* selectSessionRow<SessionUserRow>(
+      database,
+      sql,
+      value,
+      now,
+      reads === "strict" ? "primary" : reads,
+    );
+    if (
+      row &&
+      cache &&
+      lookup?.mark != null &&
+      reads === "replica" &&
+      cache.recentlyChanged(row.session_id, row.id, now)
+    ) {
+      row = yield* selectSessionRow<SessionUserRow>(database, sql, value, now, "primary");
+    }
+    if (!row) return null;
+    yield* this.#updateSessionActivityEffect(row.session_id, row.last_used_at, now);
+    const session = cachedSession(row);
+    if (cache && lookup?.mark != null) yield* cache.store(sessionCacheKey(locator), session, lookup.mark, now);
+    return session;
+  });
+
+  readonly #sessionsChanged = Effect.fn("D1AuthRepository.sessionsChanged")(function* (
+    this: D1AuthRepository,
+    changed: { keys?: readonly SessionCacheKey[]; subjects: readonly SessionCacheSubject[] },
+    now: number,
+  ): Effect.fn.Return<void> {
+    if (this.#sessionCache) yield* this.#sessionCache.forget(changed, now);
+  });
 
   readonly latestEmailChallengeAt = Effect.fn("D1AuthRepository.latestEmailChallengeAt")(
     function* (this: D1AuthRepository, email: string): Effect.fn.Return<number | null, AuthStoreError, AuthDatabase> {
@@ -326,25 +399,9 @@ export class D1AuthRepository implements AuthRepository {
       now: number,
       reads: SessionReads = "primary",
     ): Effect.fn.Return<AuthUser | null, AuthStoreError, AuthDatabase> {
-      const database = yield* AuthDatabase;
-      const tokenHash = yield* sha256(sessionToken).pipe(
-        Effect.mapError(() => new AuthStoreError({ message: "Account store operation failed." })),
-      );
-      const row = yield* selectSessionRow<AuthenticatedUserRow>(
-        database,
-        `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
-         FROM auth_sessions
-         JOIN users ON users.id = auth_sessions.user_id
-         WHERE auth_sessions.token_hash = ?
-           AND auth_sessions.revoked_at IS NULL
-           AND auth_sessions.expires_at > ?`,
-        tokenHash,
-        now,
-        reads,
-      );
-      if (!row) return null;
-      yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
-      return mapUser(row);
+      const tokenHash = yield* storeHash(sessionToken);
+      const session = yield* this.#readSession({ tokenHash }, now, reads);
+      return session?.user ?? null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -354,30 +411,62 @@ export class D1AuthRepository implements AuthRepository {
       this: D1AuthRepository,
       sessionToken: string,
       now: number,
+      reads: SessionReads = "primary",
     ): Effect.fn.Return<AuthUser | null, AuthStoreError, AuthDatabase> {
+      const tokenHash = yield* storeHash(sessionToken);
+      const session = yield* this.#readSession({ tokenHash }, now, reads);
+      return session && !session.mobile ? session.user : null;
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly authenticateSessionId = Effect.fn("D1AuthRepository.authenticateSessionId")(
+    function* (
+      this: D1AuthRepository,
+      sessionId: string,
+      userId: string,
+      now: number,
+      reads: SessionReads = "primary",
+    ): Effect.fn.Return<AuthUser | null, AuthStoreError, AuthDatabase> {
+      const session = yield* this.#readSession({ sessionId }, now, reads);
+      return session && session.user.id === userId ? session.user : null;
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly sessionForToken = Effect.fn("D1AuthRepository.sessionForToken")(
+    function* (
+      this: D1AuthRepository,
+      sessionToken: string,
+      now: number,
+    ): Effect.fn.Return<CachedSession | null, AuthStoreError, AuthDatabase> {
+      const tokenHash = yield* storeHash(sessionToken);
+      return yield* this.#readSession({ tokenHash }, now, "primary");
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly forgetSessionToken = Effect.fn("D1AuthRepository.forgetSessionToken")(
+    function* (
+      this: D1AuthRepository,
+      sessionToken: string,
+      now: number,
+    ): Effect.fn.Return<void, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      const tokenHash = yield* sha256(sessionToken).pipe(
-        Effect.mapError(() => new AuthStoreError({ message: "Account store operation failed." })),
+      const tokenHash = yield* storeHash(sessionToken);
+      const session = yield* storeCall(() =>
+        primaryD1(database)
+          .prepare("SELECT id FROM auth_sessions WHERE token_hash = ?")
+          .bind(tokenHash)
+          .first<{ id: string }>(),
       );
-      const row = yield* selectSessionRow<AuthenticatedUserRow>(
-        database,
-        `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
-         FROM auth_sessions
-         JOIN users ON users.id = auth_sessions.user_id
-         WHERE auth_sessions.token_hash = ?
-           AND auth_sessions.revoked_at IS NULL
-           AND auth_sessions.expires_at > ?
-           AND NOT EXISTS (
-             SELECT 1 FROM mobile_auth_sessions
-             WHERE mobile_auth_sessions.session_id = auth_sessions.id
-           )`,
-        tokenHash,
+      yield* this.#sessionsChanged(
+        {
+          keys: session ? [`token:${tokenHash}`, `session:${session.id}`] : [`token:${tokenHash}`],
+          subjects: session ? [`session:${session.id}`] : [],
+        },
         now,
-        "primary",
       );
-      if (!row) return null;
-      yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
-      return mapUser(row);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -392,8 +481,18 @@ export class D1AuthRepository implements AuthRepository {
       const tokenHash = yield* sha256(sessionToken).pipe(
         Effect.mapError(() => new AuthStoreError({ message: "Account store operation failed." })),
       );
-      yield* storeCall(() =>
-        database.prepare("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ?").bind(now, tokenHash).run(),
+      const revoked = yield* storeCall(() =>
+        database
+          .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ? RETURNING id")
+          .bind(now, tokenHash)
+          .all<{ id: string }>(),
+      );
+      yield* this.#sessionsChanged(
+        {
+          keys: [`token:${tokenHash}`, ...revoked.results.map((row): SessionCacheKey => `session:${row.id}`)],
+          subjects: revoked.results.map((row): SessionCacheSubject => `session:${row.id}`),
+        },
+        now,
       );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -420,6 +519,8 @@ export class D1AuthRepository implements AuthRepository {
           .bind(now, tokenHash)
           .first<{ id: string }>(),
       );
+      if (result)
+        yield* this.#sessionsChanged({ keys: [`token:${tokenHash}`], subjects: [`session:${result.id}`] }, now);
       return result !== null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -443,6 +544,7 @@ export class D1AuthRepository implements AuthRepository {
           .bind(name, now, userId)
           .first<UserRow>(),
       );
+      yield* this.#sessionsChanged({ subjects: [`user:${userId}`] }, now);
       if (!row) return yield* new AuthStoreError({ message: "User not found." });
       return mapUser(row);
     },
@@ -467,6 +569,7 @@ export class D1AuthRepository implements AuthRepository {
           .bind(enabled ? 1 : 0, answeredAt, now, userId, answeredAt)
           .run(),
       );
+      yield* this.#sessionsChanged({ subjects: [`user:${userId}`] }, now);
       const row = yield* storeCall(() =>
         database
           .prepare("SELECT id, email, name, avatar_url, analytics_enabled, chat_color FROM users WHERE id = ?")
@@ -502,6 +605,7 @@ export class D1AuthRepository implements AuthRepository {
           .bind(chatColor, now, userId)
           .first<UserRow>(),
       );
+      yield* this.#sessionsChanged({ subjects: [`user:${userId}`] }, now);
       if (!row) return yield* new AuthStoreError({ message: "User not found." });
       return mapUser(row);
     },
@@ -527,6 +631,7 @@ export class D1AuthRepository implements AuthRepository {
           .bind(avatarUrl, now, userId, expectedAvatarUrl)
           .first<UserRow>(),
       );
+      if (row) yield* this.#sessionsChanged({ subjects: [`user:${userId}`] }, now);
       return row ? mapUser(row) : null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -788,15 +893,16 @@ export class D1AuthRepository implements AuthRepository {
       input: { userId: string; hostId: string; now: number },
     ): Effect.fn.Return<void, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      yield* storeCall(() =>
-        database.batch([
+      const [revoked] = yield* storeCall(() =>
+        database.batch<{ id: string }>([
           database
             .prepare(
               `UPDATE auth_sessions SET revoked_at = ?
            WHERE user_id = ? AND revoked_at IS NULL
              AND id IN (
                SELECT session_id FROM mobile_auth_sessions WHERE user_id = ? AND connect_link_host_id = ?
-             )`,
+             )
+           RETURNING id`,
             )
             .bind(input.now, input.userId, input.userId, input.hostId),
           database
@@ -805,6 +911,10 @@ export class D1AuthRepository implements AuthRepository {
             )
             .bind(input.now, input.userId, input.hostId),
         ]),
+      );
+      yield* this.#sessionsChanged(
+        { subjects: (revoked?.results ?? []).map((row): SessionCacheSubject => `session:${row.id}`) },
+        input.now,
       );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -895,27 +1005,11 @@ export class D1AuthRepository implements AuthRepository {
       this: D1AuthRepository,
       sessionToken: string,
       now: number,
+      reads: SessionReads = "primary",
     ): Effect.fn.Return<AuthUser | null, AuthStoreError, AuthDatabase> {
-      const database = yield* AuthDatabase;
-      const tokenHash = yield* sha256(sessionToken).pipe(
-        Effect.mapError(() => new AuthStoreError({ message: "Account store operation failed." })),
-      );
-      const row = yield* selectSessionRow<MobileSessionUserRow>(
-        database,
-        `SELECT users.id, users.email, users.name, users.avatar_url, users.analytics_enabled, users.chat_color, auth_sessions.last_used_at
-         FROM auth_sessions
-         JOIN mobile_auth_sessions ON mobile_auth_sessions.session_id = auth_sessions.id
-         JOIN users ON users.id = auth_sessions.user_id
-         WHERE auth_sessions.token_hash = ?
-           AND auth_sessions.revoked_at IS NULL
-           AND auth_sessions.expires_at > ?`,
-        tokenHash,
-        now,
-        "primary",
-      );
-      if (!row) return null;
-      yield* this.#updateSessionActivityEffect(tokenHash, row.last_used_at, now);
-      return mapUser(row);
+      const tokenHash = yield* storeHash(sessionToken);
+      const session = yield* this.#readSession({ tokenHash }, now, reads);
+      return session?.mobile ? session.user : null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1021,6 +1115,7 @@ export class D1AuthRepository implements AuthRepository {
           .bind(now, sessionId, userId)
           .first<{ id: string }>(),
       );
+      if (result) yield* this.#sessionsChanged({ subjects: [`session:${result.id}`] }, now);
       return result !== null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1045,6 +1140,7 @@ export class D1AuthRepository implements AuthRepository {
           .bind(now, sessionId, userId)
           .first<{ id: string }>(),
       );
+      if (result) yield* this.#sessionsChanged({ subjects: [`session:${result.id}`] }, now);
       return result !== null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1142,7 +1238,7 @@ export class D1AuthRepository implements AuthRepository {
 
   readonly #updateSessionActivityEffect = Effect.fn("D1AuthRepository.updateSessionActivity")(function* (
     this: D1AuthRepository,
-    tokenHash: string,
+    sessionId: string,
     lastUsedAt: number,
     now: number,
   ): Effect.fn.Return<void, AuthStoreError, AuthDatabase> {
@@ -1151,8 +1247,8 @@ export class D1AuthRepository implements AuthRepository {
     if (lastUsedAt > activityCutoff) return;
     yield* storeCall(() =>
       database
-        .prepare("UPDATE auth_sessions SET last_used_at = ? WHERE token_hash = ? AND last_used_at <= ?")
-        .bind(now, tokenHash, activityCutoff)
+        .prepare("UPDATE auth_sessions SET last_used_at = ? WHERE id = ? AND last_used_at <= ?")
+        .bind(now, sessionId, activityCutoff)
         .run(),
     );
   });

@@ -2,6 +2,7 @@ import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
 import { OPENBOT_SECURITY_HEADERS, OPENBOT_SITE_URL } from "../lib/site-metadata";
+import { checkAccessToken, isAccessToken } from "./access-tokens";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
@@ -40,11 +41,35 @@ type WorkerExecutionContext = Pick<ExecutionContext, "waitUntil">;
 type RemoteAuthEventDelivery = typeof deliverPendingRemoteAuthEvents;
 type WorkerFetchBindings = Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
   Partial<
-    Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">
+    Pick<
+      WorkerBindings,
+      | "SITES"
+      | "SITE_LOCAL_ORIGIN"
+      | "DB"
+      | "OPENPANEL_CLIENT_ID"
+      | "OPENPANEL_CLIENT_SECRET"
+      | "SITE_REPORT_HASH_SECRET"
+    >
   >;
 
 const OVERLOAD_RETRY_AFTER_MIN_SECONDS = 10;
 const OVERLOAD_RETRY_AFTER_SPREAD_SECONDS = 20;
+
+const expiredAccessTokenResponse = Effect.fn("Worker.expiredAccessTokenResponse")(function* (
+  request: Request,
+  secret: string | undefined,
+) {
+  const authorization = request.headers.get("Authorization");
+  if (!secret || !authorization?.startsWith("Bearer ")) return null;
+  const token = authorization.slice("Bearer ".length);
+  if (!isAccessToken(token)) return null;
+  const check = yield* checkAccessToken(secret, token, Date.now());
+  if (check.status !== "expired") return null;
+  return Response.json(
+    { error: { code: "access_token_expired", message: "The access token has expired." } },
+    { status: 401, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
+  );
+});
 
 function withOverloadRetryAfter(response: Response): Response {
   if (response.status !== 500 || response.headers.has("Retry-After") || !d1OverloadedRecently(Date.now())) {
@@ -79,6 +104,8 @@ export function createWorkerHandler(
       Effect.gen(function* () {
         const localSiteResponse = yield* serveLocalHostedSite(request, bindings);
         if (localSiteResponse) return localSiteResponse;
+        const expiredAccessToken = yield* expiredAccessTokenResponse(request, bindings.SITE_REPORT_HASH_SECRET);
+        if (expiredAccessToken) return expiredAccessToken;
         yield* enforceMarketplaceIngress(request, bindings);
         return null;
       }).pipe(

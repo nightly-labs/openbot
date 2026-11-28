@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Schema } from "effect";
+import { SESSION_CHANGES_RETENTION_MS } from "./session-cache";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60_000;
 const CREDIT_CODE_LIMIT_WINDOW_MS = 60 * 60_000;
@@ -15,6 +16,7 @@ export interface AuthRetentionResult {
   mobileConnectLinks: number;
   serverClaims: number;
   companySignIn: number;
+  sessionChanges: number;
 }
 
 interface AuthRetentionOperation {
@@ -100,6 +102,11 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       sql: "DELETE FROM company_sign_in_codes WHERE expires_at <= ? OR redeemed_at IS NOT NULL",
       cutoff: now,
     },
+    {
+      name: "sessionChanges",
+      sql: "DELETE FROM auth_session_changes WHERE changed_at <= ?",
+      cutoff: now - SESSION_CHANGES_RETENTION_MS,
+    },
   ];
 }
 
@@ -130,6 +137,7 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
     mobileConnectLinks: 0,
     serverClaims: 0,
     companySignIn: 0,
+    sessionChanges: 0,
   };
   for (const [index, operation] of operations.entries()) {
     deleted[operation.name] += results[index]?.meta.changes ?? 0;
