@@ -1492,7 +1492,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#turn.continuesAfterProviderExit(agentId, turnId, deliveryIds),
         quietRoutineDelivery: (deliveryId) => {
           const run = this.#routines.runForDelivery(deliveryId);
-          return run === null || quietRoutineRun(run);
+          return run === null ? !this.#routines.workflowStepFeedsWork(deliveryId) : quietRoutineRun(run);
         },
         quietRunDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
         retriesAfterRestart: (deliveryId) => this.#routines.retriesAfterRestart(deliveryId),

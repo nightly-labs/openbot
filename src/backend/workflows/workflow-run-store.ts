@@ -301,6 +301,14 @@ export class WorkflowRunStore {
     return databaseRows(rows).map(toStep);
   }
 
+  agentStepsOf(runId: string, agentId: string): StoredWorkflowStep[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE run_id = ? AND agent_id = ? AND kind = 'agent'`)
+        .all(runId, agentId),
+    ).map(toStep);
+  }
+
   runningAgentStep(deliveryId: string): StoredWorkflowStep | null {
     const row = databaseRow(
       this.#database.connection

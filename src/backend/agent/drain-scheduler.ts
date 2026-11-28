@@ -976,6 +976,8 @@ export class DrainScheduler {
               skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 item.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(item.delivery.id) : null,
+              workflowStepFeedsWork:
+                item.delivery.sender.kind === "routine" && this.#routines.workflowStepFeedsWork(item.delivery.id),
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
               continuesWait: item.delivery.sender.kind === "routine" && this.#routines.continuesWait(item.delivery.id),
               routineTimezone:
