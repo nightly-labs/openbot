@@ -54,8 +54,17 @@ const PAGE = `<!doctype html><meta charset="utf-8"><title>start</title>
 const server = createServer((request, response) => {
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   if (request.url === "/done") response.end('<!doctype html><meta charset="utf-8"><title>done</title>');
-  else if (request.url === "/greet")
+  else if (request.url === "/greet" || request.url === "/welcome")
     response.end("<!doctype html><title>start</title><script>alert('Welcome'); document.title = 'greeted'</script>");
+  else if (request.url === "/stall") return;
+  else if (request.url === "/busy")
+    response.end(
+      "<!doctype html><title>busy</title><script>setTimeout(() => { while (true) {} }, 50)</script><img src='/stall'>",
+    );
+  else if (request.url === "/ask")
+    response.end(
+      "<!doctype html><title>start</title><script>document.title = 'asked:' + confirm('Continue?')</script>",
+    );
   else response.end(PAGE);
 });
 
@@ -251,6 +260,30 @@ async function main(): Promise<void> {
       assert.equal(greeted.success, true, text(greeted));
       assert.equal(await title(contents), "greeted");
       recordCases("dialog-during-navigation-returned");
+    }
+
+    {
+      const loadContents = (path: string) => {
+        const contents = webContents.getAllWebContents().find((item) => item.getURL() === `${origin}${path}`);
+        assert(contents, `Missing ${path} contents.`);
+        return contents;
+      };
+      const asked = parsedDialog(await call("open", { url: `${origin}/ask` }));
+      assert.equal(asked.dialog.type, "confirm");
+      assert.equal(asked.dialog.message, "Continue?");
+      assert(asked.dialog.id, "The agent got no id for the dialog of its open.");
+      recordCases("open-returns-load-dialog");
+      const dismissed = await answer(asked.tabId, asked.dialog.id, false);
+      assert.equal(dismissed.success, true, text(dismissed));
+      await waitUntil(async () => (await title(loadContents("/ask"))) === "asked:false");
+      recordCases("open-load-dialog-answered");
+
+      const welcome = parsedDialog(await call("open", { url: `${origin}/welcome` }));
+      assert.equal(welcome.dialog.type, "alert");
+      assert(welcome.dialog.id, "The agent got no id for the alert of its open.");
+      assert.equal((await answer(welcome.tabId, welcome.dialog.id, true)).success, true);
+      await waitUntil(async () => (await title(loadContents("/welcome"))) === "greeted");
+      recordCases("open-load-alert-returned");
     }
 
     {
@@ -488,6 +521,15 @@ async function main(): Promise<void> {
         viewServer.closeAllConnections();
         await new Promise<void>((resolve) => viewServer.close(() => resolve()));
       }
+    }
+
+    {
+      phase("open-deadline-busy-page");
+      const busy = await call("open", { url: `${origin}/busy` });
+      assert.equal(busy.success, true, text(busy));
+      assert.match(text(busy), /"loading":true/);
+      phase("cases");
+      recordCases("open-returns-at-deadline-on-busy-page");
     }
 
     {

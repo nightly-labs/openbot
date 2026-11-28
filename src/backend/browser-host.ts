@@ -68,6 +68,7 @@ import { writeJsonFileAtomically } from "./atomic-json-file";
 import type { BrowserCardFillResult } from "./browser-card-fill";
 import {
   BrowserCdpEngine,
+  type BrowserDialogOwner,
   type BrowserScreencastFrame,
   type BrowserUploadAssignment,
   type BrowserViewportInput,
@@ -1058,6 +1059,7 @@ export class BrowserHost {
     closeOnFailure: boolean,
     firstLoadTimeoutMs: number | null,
     privateSession?: Session,
+    dialogOwner?: BrowserDialogOwner,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       return yield* browserFailure(new Error(sourceText("error.backend.browserTabLimit", { limit: this.#tabLimit() })));
@@ -1097,13 +1099,36 @@ export class BrowserHost {
       const loadGeneration = tab.loadGeneration;
       yield* Effect.gen({ self: this }, function* () {
         tab.opening = true;
-        yield* navigateAndWait(
-          tab.contents,
-          () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
-          firstLoadTimeoutMs,
-        ).pipe(
+        const dialogWatch = dialogOwner ? tab.engine.watchDialogs(dialogOwner) : undefined;
+        yield* Effect.gen(function* () {
+          const loading = yield* Effect.forkIn(
+            navigateAndWait(
+              tab.contents,
+              () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
+              firstLoadTimeoutMs,
+              dialogWatch
+                ? (settle) =>
+                    tab.engine.onDialogChange(() => {
+                      if (tab.engine.dialog) settle();
+                    })
+                : undefined,
+            ),
+            tab.scope,
+            { startImmediately: true },
+          );
+          if (dialogWatch)
+            yield* Effect.forkIn(tab.engine.observeDialogs().pipe(Effect.ignore), tab.scope, {
+              startImmediately: true,
+            });
+          yield* Fiber.join(loading).pipe(Effect.onInterrupt(() => Fiber.interrupt(loading)));
+        }).pipe(
           Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
-          Effect.ensuring(Effect.sync(() => (tab.opening = false))),
+          Effect.ensuring(
+            Effect.sync(() => {
+              tab.opening = false;
+              dialogWatch?.end();
+            }),
+          ),
         );
         if (focus) {
           this.#focusTab(tab);
@@ -2584,6 +2609,7 @@ export class BrowserHost {
   readonly #toolHandlers: BrowserToolHandlers = {
     open: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
+        const dialogOwner = { threadId: params.threadId, turnId: params.turnId };
         const tab = yield* this.#open(
           args.url,
           params.threadId,
@@ -2591,8 +2617,14 @@ export class BrowserHost {
           false,
           true,
           AGENT_OPEN_LOAD_TIMEOUT_MS,
+          undefined,
+          dialogOwner,
         );
         this.#controls.updateTab(params, tab.id);
+        const engine = this.#tabs.get(tab.id)?.engine;
+        const pageDialog = engine?.dialog;
+        if (engine && pageDialog)
+          return textResult(dialogTabResult(tab.id, { ...pageDialog, agent: engine.dialogOwnedBy(dialogOwner) }));
         let read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
         for (
           let again = 0;

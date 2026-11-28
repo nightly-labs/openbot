@@ -7,6 +7,9 @@ const NAVIGATION_TIMED_OUT = "Navigation timed out.";
 const TAB_CLOSED = "Browser tab was closed during navigation.";
 const ERR_ABORTED = -3;
 const SUCCESSOR_TIMEOUT_MS = 10_000;
+const STOP_SETTLE_MS = 2_000;
+
+export type NavigationSettleSignal = (settle: () => void) => () => void;
 
 class NavigationTimeoutError extends Error {
   constructor(readonly committed: boolean) {
@@ -22,8 +25,9 @@ export function navigateAndWait(
   contents: WebContents,
   initiate: () => boolean | Promise<unknown>,
   timeoutMs: number | null = 10_000,
+  settleSignal?: NavigationSettleSignal,
 ): Effect.Effect<void, BrowserOperationError> {
-  return watchNavigation(contents, initiate, timeoutMs);
+  return watchNavigation(contents, initiate, timeoutMs, settleSignal);
 }
 
 export function waitForLoading(contents: WebContents, timeoutMs: number): Effect.Effect<void, BrowserOperationError> {
@@ -65,7 +69,12 @@ export const stopLoadingAndWait = Effect.fn("Browser.stopLoadingAndWait")((conte
 });
 
 const watchNavigation = Effect.fn("Browser.watchNavigation")(
-  (contents: WebContents, initiate: (() => boolean | Promise<unknown>) | undefined, timeoutMs: number | null) => {
+  (
+    contents: WebContents,
+    initiate: (() => boolean | Promise<unknown>) | undefined,
+    timeoutMs: number | null,
+    settleSignal?: NavigationSettleSignal,
+  ) => {
     return Effect.callback<void, BrowserOperationError>((resume) => {
       let started = initiate === undefined;
       let inPlace = false;
@@ -77,8 +86,10 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       let documentPending = false;
       let previousDocumentAborted = false;
       let timer: NodeJS.Timeout | undefined;
+      let stopSettleSignal: (() => void) | undefined;
       const cleanup = () => {
         clearTimeout(timer);
+        stopSettleSignal?.();
         contents.off("did-start-navigation", didStartNavigation);
         contents.off("did-navigate", didNavigate);
         contents.off("did-stop-loading", didStopLoading);
@@ -146,6 +157,10 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
             const navigationWasActive = started || contents.isLoading();
             contents.stop();
             if (!navigationWasActive && !initiationPending) complete();
+            else if (!settled) {
+              timer = setTimeout(complete, STOP_SETTLE_MS);
+              timer.unref();
+            }
           } catch (error) {
             finish(error);
           }
@@ -153,6 +168,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         timer.unref();
       };
       if (timeoutMs !== null) startDeadline(timeoutMs);
+      if (settleSignal) stopSettleSignal = settleSignal(() => finish());
       if (!initiate) return Effect.sync(cleanup);
       try {
         const initiation = initiate();

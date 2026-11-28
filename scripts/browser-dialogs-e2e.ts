@@ -9,7 +9,7 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 class FixtureProcessTimeout extends Error {}
 
-const DIALOG_CASES = 32;
+const DIALOG_CASES = 36;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildRoot = await mkdtemp(join(tmpdir(), "openbot-dialogs-"));
