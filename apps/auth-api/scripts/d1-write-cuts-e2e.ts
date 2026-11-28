@@ -153,17 +153,22 @@ async function resetDirectory(path: string) {
   await mkdir(path, { recursive: true });
 }
 
-const base = (await run("git", ["merge-base", "HEAD", "origin/main"], { cwd: ROOT })).stdout.trim();
+const base = process.argv.find((argument) => argument.startsWith("--before="))?.slice("--before=".length) ?? null;
 const head = (await run("git", ["rev-parse", "HEAD"], { cwd: ROOT })).stdout.trim();
 const beforeRoot = join(OUT, "before");
 await resetDirectory(OUT);
-await mkdir(beforeRoot, { recursive: true });
-const archive = join(OUT, "before.tar");
-await run("git", ["archive", "--format=tar", "-o", archive, base, "apps/auth-api/src", "apps/auth-api/migrations"], {
-  cwd: ROOT,
-});
-await run("tar", ["-xf", archive, "-C", beforeRoot]);
-await rm(archive);
+
+async function extractBefore(commit: string) {
+  await mkdir(beforeRoot, { recursive: true });
+  const archive = join(OUT, "before.tar");
+  await run(
+    "git",
+    ["archive", "--format=tar", "-o", archive, commit, "apps/auth-api/src", "apps/auth-api/migrations"],
+    { cwd: ROOT },
+  );
+  await run("tar", ["-xf", archive, "-C", beforeRoot]);
+  await rm(archive);
+}
 
 const ticketKeyPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
 const ticketKeys = {
@@ -598,7 +603,10 @@ async function runSide(side: SideName, authRoot: string) {
   await proxy.dispose();
 }
 
-await runSide("before", join(beforeRoot, "apps", "auth-api"));
+if (base) {
+  await extractBefore(base);
+  await runSide("before", join(beforeRoot, "apps", "auth-api"));
+}
 await runSide("after", join(ROOT, "apps", "auth-api"));
 
 const comparison = Object.entries(steps).flatMap(([scenario, scenarioSteps]) =>
