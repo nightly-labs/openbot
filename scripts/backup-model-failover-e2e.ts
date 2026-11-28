@@ -209,6 +209,15 @@ const turn = (message) => {
     result({ is_error: true, result: ${JSON.stringify(REFUSED_REQUEST)} });
     return;
   }
+  if (input.includes("billing-") && model === ${JSON.stringify(PRIMARY)}) {
+    if (input.includes("billing-work")) assistant("Checkpoint saved. Only the final step remains.");
+    const spent = "Credit balance is too low";
+    write({ type: "assistant", error: "billing_error", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "text", text: spent }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    result({ is_error: true, result: spent });
+    return;
+  }
   if (fails) {
     if (acts) assistant("Partial answer.");
     result({ is_error: true, result: drops ? ${JSON.stringify(CONNECTION_ERROR)} : ${JSON.stringify(PROVIDER_ERROR)} });
@@ -1822,6 +1831,59 @@ try {
       .map((turn) => turn.model);
     assert.deepEqual(nextModels, [BACKUP], "The next message does not try the refused sign-in again.");
     return { models, shown, nextModels };
+  });
+
+  for (const automatic of [true, false]) {
+    await check(
+      automatic
+        ? "a spent credit balance after partial work continues on the backup"
+        : "ask before switching continues work after a spent credit balance",
+      async () => {
+        await restart();
+        failing([]);
+        const agent = await create(automatic ? "Spender" : "Asker");
+        await waitFor("the first turn to end", () =>
+          service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+        );
+        await runCauseEffect(
+          service.updateAgent({
+            agentId: agent.id,
+            backupModels: { automatic, order: [{ provider: "claude", model: BACKUP }] },
+          }),
+        );
+        const since = events.length;
+        const before = turns().length;
+        const outcome = await send(agent.id, "billing-work: save a checkpoint, then finish the last step.");
+        assert.equal(outcome.status, "completed", `The interrupted task completes: ${outcome.error}`);
+        const ran = turns().slice(before);
+        assert.deepEqual(
+          ran.map((turn) => turn.model),
+          [PRIMARY, BACKUP],
+          "The spent model runs once, then the backup.",
+        );
+        assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+        assert.ok(ran[1]?.input.includes("Checkpoint saved."), "The work that the spent model did reaches the backup.");
+        assert.equal(agentOf(agent.id).model, BACKUP, "The agent leaves the spent model.");
+        assert.deepEqual(errorsFor(agent.id, since), [], "A continued turn shows no failure.");
+        return { outcome, models: ran.map((turn) => turn.model) };
+      },
+    );
+  }
+
+  await check("a spent credit balance before work runs the message again on the backup", async () => {
+    await restart();
+    failing([]);
+    const agent = await withBackup("Unstarted");
+    const before = turns().length;
+    const outcome = await send(agent.id, "billing-before");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+    );
+    assert.ok(!ran[1]?.input.includes("Continue the unfinished task"), "A turn with no work runs again as it was.");
+    return { outcome, models: ran.map((turn) => turn.model) };
   });
 
   report.passed = true;
