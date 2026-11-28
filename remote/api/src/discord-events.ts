@@ -90,7 +90,7 @@ export type DiscordAction =
   | { type: "direct-reply"; channelId: string }
   | { type: "reconcile" };
 
-interface StoredInteraction {
+export interface StoredInteraction {
   token: string;
   guildId: string;
   expiresAt: number;
@@ -242,6 +242,18 @@ function isDiscordCdnUrl(value: string): boolean {
   }
 }
 
+export interface DiscordStateExport {
+  applicationId: string | null;
+  botUserId: string | null;
+  guilds: [string, string][];
+  shardGuilds: [number, string[]][];
+  shardCount: number | null;
+  channels: [string, { guildId: string; name: string }][];
+  botRoles: [string, string][];
+  interactions: [string, StoredInteraction][];
+  directReplies: [string, number][];
+}
+
 export class DiscordState {
   readonly #configuredApplicationId: string;
   #applicationId: string | null = null;
@@ -257,6 +269,32 @@ export class DiscordState {
 
   constructor(applicationId: string) {
     this.#configuredApplicationId = applicationId;
+  }
+
+  export(now = Date.now()): DiscordStateExport {
+    return {
+      applicationId: this.#applicationId,
+      botUserId: this.#botUserId,
+      guilds: [...this.#guilds],
+      shardGuilds: [...this.#shardGuilds].map(([shard, guilds]) => [shard, [...guilds]]),
+      shardCount: this.#shardCount,
+      channels: [...this.#channels],
+      botRoles: [...this.#botRoles],
+      interactions: [...this.#interactions].filter(([, stored]) => stored.expiresAt > now),
+      directReplies: [...this.#directReplies],
+    };
+  }
+
+  load(state: DiscordStateExport): void {
+    this.#applicationId = state.applicationId;
+    this.#botUserId = state.botUserId;
+    for (const [key, value] of state.guilds) this.#guilds.set(key, value);
+    for (const [shard, guilds] of state.shardGuilds) this.#shardGuilds.set(shard, new Set(guilds));
+    this.#shardCount = state.shardCount;
+    for (const [key, value] of state.channels) this.#channels.set(key, value);
+    for (const [key, value] of state.botRoles) this.#botRoles.set(key, value);
+    for (const [key, value] of state.interactions) this.#interactions.set(key, value);
+    for (const [key, value] of state.directReplies) this.#directReplies.set(key, value);
   }
 
   isMember(guildId: string): boolean | null {

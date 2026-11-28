@@ -326,8 +326,9 @@ without losing revocations when Signal is temporarily unavailable.
 A host does not need its Signal socket to keep a WebRTC connection, so Signal must tell it about a
 session that ended while the host socket was away. Signal keeps the ended session IDs of each host for
 24 hours and sends them in a `sessions-ended` frame each time a host socket authenticates, and at once
-to a host socket that is connected. The host closes the child peer of each listed session. Signal
-forgets these IDs when it restarts, so the host also fails closed: after each new host Signal socket,
+to a host socket that is connected. The host closes the child peer of each listed session. A
+[Signal handoff](signal-restart.md) keeps these IDs, and a crash restart keeps them from the last
+snapshot; a restart with no snapshot forgets them. So the host also fails closed: after each new host Signal socket,
 every child peer must be confirmed again by a `peer-ready` for its session, or the host closes it.
 Each child peer has 11 minutes for this (`CLIENT_RECONFIRM_MS` in `team-webrtc.ts`): the 10-minute
 client reconnect grace of Signal and 1 minute more. The time counts only while the host has a ready
