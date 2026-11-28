@@ -377,7 +377,9 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     });
     if (!hosts.length) return;
     const saved = await readServerId();
-    await open(hosts.some((entry) => entry.hostId === saved) && saved ? saved : (hosts[0]?.hostId ?? ""));
+    const shown = hosts.filter((entry) => entry.hidden !== true);
+    const initial = shown.find((entry) => entry.hostId === saved) ?? shown[0] ?? hosts[0];
+    if (initial) await open(initial.hostId);
   }
 
   function listServersAgain() {
