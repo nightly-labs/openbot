@@ -63,7 +63,21 @@ function countedD1(database: DatabaseSync, counts: D1Counts): D1Database {
       return source.batch(statements);
     },
     exec: (query) => source.exec(query),
-    withSession: (constraintOrBookmark) => source.withSession(constraintOrBookmark),
+    withSession: (constraintOrBookmark) => {
+      const session = source.withSession(constraintOrBookmark);
+      return {
+        prepare: (query: string) => {
+          counts.queries.push(query);
+          return counted(session.prepare(query));
+        },
+        batch: (statements) => {
+          counts.batches += 1;
+          counts.statements += statements.length;
+          return session.batch(statements);
+        },
+        getBookmark: () => session.getBookmark(),
+      };
+    },
     dump: () => source.dump(),
   };
 }
@@ -198,8 +212,8 @@ async function main() {
   resetCounts(counts);
   const stranger = await Effect.runPromise(plane.listHostsWithTransfers(authUser("user-none", "none@example.test")));
   check(
-    "an account with no servers and no transfers gets empty lists in one batch",
-    stranger.hosts.length === 0 && stranger.pendingIncomingTransfers.length === 0 && counts.batches === 1,
+    "an account with no servers and no transfers reads the replica batch, then the primary batch",
+    stranger.hosts.length === 0 && stranger.pendingIncomingTransfers.length === 0 && counts.batches === 2,
     { batches: counts.batches, statements: counts.statements },
   );
 

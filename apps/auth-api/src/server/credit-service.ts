@@ -44,6 +44,7 @@ import {
   welcomeTenthsSql,
 } from "./credit-grants";
 import { availableTenthsSql, overdueGrantTenthsSql, paidTenthsSql } from "./credit-spending";
+import { replicaD1 } from "./observed-d1";
 import {
   EARLY_START_METADATA,
   isBillingCurrency,
@@ -177,6 +178,22 @@ function returnUrl(origin: string, target: CreditReturnTarget): string {
   return `${origin}/billing/return?kind=credits`;
 }
 
+type CreditStateRow = LockedCurrencyRow | WalletRow | ServerRow;
+
+function serverWalletsStatement(database: D1Database, userId: string, now: number) {
+  return database
+    .prepare(
+      `SELECT h.host_id AS server_id, h.name AS name,
+              CASE WHEN h.owner_user_id = ?1 THEN 'owner' ELSE m.role END AS role,
+              ${availableTenthsSql("server_id", "h.host_id")} AS balance_tenths,
+              ${expiringGrantsSql("server_id", "h.host_id", "?2")}
+         FROM remote_hosts h
+         JOIN remote_memberships m ON m.host_id = h.host_id AND m.user_id = ?1 AND m.status = 'active'
+        ORDER BY h.owner_user_id = ?1 DESC, h.name COLLATE NOCASE, h.host_id`,
+    )
+    .bind(userId, now);
+}
+
 export class CreditService {
   readonly #database: D1Database;
   readonly #stripe: StripeClient;
@@ -203,25 +220,26 @@ export class CreditService {
   readonly getState = Effect.fn("CreditService.getState")(function* (
     this: CreditService,
     userId: string,
+    serverReads: "request" | "replica" = "request",
   ): Effect.fn.Return<CreditsState, Failure> {
     const now = this.#now();
-    const [lockedRows, personalRows, rows] = yield* billingCall(() =>
-      this.#database.batch<LockedCurrencyRow | WalletRow | ServerRow>([
-        lockedCurrencyStatement(this.#database, userId),
-        personalWalletStatement(this.#database, userId, now),
-        this.#database
-          .prepare(
-            `SELECT h.host_id AS server_id, h.name AS name,
-                    CASE WHEN h.owner_user_id = ?1 THEN 'owner' ELSE m.role END AS role,
-                    ${availableTenthsSql("server_id", "h.host_id")} AS balance_tenths,
-                    ${expiringGrantsSql("server_id", "h.host_id", "?2")}
-               FROM remote_hosts h
-               JOIN remote_memberships m ON m.host_id = h.host_id AND m.user_id = ?1 AND m.status = 'active'
-              ORDER BY h.owner_user_id = ?1 DESC, h.name COLLATE NOCASE, h.host_id`,
-          )
-          .bind(userId, now),
-      ]),
+    const replicaServers = serverReads === "replica";
+    const [[lockedRows, personalRows, batchedRows], replicaRows] = yield* Effect.all(
+      [
+        billingCall(() =>
+          this.#database.batch<CreditStateRow>([
+            lockedCurrencyStatement(this.#database, userId),
+            personalWalletStatement(this.#database, userId, now),
+            ...(replicaServers ? [] : [serverWalletsStatement(this.#database, userId, now)]),
+          ]),
+        ),
+        replicaServers
+          ? billingCall(() => serverWalletsStatement(replicaD1(this.#database), userId, now).all<CreditStateRow>())
+          : Effect.succeed(null),
+      ],
+      { concurrency: "unbounded" },
     );
+    const rows = replicaRows ?? batchedRows;
     const lockedRow = lockedRows?.results[0];
     const locked = lockedRow && "currency" in lockedRow ? lockedCurrencyOf(lockedRow) : null;
     const prices = yield* this.#prices().pipe(Effect.orElseSucceed(() => new Map<string, StripePrice>()));

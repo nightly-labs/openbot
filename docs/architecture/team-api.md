@@ -311,8 +311,8 @@ would give a ticket with the old auth epoch, and a Signal that started after the
 would accept it with no check. An expired token also needs one
 durable check before Signal issues a replacement. Later reconnects use the in-memory trust cache.
 This is not a heartbeat. Signal collects these checks for 25 ms and sends up to 100 of them in one
-signed `/v2/remote/resume/validate-batch` request, which reads D1 with one host query and one
-session query, so a restart that reconnects every host costs about one request per 100 hosts, not
+signed `/v2/remote/resume/validate-batch` request, which reads the D1 primary with one host query and
+one session query, so a restart that reconnects every host costs about one request per 100 hosts, not
 one per host. Signal sends at most 128 batch requests at a time, and closes a socket with 1013 when
 its check has no answer after 15 s. One batch request takes 0.2 to 3.3 s in production
 (2026-11-28), also with 128 requests at a time, so a home with 18,000 sockets is checked in about
@@ -320,6 +320,18 @@ its check has no answer after 15 s. One batch request takes 0.2 to 3.3 s in prod
 the old 7 s limit. An account service without the batch route answers 404; Signal then uses the
 single `/v2/remote/resume/validate` route, at most 64 at a time, and tries the batch route again
 after 10 minutes.
+The account service can accept a revoked credential for up to 60 s (developer decision,
+2026-11-28). Thus these checks read the D1 read replica first and read the primary only when the
+replica has no row or the row does not match: the machine token check of notifications and route
+tickets, the notification session check, the role check of the member, invitation
+and logo reads, the host list, the server list of the credits page and the pool machine token. A new
+host, session, role or machine works at once, and the primary decides each refusal. The machine token
+check also keeps an accepted token hash for 30 s in each Worker isolate, so a rotated or revoked token
+works for at most 30 s plus the replica lag. Host tickets, resume validation, money paths, writes, ticket
+consume, invitation redeem and owner transfer accept still read the primary: Signal trusts a resumed
+token until it expires, and after a restart it does not know the revocations that it had before.
+The pool machine writes its `seen_at` only when the primary value is more than 60 s old, so a late
+replica does not add writes. `apps/auth-api/scripts/host-replica-reads-e2e.ts` counts the queries for each check.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
 immediately and retries failed deliveries from a scheduled task. This keeps reconnect validation local
 without losing revocations when Signal is temporarily unavailable.

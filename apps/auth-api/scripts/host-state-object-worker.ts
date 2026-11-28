@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { decodeJwt } from "jose";
+import { HostCredentialCache } from "../src/server/host-credential-cache";
 import { type HostStateStore, hostStateStore } from "../src/server/host-state";
 import { HostState, type HostStateSnapshot } from "../src/server/host-state-object";
 import {
@@ -335,6 +336,7 @@ export default {
         schedule: () => undefined,
         fetch: async () => new Response(null, { status: 200 }),
         hostState: probeHostState(env, body.options),
+        hostCredentials: new HostCredentialCache(),
       },
     );
     const result = await run(plane, body.request, env, body.options, database);
