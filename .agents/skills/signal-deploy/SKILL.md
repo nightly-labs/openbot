@@ -138,6 +138,48 @@ Signal closed hosts with 1013 for about 5 minutes.
   not answer. A new process starts the counter at 0, so read it on the new slot. If it grows, or the
   account Worker log shows D1 `7429` errors, stop and report. Do not restart the next home.
 
+### Drain a home with go-away
+
+A home that runs a release with `/admin/go-away` and has `REMOTE_ADMIN_TOKEN` set can move its hosts
+before the restart. Each host that announced `goAway` gets a new ticket with this home as
+`failedSignalUrl`, at a random time in `withinMs`, and keeps its open WebRTC peers. Clients follow
+their host. Old hosts and clients keep the old path: they move when the socket closes.
+
+The route answers only on the health port, only from loopback inside the container, and only with
+the token. A call from the machine itself comes from the Docker gateway and gets 404. Run it in the
+container, so that the token stays in the container environment:
+
+```sh
+docker exec openbot-remote-remote-api-1 bun -e 'const r = await fetch("http://127.0.0.1:8080/admin/go-away", { method: "POST", headers: { authorization: `Bearer ${process.env.REMOTE_ADMIN_TOKEN}` }, body: JSON.stringify({ waveSize: 50, waveIntervalMs: 10000, withinMs: 60000 }) }); console.log(r.status, await r.text())'
+```
+
+The answer gives `hosts`, `waves` and `withoutCapability`. Each host renewal is a Worker call, so
+keep about 300 hosts per minute or less (the defaults above), and watch D1 as step 4 says. Wait
+until `openbot_remote_peer_connections` stops falling, then restart the home. The drain stays on
+until the restart: a host that connects to this home again gets go-away at once.
+
+### Ingress backup in Nginx
+
+`remote/nginx/signal.openbot.run.conf` sends the Slack, GitHub, Telegram, Discord and webhook
+locations to the `openbot_signal_ingress` upstream. Its backup server, `127.0.0.1:8091`, sends the
+request over TLS to the other home when the local Signal refuses the connection or does not connect
+in 2 s. A request that the local Signal received is not sent again. Applying this needs developer
+approval. On each machine that serves `signal.openbot.run`:
+
+1. `cp /etc/nginx/conf.d/openbot-remote.conf /etc/nginx/conf.d/openbot-remote.conf.bak-<date>-ingress-backup`.
+2. Add the `upstream openbot_signal_ingress` block and the `127.0.0.1:8091` server from the repository
+   file. On `signal2`, set `proxy_pass`, `proxy_ssl_name` and `Host` to `signal1.openbot.run`.
+3. In the five locations, replace `proxy_pass http://127.0.0.1:8081;` with the three lines from the
+   repository file. Keep `location /` on `127.0.0.1:8081`: WebSockets do not use the backup.
+4. `nginx -t`, then `systemctl reload nginx`.
+5. Check that `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8091/health/ready` gives 200,
+   and that an unauthenticated `POST https://signal.openbot.run/v1/webhooks/x` still gives 401.
+6. Rollback: copy the backup file back, `nginx -t`, `systemctl reload nginx`.
+
+The other home does not hold the entry ingress peer, so the backup only keeps the routes that it can
+answer (the delivery queue and its host wake, when that home has a route waker, and the signature and route checks). This is not confirmed on production. Signal on
+the other home sees the address of this machine, not the address of the sender.
+
 Report the results of steps 1 to 3 and get approval. Then follow "Deployment procedure" in
 [docs/remote-session-deployment.md](../../../docs/remote-session-deployment.md) with these changes:
 

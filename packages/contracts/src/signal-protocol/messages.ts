@@ -19,6 +19,10 @@ export const SIGNAL_CLIENT_RECONNECT_GRACE_MS = 10 * 60_000;
 
 export const SIGNAL_NO_READY_CLOSE_CODE = "no-ready";
 
+export const SIGNAL_GO_AWAY_CAPABILITY = "go-away";
+export const SIGNAL_RESUME_FROM_CAPABILITY = "resume-from";
+export const SIGNAL_GO_AWAY_WITHIN_MS_LIMIT = 10 * 60_000;
+
 export const SIGNAL_SESSIONS_ENDED_LIMIT = 256;
 
 export type SignalPeer = "host" | "client" | "ingress";
@@ -101,6 +105,8 @@ export type SignalClientMessage =
       queueKey?: string;
       webhookFormats?: string[];
       watchRelay?: boolean;
+      goAway?: boolean;
+      resumeFrom?: string;
     }
   | {
       type: "telegram-call";
@@ -161,6 +167,7 @@ export type SignalServerMessage =
       reconnectGraceMs?: number;
     }
   | { type: "host-waiting"; version: SignalProtocolVersion; resumeToken: string }
+  | { type: "go-away"; version: SignalProtocolVersion; withinMs: number }
   | { type: "sessions-ended"; version: SignalProtocolVersion; sessionIds: string[] }
   | {
       type: "peer-ready";

@@ -276,6 +276,9 @@ jobs:
       - name: Run the Signal E2E test
         run: bun run test:signal
 
+      - name: Run the Signal cross-home E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:signal-cross-home
       - name: Run the Signal same-home handoff E2E test
         if: ${{ !cancelled() }}
         run: bun run test:signal-handoff
@@ -304,6 +307,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:d1-request-session
 
+      - name: Run the account access token E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:account-access-token
+
       - name: Upload the Signal E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -311,9 +318,11 @@ jobs:
           name: signal-security-e2e
           path: |
             .openbot-build/signal-security-e2e/
+            .openbot-build/signal-cross-home/
             .openbot-build/signal-handoff/
             .openbot-build/remote-protocol-e2e/
             .openbot-build/d1-request-session-e2e/
+            .openbot-build/account-access-token/
           if-no-files-found: ignore
 
   automation-cli-e2e:

@@ -1,4 +1,7 @@
-import { SIGNAL_NO_READY_CLOSE_CODE } from "@openbot/contracts/signal-protocol/messages";
+import {
+  SIGNAL_GO_AWAY_WITHIN_MS_LIMIT,
+  SIGNAL_NO_READY_CLOSE_CODE,
+} from "@openbot/contracts/signal-protocol/messages";
 import { ticketNamesSignalHome, ticketSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -32,6 +35,7 @@ class HostSignal extends Context.Service<
   HostSignal,
   {
     connect(peerId: string, signalUrl: string, token: string): Effect.Effect<void, RemoteWorkflowError>;
+    move(peerId: string, signalUrl: string, token: string): Effect.Effect<void, RemoteWorkflowError>;
     disconnect(peerId: string): Effect.Effect<void, RemoteWorkflowError>;
   }
 >()("openbot/main/HostSignal") {
@@ -41,57 +45,69 @@ class HostSignal extends Context.Service<
     pendingConnections: Set<Fiber.Fiber<void, RemoteWorkflowError>>,
     privateNetwork: () => boolean,
   ) {
+    const awaitSignal = Effect.fn("HostSignal.awaitSignal")(function* (
+      peerId: string,
+      open: Effect.Effect<void, RemoteWorkflowError>,
+      keepsPeers: boolean,
+    ) {
+      const ready = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+      const onReady = (id: string) => {
+        if (id === peerId) Deferred.doneUnsafe(ready, Effect.void);
+      };
+      const onError = (id: string, code: string, message: string, terminal = false) => {
+        if (id !== peerId || (keepsPeers && code === "permission_denied" && !terminal)) return;
+        Deferred.doneUnsafe(ready, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
+      };
+      return yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          bridge.on("signalReady", onReady);
+          bridge.on("error", onError);
+        }),
+        () =>
+          Effect.gen(function* () {
+            const connecting = yield* Effect.forkIn(
+              bridge.start().pipe(
+                Effect.andThen(open),
+                Effect.tapError((error) => Effect.sync(() => Deferred.doneUnsafe(ready, Effect.fail(error)))),
+              ),
+              scope,
+              { startImmediately: false },
+            );
+            pendingConnections.add(connecting);
+            connecting.addObserver(() => pendingConnections.delete(connecting));
+            yield* Deferred.await(ready).pipe(
+              Effect.timeoutOrElse({
+                duration: "30 seconds",
+                orElse: () =>
+                  Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.signalTimeout")) })),
+              }),
+            );
+          }),
+        () =>
+          Effect.sync(() => {
+            bridge.off("signalReady", onReady);
+            bridge.off("error", onError);
+          }),
+      );
+    });
     return Layer.succeed(
       HostSignal,
       HostSignal.of({
         disconnect: (peerId) => bridge.disconnect(peerId),
-        connect: Effect.fn("HostSignal.connect")(function* (peerId: string, signalUrl: string, token: string) {
-          const ready = Deferred.makeUnsafe<void, RemoteWorkflowError>();
-          const onReady = (id: string) => {
-            if (id === peerId) Deferred.doneUnsafe(ready, Effect.void);
-          };
-          const onError = (id: string, _code: string, message: string) => {
-            if (id === peerId)
-              Deferred.doneUnsafe(ready, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
-          };
-          return yield* Effect.acquireUseRelease(
-            Effect.sync(() => {
-              bridge.on("signalReady", onReady);
-              bridge.on("error", onError);
-            }),
-            () =>
-              Effect.gen(function* () {
-                const connecting = yield* Effect.forkIn(
-                  bridge.start().pipe(
-                    Effect.andThen(
-                      Effect.suspend(() =>
-                        bridge.connect({ peerId, signalUrl, token, peer: "host", privateNetwork: privateNetwork() }),
-                      ),
-                    ),
-                    Effect.tapError((error) => Effect.sync(() => Deferred.doneUnsafe(ready, Effect.fail(error)))),
-                  ),
-                  scope,
-                  { startImmediately: false },
-                );
-                pendingConnections.add(connecting);
-                connecting.addObserver(() => pendingConnections.delete(connecting));
-                yield* Deferred.await(ready).pipe(
-                  Effect.timeoutOrElse({
-                    duration: "30 seconds",
-                    orElse: () =>
-                      Effect.fail(
-                        new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.signalTimeout")) }),
-                      ),
-                  }),
-                );
-              }),
-            () =>
-              Effect.sync(() => {
-                bridge.off("signalReady", onReady);
-                bridge.off("error", onError);
-              }),
-          );
-        }),
+        connect: (peerId, signalUrl, token) =>
+          awaitSignal(
+            peerId,
+            Effect.suspend(() =>
+              bridge.connect({ peerId, signalUrl, token, peer: "host", privateNetwork: privateNetwork() }),
+            ),
+            false,
+          ),
+        move: (peerId, signalUrl, token) =>
+          awaitSignal(
+            peerId,
+            Effect.suspend(() => bridge.moveSignal({ peerId, signalUrl, token })),
+            true,
+          ),
       }),
     );
   }
@@ -114,6 +130,7 @@ export class TeamWebRtcHostGateway {
   #signalHomeReturnTimer: ReturnType<typeof setInterval> | null = null;
   #signalHomeFollowTimer: ReturnType<typeof setTimeout> | null = null;
   #signalMoveTimer: ReturnType<typeof setTimeout> | null = null;
+  #signalGoAwayTimer: ReturnType<typeof setTimeout> | null = null;
   #signalLostTimer: ReturnType<typeof setTimeout> | null = null;
   #signalLostReported = false;
   #signalEnded = false;
@@ -141,6 +158,7 @@ export class TeamWebRtcHostGateway {
     this.#bridge.on("error", this.#onError);
     this.#bridge.on("signalClosed", this.#onSignalClosed);
     this.#bridge.on("signalReady", this.#onSignalReady);
+    this.#bridge.on("signalGoAway", this.#onSignalGoAway);
   }
 
   #provide<A>(operation: Effect.Effect<A, RemoteWorkflowError, HostSignal>): Effect.Effect<A, RemoteWorkflowError> {
@@ -202,6 +220,7 @@ export class TeamWebRtcHostGateway {
       this.#stopSignalHomeReturnCheck();
       this.#cancelSignalHomeFollow();
       this.#cancelSignalMove();
+      this.#cancelSignalGoAway();
       this.#cancelSignalLostReport();
       if (this.#connecting) yield* Fiber.interrupt(this.#connecting);
       if (this.#signalRecovery) yield* Fiber.interrupt(this.#signalRecovery);
@@ -231,7 +250,7 @@ export class TeamWebRtcHostGateway {
     }
     const signalUrlBefore = this.#signalUrl;
     const fiber = this.#runtime.runFork(
-      this.#recoverSignal(hostId, undefined, true).pipe(
+      this.#recoverSignal(hostId, undefined, true, true).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             if (this.#hostId !== hostId) return;
@@ -328,6 +347,7 @@ export class TeamWebRtcHostGateway {
           this.#bridge.off("error", this.#onError);
           this.#bridge.off("signalClosed", this.#onSignalClosed);
           this.#bridge.off("signalReady", this.#onSignalReady);
+          this.#bridge.off("signalGoAway", this.#onSignalGoAway);
           yield* Fiber.awaitAll([...this.#operations]);
           yield* Scope.close(this.#connectionScope, Exit.void);
           yield* this.#runtime.disposeEffect;
@@ -471,7 +491,7 @@ export class TeamWebRtcHostGateway {
     logger.warn(`Host Signal socket is not ready after ${this.#lastSignalEnd ?? "a close"}; it asks for a new home.`);
     this.#signalMoves += 1;
     const fiber = this.#runtime.runFork(
-      this.#recoverSignal(hostId, this.#signalUrl ?? undefined).pipe(
+      this.#recoverSignal(hostId, this.#signalUrl ?? undefined, false, true).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             if (this.#hostId !== hostId) return;
@@ -488,6 +508,45 @@ export class TeamWebRtcHostGateway {
               `Host Signal move failed; the host tries again in ${Math.round(this.#signalMoveDelay() / 1000)} s.`,
             );
             this.#scheduleSignalMove();
+          }),
+        ),
+      ),
+    );
+    this.#signalRecovery = fiber;
+    fiber.addObserver(() => {
+      if (this.#signalRecovery === fiber) this.#signalRecovery = null;
+    });
+  };
+
+  readonly #onSignalGoAway = (peerId: string, withinMs: number): void => {
+    if (peerId !== this.#hostId || !this.#options.renewSignal || this.#signalRenewalRefused) return;
+    this.#cancelSignalGoAway();
+    const delay = Math.floor(Math.random() * Math.min(withinMs, SIGNAL_GO_AWAY_WITHIN_MS_LIMIT));
+    logger.info(`Host Signal home drains; the host moves in ${Math.round(delay / 1_000)} s.`);
+    this.#signalGoAwayTimer = setTimeout(this.#goAway, delay);
+  };
+
+  #cancelSignalGoAway(): void {
+    if (this.#signalGoAwayTimer !== null) clearTimeout(this.#signalGoAwayTimer);
+    this.#signalGoAwayTimer = null;
+  }
+
+  readonly #goAway = (): void => {
+    this.#signalGoAwayTimer = null;
+    const hostId = this.#hostId;
+    const drainingSignalUrl = this.#signalUrl;
+    if (!hostId || !drainingSignalUrl) return;
+    if (this.#connecting || this.#signalRecovery) {
+      this.#signalGoAwayTimer = setTimeout(this.#goAway, SIGNAL_HOME_FOLLOW_DELAY_MS);
+      return;
+    }
+    const fiber = this.#runtime.runFork(
+      this.#recoverSignal(hostId, drainingSignalUrl, false, true).pipe(
+        Effect.catch(({ cause }) =>
+          Effect.sync(() => {
+            if (this.#hostId !== hostId) return;
+            this.#noteRenewalRefused(cause);
+            logger.warn("Host Signal move after a drain notice failed; the host keeps its Signal.");
           }),
         ),
       ),
@@ -545,6 +604,7 @@ export class TeamWebRtcHostGateway {
     hostId: string,
     failedSignalUrl?: string,
     onlyToMove = false,
+    keepsOpenPeers = false,
   ): Effect.fn.Return<void, RemoteWorkflowError, HostSignal> {
     const renew = this.#options.renewSignal;
     if (!renew) return;
@@ -552,6 +612,23 @@ export class TeamWebRtcHostGateway {
     if (this.#hostId !== hostId) return;
     if (failedSignalUrl !== undefined && bootstrap.signalUrl === failedSignalUrl && !this.#signalEnded) return;
     if (onlyToMove && bootstrap.signalUrl === this.#signalUrl && !this.#signalEnded) return;
+    if (keepsOpenPeers && !this.#signalEnded) {
+      const moved = yield* HostSignal.use((signal) => signal.move(hostId, bootstrap.signalUrl, bootstrap.ticket)).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      );
+      if (this.#hostId !== hostId) {
+        yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
+        return;
+      }
+      if (moved) {
+        this.#signalUrl = bootstrap.signalUrl;
+        this.#signalHomed = ticketNamesSignalHome(bootstrap.ticket);
+        this.#signalHome = ticketSignalHome(bootstrap.ticket);
+        return;
+      }
+      logger.warn("Host Signal move did not get ready; the host connects again without its peers.");
+    }
     yield* this.#clearPeers();
     yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
     if (this.#hostId !== hostId) return;
