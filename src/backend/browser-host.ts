@@ -1108,6 +1108,7 @@ export class BrowserHost {
             { startImmediately: true },
           );
         let watchOutlivesOpen = false;
+        const loadDeadline = Date.now() + (firstLoadTimeoutMs ?? AGENT_OPEN_LOAD_TIMEOUT_MS);
         yield* navigateAndWait(
           tab.contents,
           () => {
@@ -1128,7 +1129,7 @@ export class BrowserHost {
               if (!dialogWatch || !tab.engine.dialog || !tab.contents.isLoading()) return Effect.void;
               watchOutlivesOpen = true;
               return Effect.forkIn(
-                waitForLoading(tab.contents, firstLoadTimeoutMs ?? AGENT_OPEN_LOAD_TIMEOUT_MS).pipe(
+                waitForLoading(tab.contents, Math.max(1, loadDeadline - Date.now())).pipe(
                   Effect.ignore,
                   Effect.ensuring(Effect.sync(dialogWatch.end)),
                 ),
