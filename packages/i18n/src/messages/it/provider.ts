@@ -49,7 +49,7 @@ export const messages = {
   "provider.action.signIn": "Accedi",
   "provider.action.apiKey": "Chiave API",
   "provider.action.signInWithCode": "Accedi con un codice",
-  "provider.action.signInMainlandChina": "Accedi con {site} (Cina)",
+  "provider.action.signInWithCodeAt": "Accedi con un codice ({site})",
   "provider.action.pasteAddress": "Incolla l'indirizzo",
   "provider.aria.download": "Scarica {name}",
   "provider.aria.cancel": "Annulla {name}",
@@ -108,6 +108,10 @@ export const messages = {
   "provider.useApp.description":
     "L'accesso a {name} torna al computer che lo ha avviato, e una scheda del browser non può riceverlo. Connetti {name} nell'app OpenBot. L'app completa l'accesso da sola.",
   "provider.useApp.download": "Scarica l'app",
+  "provider.region.title": "Dov'è il tuo account {name}?",
+  "provider.region.description": "Scegli il sito in cui hai creato il tuo account {name}.",
+  "provider.region.mainlandChina": "{site} (Cina)",
+  "provider.region.global": "{site} (globale)",
 
   "provider.picker.noEndpoints": "Ancora nessun endpoint",
   "provider.picker.customCounts": "{endpoints} · {agents}",

@@ -478,6 +478,7 @@
     "./features/transfer/InstanceTransferView": "./src/features/transfer/InstanceTransferView.tsx",
     "./components/GlobalSearch": "./src/components/GlobalSearch.tsx",
     "./components/ProviderCodeLoginDialog": "./src/components/ProviderCodeLoginDialog.tsx",
+    "./components/ProviderRegionDialog": "./src/components/ProviderRegionDialog.tsx",
     "./components/ProviderUseAppDialog": "./src/components/ProviderUseAppDialog.tsx",
     "./components/QuestionPromptBubble": "./src/components/QuestionPromptBubble.tsx",
     "./features/conversation/DirectConversation": "./src/features/conversation/DirectConversation.tsx",

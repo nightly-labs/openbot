@@ -10,6 +10,7 @@ import {
   type ProviderRelaySignInStatus,
 } from "@openbot/contracts/ipc";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import type { ProviderRegion } from "@openbot/ui/components/ProviderRegionDialog";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onCleanup } from "solid-js";
@@ -17,6 +18,7 @@ import { actionToast } from "../../action-toast";
 import type {
   ProviderCodeLoginOpener,
   ProviderConnectionApi,
+  ProviderRegionChoice,
   ProviderUseApp,
 } from "../../components/provider-connection-api";
 import {
@@ -104,6 +106,8 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   const [codeLoginState, setCodeLoginState] = createSignal<ProviderCodeLoginState>({ phase: "starting" });
   const [codeLoginOpener, setCodeLoginOpener] = createSignal<ProviderCodeLoginOpener | null>(null);
   const [useApp, setUseApp] = createSignal<ProviderUseApp | null>(null);
+  const [regionChoice, setRegionChoice] = createSignal<ProviderRegionChoice | null>(null);
+  let settleRegionChoice: ((region: ProviderRegion | null) => void) | undefined;
   let codeLoginExpiry: number | undefined;
   let codeLoginStarted = false;
   let codeLoginGeneration = 0;
@@ -118,12 +122,36 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     method: ProviderSignInMethod | null,
     opener: ProviderCodeLoginOpener | null,
   ): Promise<void> {
-    if (method === "browser") return options.connectInBrowser?.(provider) ?? Promise.resolve();
+    if (method === "browser") return connectInBrowser(provider, opener);
     if (method === "use-app") setUseApp({ provider, opener });
     else if (method === "address") openAddressPaste(provider, opener);
     else if (method === "relay" || method === "host-page" || method === "code")
       void startProviderCodeLogin(provider, method, opener);
     return Promise.resolve();
+  }
+
+  function connectInBrowser(provider: AgentProviderId, opener: ProviderCodeLoginOpener | null): Promise<void> {
+    const { globalSignInSite, mainlandChinaSignInSite } = agentProviderDescriptor(provider);
+    const connectInMainlandChina = options.connectInMainlandChina;
+    if (!globalSignInSite || !mainlandChinaSignInSite || !connectInMainlandChina) {
+      return options.connectInBrowser?.(provider) ?? Promise.resolve();
+    }
+    settleRegionChoice?.(null);
+    return new Promise((resolve, reject) => {
+      const settle = (region: ProviderRegion | null) => {
+        if (settleRegionChoice !== settle) return;
+        settleRegionChoice = undefined;
+        setRegionChoice(null);
+        if (region === null) {
+          resolve();
+          return;
+        }
+        const start = region === "mainland-cn" ? connectInMainlandChina : options.connectInBrowser;
+        (start?.(provider) ?? Promise.resolve()).then(resolve, reject);
+      };
+      settleRegionChoice = settle;
+      setRegionChoice({ provider, opener, globalSite: globalSignInSite, mainlandChinaSite: mainlandChinaSignInSite });
+    });
   }
 
   function openAddressPaste(provider: AgentProviderId, opener: ProviderCodeLoginOpener | null): void {
@@ -556,6 +584,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   );
 
   onCleanup(() => {
+    settleRegionChoice?.(null);
     codeLoginGeneration++;
     clearCodeLoginExpiry();
   });
@@ -585,11 +614,8 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     },
     connectAccountWithCode: (provider, accountId) => void startProviderCodeLogin(provider, "code", null, accountId),
     alternative: (provider, opener) => run(provider, route(provider).alternative, opener ?? null),
-    mainlandChinaSite: (provider) =>
-      route(provider).connect === "browser" && options.connectInMainlandChina
-        ? (agentProviderDescriptor(provider).mainlandChinaSignInSite ?? null)
-        : null,
-    connectInMainlandChina: (provider) => options.connectInMainlandChina?.(provider) ?? Promise.resolve(),
+    regionChoice,
+    chooseRegion: (region) => settleRegionChoice?.(region),
     useApp,
     closeUseApp: () => setUseApp(null),
     openAppDownload: options.openAppDownload,

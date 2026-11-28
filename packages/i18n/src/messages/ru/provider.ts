@@ -64,7 +64,7 @@ export const messages = {
   "provider.action.signIn": "Войти",
   "provider.action.apiKey": "Ключ API",
   "provider.action.signInWithCode": "Войти по коду",
-  "provider.action.signInMainlandChina": "Войти через {site} (Китай)",
+  "provider.action.signInWithCodeAt": "Войти по коду ({site})",
   "provider.action.pasteAddress": "Вставить адрес",
   "provider.aria.download": "Скачать: {name}",
   "provider.aria.cancel": "Отменить: {name}",
@@ -124,6 +124,10 @@ export const messages = {
   "provider.useApp.description":
     "Вход в {name} возвращается на компьютер, который его начал, а вкладка браузера не может его принять. Подключите {name} в приложении OpenBot. Приложение завершит вход само.",
   "provider.useApp.download": "Скачать приложение",
+  "provider.region.title": "Где ваш аккаунт {name}?",
+  "provider.region.description": "Выберите сайт, на котором вы создали аккаунт {name}.",
+  "provider.region.mainlandChina": "{site} (Китай)",
+  "provider.region.global": "{site} (глобальный)",
 
   "provider.picker.noEndpoints": "Эндпоинтов пока нет",
   "provider.picker.customCounts": "{endpoints} · {agents}",

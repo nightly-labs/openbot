@@ -68,10 +68,6 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     codeFallback.startedWithCode();
     host.connection?.alternative(option().id);
   };
-  const mainlandChinaSite = (): string | null =>
-    browserConnect() && !off() && state() !== "available"
-      ? (host.connection?.mainlandChinaSite?.(option().id) ?? null)
-      : null;
   const [connectError, setConnectError] = createSignal<string | null>(null);
   const connect = () => {
     if (isKeyOnlyProvider(option().id) && host.onSignInProvider) {
@@ -82,13 +78,6 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     else codeFallback.startedWithCode();
     setConnectError(null);
     void Promise.resolve(host.connection?.connect(option().id)).catch((error: unknown) =>
-      setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
-    );
-  };
-  const connectInMainlandChina = () => {
-    codeFallback.startedInBrowser();
-    setConnectError(null);
-    void Promise.resolve(host.connection?.connectInMainlandChina?.(option().id)).catch((error: unknown) =>
       setConnectError(errorMessage(error, t("app.provider.connectFailedRetry", { name: option().name }))),
     );
   };
@@ -196,8 +185,6 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     runtimeAction,
     codeFallbackOffered,
     signInAlternative,
-    mainlandChinaSite,
-    connectInMainlandChina,
     connectError,
     connect,
     runAction,
@@ -221,6 +208,11 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
 }
 
 export type ProviderRow = ReturnType<typeof createProviderRow>;
+
+export function providerCodeSignInText(translate: AppTranslate, provider: AgentProviderId): string {
+  const site = agentProviderDescriptor(provider).globalSignInSite;
+  return site ? translate("provider.action.signInWithCodeAt", { site }) : translate("provider.action.signInWithCode");
+}
 
 export function servesCustomProvider(openCode: ProviderPickerOption | undefined): boolean {
   return openCode?.state === "available" || openCode?.state === "sign-in-required";

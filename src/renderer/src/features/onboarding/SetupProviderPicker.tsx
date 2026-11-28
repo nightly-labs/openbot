@@ -446,10 +446,6 @@ export function createSetupProviders(
     return followSignIn(provider, (connection) => connection.connect(provider));
   }
 
-  function connectProviderInMainlandChina(provider: AgentProviderId): Promise<boolean> {
-    return followSignIn(provider, (connection) => connection.connectInMainlandChina?.(provider) ?? Promise.resolve());
-  }
-
   async function followSignIn(
     provider: AgentProviderId,
     start: (connection: ProviderConnectionApi) => Promise<void>,
@@ -555,7 +551,6 @@ export function createSetupProviders(
     selectCustomProvider,
     signInProvider,
     connectProvider,
-    connectProviderInMainlandChina,
     downloadProvider,
     clearChoice: () => {
       choiceChanged = true;
@@ -596,14 +591,6 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           connect: async (provider) => {
             await props.providers.connectProvider(provider);
           },
-          ...(api.mainlandChinaSite && api.connectInMainlandChina
-            ? {
-                mainlandChinaSite: api.mainlandChinaSite,
-                connectInMainlandChina: async (provider) => {
-                  await props.providers.connectProviderInMainlandChina(provider);
-                },
-              }
-            : {}),
         }
       : undefined;
   });

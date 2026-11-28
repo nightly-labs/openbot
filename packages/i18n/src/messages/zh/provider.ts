@@ -49,7 +49,7 @@ export const messages = {
   "provider.action.signIn": "登录",
   "provider.action.apiKey": "API 密钥",
   "provider.action.signInWithCode": "用验证码登录",
-  "provider.action.signInMainlandChina": "用 {site} 登录（中国大陆）",
+  "provider.action.signInWithCodeAt": "用验证码登录（{site}）",
   "provider.action.pasteAddress": "粘贴地址",
   "provider.aria.download": "下载 {name}",
   "provider.aria.cancel": "取消 {name}",
@@ -106,6 +106,10 @@ export const messages = {
   "provider.useApp.description":
     "{name} 的登录结果会返回发起登录的电脑，浏览器标签页无法接收。请在 OpenBot 应用中连接 {name}，应用会自动完成登录。",
   "provider.useApp.download": "获取应用",
+  "provider.region.title": "你的 {name} 账号在哪个站点？",
+  "provider.region.description": "选择你注册 {name} 账号的站点。",
+  "provider.region.mainlandChina": "{site}（中国大陆）",
+  "provider.region.global": "{site}（国际）",
 
   "provider.picker.noEndpoints": "还没有端点",
   "provider.picker.customCounts": "{endpoints} · {agents}",

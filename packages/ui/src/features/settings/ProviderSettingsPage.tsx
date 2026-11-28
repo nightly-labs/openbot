@@ -44,7 +44,6 @@ import {
   DropdownMenu,
   Ellipsis,
   Gauge,
-  Globe2,
   IconButton,
   Input,
   Item,
@@ -100,6 +99,7 @@ import {
   type ProviderRow,
   type ProviderRowHost,
   providerAction,
+  providerCodeSignInText,
   providerStatusLabel,
   servesCustomProvider,
   showProviderInUse,
@@ -666,34 +666,25 @@ function MenuTrigger(props: { label: string; disabled?: boolean | undefined }) {
   );
 }
 
-function AlternativeItem(props: { row: ProviderRow }) {
+function AlternativeItem(props: { row: ProviderRow; provider: AgentProviderId }) {
   const { t } = useText();
   return (
-    <>
-      <Show when={props.row.alternative()}>
-        {(kind) => (
-          <DropdownMenu.Item onSelect={props.row.signInAlternative}>
-            <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
-              <Link aria-hidden="true" />
-            </Show>
-            {t(kind() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode")}
-          </DropdownMenu.Item>
-        )}
-      </Show>
-      <Show when={props.row.mainlandChinaSite()}>
-        {(site) => (
-          <DropdownMenu.Item onSelect={props.row.connectInMainlandChina}>
-            <Globe2 aria-hidden="true" />
-            {t("provider.action.signInMainlandChina", { site: site() })}
-          </DropdownMenu.Item>
-        )}
-      </Show>
-    </>
+    <Show when={props.row.alternative()}>
+      {(kind) => (
+        <DropdownMenu.Item onSelect={props.row.signInAlternative}>
+          <Show when={kind() === "address"} fallback={<Smartphone aria-hidden="true" />}>
+            <Link aria-hidden="true" />
+          </Show>
+          {kind() === "address" ? t("provider.action.pasteAddress") : providerCodeSignInText(t, props.provider)}
+        </DropdownMenu.Item>
+      )}
+    </Show>
   );
 }
 
 const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "claude",
+  "kimi",
   "codex",
   "grok",
   "muse",
@@ -1276,7 +1267,7 @@ function AccountRow(
                 )}
               </Show>
               <Show when={own()}>
-                <AlternativeItem row={props.row} />
+                <AlternativeItem row={props.row} provider={props.option.id} />
               </Show>
               <Show when={signInAgain() && accountCodeSignInOffered(props.option.id, props.accountActions)}>
                 <DropdownMenu.Item
@@ -1497,9 +1488,9 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
                 disabled={props.disabled}
                 onClick={row().signInAlternative}
               >
-                {t(
-                  row().alternative() === "address" ? "provider.action.pasteAddress" : "provider.action.signInWithCode",
-                )}
+                {row().alternative() === "address"
+                  ? t("provider.action.pasteAddress")
+                  : providerCodeSignInText(t, props.option.id)}
               </Button>
             </Show>
             <Show when={row().signingIn() && props.onCancelProviderSignIn}>
@@ -1566,7 +1557,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
                 {t("provider.action.signIn")}
               </Button>
             </Show>
-            <Show when={row().alternative() || row().mainlandChinaSite() || disconnectOffered()}>
+            <Show when={row().alternative() || disconnectOffered()}>
               <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                 <MenuTrigger
                   label={t("provider.aria.moreActions", { name: props.option.name })}
@@ -1574,9 +1565,9 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
                 />
                 <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
                   <DropdownMenu.Content>
-                    <AlternativeItem row={row()} />
+                    <AlternativeItem row={row()} provider={props.option.id} />
                     <Show when={disconnectOffered()}>
-                      <Show when={row().alternative() || row().mainlandChinaSite()}>
+                      <Show when={row().alternative()}>
                         <DropdownMenu.Separator />
                       </Show>
                       <DropdownMenu.Item onSelect={() => setDisconnecting(true)}>

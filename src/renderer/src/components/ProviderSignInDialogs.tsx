@@ -1,5 +1,6 @@
 import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import { ProviderRegionDialog } from "@openbot/ui/components/ProviderRegionDialog";
 import { ProviderUseAppDialog } from "@openbot/ui/components/ProviderUseAppDialog";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
@@ -19,8 +20,24 @@ export function ProviderSignInDialogs(props: {
     const handOff = props.api?.openAppDownload ? props.api.useApp() : null;
     return handOff && shown(handOff.opener) ? handOff.provider : null;
   };
+  const regionChoice = () => {
+    const choice = props.api?.regionChoice() ?? null;
+    return choice && shown(choice.opener) ? choice : null;
+  };
   return (
     <>
+      <Show when={regionChoice()}>
+        {(choice) => (
+          <ProviderRegionDialog
+            open={true}
+            providerName={agentProviderDescriptor(choice().provider).displayName}
+            globalSite={choice().globalSite}
+            mainlandChinaSite={choice().mainlandChinaSite}
+            onChoose={(region) => props.api?.chooseRegion(region)}
+            onClose={() => props.api?.chooseRegion(null)}
+          />
+        )}
+      </Show>
       <Show when={props.api && provider() ? props.api : undefined}>
         {(api) => (
           <ProviderCodeLoginDialog

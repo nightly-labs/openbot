@@ -49,7 +49,7 @@ export const messages = {
   "provider.action.signIn": "로그인",
   "provider.action.apiKey": "API 키",
   "provider.action.signInWithCode": "코드로 로그인",
-  "provider.action.signInMainlandChina": "{site}로 로그인 (중국)",
+  "provider.action.signInWithCodeAt": "코드로 로그인 ({site})",
   "provider.action.pasteAddress": "주소 붙여넣기",
   "provider.aria.download": "{name} 다운로드",
   "provider.aria.cancel": "{name} 취소",
@@ -107,6 +107,10 @@ export const messages = {
   "provider.useApp.description":
     "{name} 로그인은 시작한 컴퓨터로 돌아오는데, 브라우저 탭은 이를 받을 수 없어요. OpenBot 앱에서 {name}을(를) 연결하세요. 앱이 로그인을 알아서 마무리해요.",
   "provider.useApp.download": "앱 받기",
+  "provider.region.title": "{name} 계정은 어느 사이트에 있나요?",
+  "provider.region.description": "{name} 계정을 만든 사이트를 선택하세요.",
+  "provider.region.mainlandChina": "{site} (중국)",
+  "provider.region.global": "{site} (글로벌)",
 
   "provider.picker.noEndpoints": "아직 엔드포인트가 없어요",
   "provider.picker.customCounts": "{endpoints} · {agents}",

@@ -48,7 +48,7 @@ export const messages = defineMessages("provider", {
   "provider.action.signIn": "Sign in",
   "provider.action.apiKey": "API key",
   "provider.action.signInWithCode": "Log in with code",
-  "provider.action.signInMainlandChina": "Sign in with {site} (China)",
+  "provider.action.signInWithCodeAt": "Log in with code ({site})",
   "provider.action.pasteAddress": "Paste the address",
   "provider.aria.download": "Download {name}",
   "provider.aria.cancel": "Cancel {name}",
@@ -107,6 +107,10 @@ export const messages = defineMessages("provider", {
   "provider.useApp.description":
     "The {name} sign-in returns to the computer that started it, and a browser tab cannot receive it. Connect {name} in the OpenBot app. The app finishes the sign-in by itself.",
   "provider.useApp.download": "Get the app",
+  "provider.region.title": "Where is your {name} account?",
+  "provider.region.description": "Choose the site where you made your {name} account.",
+  "provider.region.mainlandChina": "{site} (China)",
+  "provider.region.global": "{site} (global)",
 
   "provider.picker.noEndpoints": "No endpoints yet",
   "provider.picker.customCounts": "{endpoints} · {agents}",
