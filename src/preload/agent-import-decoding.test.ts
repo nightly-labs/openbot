@@ -3,6 +3,7 @@
 import {
   decodeAgentImportResult,
   decodeInstanceTransferResult,
+  decodeInstanceTransferUploadProgress,
   decodeRemoteInstanceTransferResult,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
@@ -74,5 +75,27 @@ describe("instance transfer result decoding", () => {
     expect(() =>
       decodeRemoteInstanceTransferResult({ ...TRANSFER_RESULT, agents: [], signIn: ["claude", "Not An Id"] }),
     ).toThrow("Invalid transfer result.");
+  });
+});
+
+describe("instance transfer progress decoding", () => {
+  it("keeps upload progress without a copy step", () => {
+    expect(decodeInstanceTransferUploadProgress({ serverId: "server-1", sent: 1, total: 2 })).toEqual({
+      serverId: "server-1",
+      sent: 1,
+      total: 2,
+    });
+  });
+
+  it("keeps the step of a copy", () => {
+    expect(
+      decodeInstanceTransferUploadProgress({ serverId: "server-1", sent: 0, total: 0, copyStep: "preparing" }),
+    ).toEqual({ serverId: "server-1", sent: 0, total: 0, copyStep: "preparing" });
+  });
+
+  it("rejects a copy step that this build does not know", () => {
+    expect(() =>
+      decodeInstanceTransferUploadProgress({ serverId: "server-1", sent: 0, total: 0, copyStep: "other" }),
+    ).toThrow("Invalid transfer upload progress.");
   });
 });

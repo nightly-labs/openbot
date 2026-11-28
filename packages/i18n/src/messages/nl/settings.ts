@@ -877,6 +877,14 @@ export const messages = {
     "{server} heeft al agents met deze namen: {names}. De kopie voegt voor elk een tweede agent toe. Elke kopie is een aparte agent met eigen chats, bestanden en herinneringen.",
   "settings.transfer.copy.duplicatesConfirm": "Dubbele kopiëren",
   "settings.transfer.copy.copying": "Kopiëren…",
+  "settings.transfer.copy.preparing": "Agents voorbereiden op {server}…",
+  "settings.transfer.copy.downloading": "Agents ontvangen van {server}…",
+  "settings.transfer.copy.uploading": "Agents verzenden naar {server}…",
+  "settings.transfer.copy.installing": "Agents toevoegen aan {server}…",
+  "settings.transfer.copy.receiveLabel": "Download van de server",
+  "settings.transfer.copy.received": "{sent} van {total} ontvangen",
+  "settings.transfer.copy.stalled":
+    "Al 30 seconden komen er geen gegevens. OpenBot probeert het opnieuw. Als de server niet antwoordt, stopt de kopie met een fout.",
   "settings.transfer.copy.done": {
     one: "{count} agent gekopieerd naar {server}.",
     other: "{count} agents gekopieerd naar {server}.",

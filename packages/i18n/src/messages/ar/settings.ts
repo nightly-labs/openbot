@@ -954,6 +954,14 @@ export const messages = {
     "يحتوي {server} بالفعل على وكلاء بهذه الأسماء: {names}. يضيف النسخ وكيلًا ثانيًا لكل واحد منهم. كل نسخة وكيل منفصل له دردشاته وملفاته وذكرياته.",
   "settings.transfer.copy.duplicatesConfirm": "نسخ المكررين",
   "settings.transfer.copy.copying": "جارٍ النسخ…",
+  "settings.transfer.copy.preparing": "جارٍ تجهيز الوكلاء على {server}…",
+  "settings.transfer.copy.downloading": "جارٍ استلام الوكلاء من {server}…",
+  "settings.transfer.copy.uploading": "جارٍ إرسال الوكلاء إلى {server}…",
+  "settings.transfer.copy.installing": "جارٍ إضافة الوكلاء إلى {server}…",
+  "settings.transfer.copy.receiveLabel": "التنزيل من الخادم",
+  "settings.transfer.copy.received": "تم استلام {sent} من {total}",
+  "settings.transfer.copy.stalled":
+    "لم تصل بيانات منذ 30 ثانية. يحاول OpenBot مرة أخرى. إذا لم يرد الخادم، يتوقف النسخ ويعرض خطأ.",
   "settings.transfer.copy.done": {
     zero: "لم يُنسخ أي وكيل إلى {server}.",
     one: "نُسخ وكيل واحد إلى {server}.",

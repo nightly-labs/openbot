@@ -1,5 +1,5 @@
 import { agentProviderName } from "@openbot/contracts/agent-providers";
-import type { InstanceTransferAgent, InstanceTransferResult } from "@openbot/contracts/ipc";
+import type { InstanceTransferAgent, InstanceTransferCopyStep, InstanceTransferResult } from "@openbot/contracts/ipc";
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import {
   ArrowRight,
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ServerLogo } from "../servers/ServerLogo";
@@ -38,6 +38,10 @@ export interface CopyAgentsServer {
 
 export type CopyAgentsPhase = "idle" | "copying" | "done";
 
+export interface CopyAgentsProgress extends TransferUploadState {
+  step: InstanceTransferCopyStep;
+}
+
 export interface CopyAgentsDialogProps {
   servers: readonly CopyAgentsServer[];
   fromId: string;
@@ -48,7 +52,7 @@ export interface CopyAgentsDialogProps {
   toAgents: readonly CopyAgentsAgent[] | null;
   loadError: string | null;
   phase: CopyAgentsPhase;
-  progress?: TransferUploadState | null | undefined;
+  progress?: CopyAgentsProgress | null | undefined;
   result: InstanceTransferResult | null;
   error: string | null;
   onCopy: (agentIds: string[]) => void;
@@ -83,11 +87,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   const startCopy = () => props.onCopy(selected().map((agent) => agent.id));
   const readingDestination = () => props.toAgents === null && !props.loadError;
   const busy = () => props.phase === "copying";
-  const uploading = () => (busy() ? props.progress : null);
-  const sendingFile = () => {
-    const progress = uploading();
-    return progress ? progress.sent < progress.total : false;
-  };
+  const copyProgress = () => (busy() ? props.progress : null);
   const done = () => props.phase === "done";
   const from = () => props.servers.find((server) => server.id === props.fromId) ?? null;
   const to = () => props.servers.find((server) => server.id === props.toId) ?? null;
@@ -241,7 +241,9 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
               <Show when={props.error}>
                 {(message) => <TransferAlert title={t("settings.transfer.copy.failed")} description={message()} />}
               </Show>
-              <Show when={uploading()}>{(progress) => <TransferUploadProgress progress={progress()} />}</Show>
+              <Show when={copyProgress()}>
+                {(progress) => <CopyProgress progress={progress()} from={from()?.name ?? ""} to={to()?.name ?? ""} />}
+              </Show>
               <Show when={doneResult()} fallback={<NotMoved text="settings.transfer.copy.notCopied" />}>
                 {(result) => <CopyResult result={result()} server={to()?.name ?? ""} />}
               </Show>
@@ -258,9 +260,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                       type="button"
                       disabled={!to() || selected().length === 0 || readingDestination()}
                       loading={busy()}
-                      loadingLabel={t(
-                        sendingFile() ? "settings.transfer.upload.sending" : "settings.transfer.copy.copying",
-                      )}
+                      loadingLabel={t("settings.transfer.copy.copying")}
                       onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startCopy())}
                     >
                       {t("settings.transfer.copy.submit", { count: selected().length })}
@@ -411,5 +411,53 @@ function CopyResult(props: { result: InstanceTransferResult; server: string }) {
         <TransferNotes title={t("settings.transfer.result.warnings")} notes={props.result.warnings} />
       </Show>
     </>
+  );
+}
+
+const STALLED_AFTER_MS = 30_000;
+
+const STEP_TEXT = {
+  preparing: "settings.transfer.copy.preparing",
+  downloading: "settings.transfer.copy.downloading",
+  uploading: "settings.transfer.copy.uploading",
+  installing: "settings.transfer.copy.installing",
+} as const;
+
+function createStalled(progress: () => CopyAgentsProgress) {
+  const [stalled, setStalled] = createSignal(false);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(timer));
+  createEffect(
+    () => `${progress().step}:${progress().sent}`,
+    () => {
+      clearTimeout(timer);
+      setStalled(false);
+      timer = setTimeout(() => setStalled(true), STALLED_AFTER_MS);
+    },
+  );
+  return stalled;
+}
+
+function CopyProgress(props: { progress: CopyAgentsProgress; from: string; to: string }) {
+  const { t } = useText();
+  const moving = () => props.progress.step === "downloading" || props.progress.step === "uploading";
+  const showsBytes = () => moving() && props.progress.total > 0;
+  const stalled = createStalled(() => props.progress);
+  return (
+    <div class="copy-agents-progress">
+      <p class="instance-transfer-upload-status" aria-live="polite">
+        {t(STEP_TEXT[props.progress.step], {
+          server: props.progress.step === "preparing" || props.progress.step === "downloading" ? props.from : props.to,
+        })}
+      </p>
+      <Show when={showsBytes()}>
+        <TransferUploadProgress progress={props.progress} receiving={props.progress.step === "downloading"} />
+      </Show>
+      <Show when={props.progress.step === "downloading" && stalled() && props.progress.sent < props.progress.total}>
+        <p class="instance-transfer-upload-status" role="status">
+          {t("settings.transfer.copy.stalled")}
+        </p>
+      </Show>
+    </div>
   );
 }

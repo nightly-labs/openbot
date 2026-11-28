@@ -886,6 +886,14 @@ export const messages = {
     "ב-{server} כבר יש סוכנים בשמות האלה: {names}. ההעתקה מוסיפה סוכן שני לכל אחד מהם. כל עותק הוא סוכן נפרד עם צ'אטים, קבצים וזיכרונות משלו.",
   "settings.transfer.copy.duplicatesConfirm": "העתקת כפילויות",
   "settings.transfer.copy.copying": "מעתיק…",
+  "settings.transfer.copy.preparing": "מכין את הסוכנים ב-{server}…",
+  "settings.transfer.copy.downloading": "מקבל את הסוכנים מ-{server}…",
+  "settings.transfer.copy.uploading": "שולח את הסוכנים ל-{server}…",
+  "settings.transfer.copy.installing": "מוסיף את הסוכנים ל-{server}…",
+  "settings.transfer.copy.receiveLabel": "הורדה מהשרת",
+  "settings.transfer.copy.received": "התקבלו {sent} מתוך {total}",
+  "settings.transfer.copy.stalled":
+    "לא הגיעו נתונים במשך 30 שניות. OpenBot מנסה שוב. אם השרת לא עונה, ההעתקה נעצרת ומציגה שגיאה.",
   "settings.transfer.copy.done": {
     one: "סוכן אחד הועתק אל {server}.",
     two: "שני סוכנים הועתקו אל {server}.",

@@ -883,6 +883,14 @@ export const messages = {
     "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
   "settings.transfer.copy.duplicatesConfirm": "Yinelenenleri kopyala",
   "settings.transfer.copy.copying": "Kopyalanıyor…",
+  "settings.transfer.copy.preparing": "Ajanlar {server} üzerinde hazırlanıyor…",
+  "settings.transfer.copy.downloading": "Ajanlar {server} sunucusundan alınıyor…",
+  "settings.transfer.copy.uploading": "Ajanlar {server} sunucusuna gönderiliyor…",
+  "settings.transfer.copy.installing": "Ajanlar {server} sunucusuna ekleniyor…",
+  "settings.transfer.copy.receiveLabel": "Sunucudan indirme",
+  "settings.transfer.copy.received": "{total} içinden {sent} alındı",
+  "settings.transfer.copy.stalled":
+    "30 saniyedir veri gelmedi. OpenBot yeniden deniyor. Sunucu yanıt vermezse kopyalama durur ve bir hata gösterir.",
   "settings.transfer.copy.done": {
     one: "{count} ajan {server} sunucusuna kopyalandı.",
     other: "{count} ajan {server} sunucusuna kopyalandı.",

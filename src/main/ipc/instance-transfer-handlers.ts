@@ -8,6 +8,7 @@ import {
   decodeRemoteInstanceTransferSummary,
   type ExportInstanceInput,
   type InstanceExportResult,
+  type InstanceTransferCopyStep,
   type InstanceTransferPreview,
   type InstanceTransferResult,
   type InstanceTransferUploadProgress,
@@ -145,18 +146,20 @@ export function instanceTransferIpcHandlers({
 
   const runningUploads = new Map<string, { file: string; preview: Promise<InstanceTransferPreview> }>();
 
-  const uploadOnce = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
+  type ReportProgress = (sent: number, total: number) => void;
+
+  const uploadOnce = async (
+    serverId: string,
+    path: string,
+    report: ReportProgress = (sent, total) => reportUploadProgress({ serverId, sent, total }),
+  ): Promise<InstanceTransferPreview> => {
     const info = await stat(path);
     const file = JSON.stringify([path, info.size, info.mtimeMs]);
     const running = runningUploads.get(serverId);
     if (running?.file === file) return running.preview;
     const upload = {
       file,
-      preview: runCauseEffect(
-        uploadTransferInParts(remoteServers, serverId, path, (sent, total) =>
-          reportUploadProgress({ serverId, sent, total }),
-        ),
-      ),
+      preview: runCauseEffect(uploadTransferInParts(remoteServers, serverId, path, report)),
     };
     runningUploads.set(serverId, upload);
     const release = () => {
@@ -166,8 +169,12 @@ export function instanceTransferIpcHandlers({
     return upload.preview;
   };
 
-  const stageRemoteFile = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
-    if (inParts(serverId)) return uploadOnce(serverId, path);
+  const stageRemoteFile = async (
+    serverId: string,
+    path: string,
+    report?: ReportProgress,
+  ): Promise<InstanceTransferPreview> => {
+    if (inParts(serverId)) return uploadOnce(serverId, path, report);
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
     if (info.size > INSTANCE_TRANSFER_REMOTE_BYTES) throw new Error(sourceText("error.import.transferRemoteTooLarge"));
@@ -205,7 +212,12 @@ export function instanceTransferIpcHandlers({
     );
   };
 
-  const exportTo = async (serverId: string, agentIds: string[], path: string): Promise<string[]> => {
+  const exportTo = async (
+    serverId: string,
+    agentIds: string[],
+    path: string,
+    report: ReportProgress,
+  ): Promise<string[]> => {
     const input: ExportInstanceInput = { agentIds, includeFiles: true, includeSettings: true };
     if (serverId === LOCAL_SERVER_ID) {
       const prepared = await runCauseEffect(
@@ -215,17 +227,18 @@ export function instanceTransferIpcHandlers({
     }
     requireRemote(serverId);
     if (inParts(serverId))
-      return (await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path))).warnings;
+      return (await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path, false, report)))
+        .warnings;
     await writeFile(path, await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, input)));
     return [];
   };
 
-  const stageAt = (serverId: string, path: string) =>
+  const stageAt = (serverId: string, path: string, report: ReportProgress) =>
     routeToServer(serverId, {
       local: () => runCauseEffect(instanceTransfer.stage(path)),
       remote: (target) => {
         requireRemote(target);
-        return stageRemoteFile(target, path);
+        return stageRemoteFile(target, path, report);
       },
     });
 
@@ -234,13 +247,22 @@ export function instanceTransferIpcHandlers({
     serverId: string,
   ): Promise<InstanceTransferResult> => {
     if (fromServerId === serverId) throw new Error("Invalid copy request: the servers are the same.");
+    const reportStep =
+      (copyStep: InstanceTransferCopyStep): ReportProgress =>
+      (sent, total) =>
+        reportUploadProgress({ serverId, sent, total, copyStep });
+    reportStep("preparing")(0, 0);
     const directory = await mkdtemp(join(app.getPath("temp"), "openbot-copy-"));
     try {
       const path = join(directory, "agents.zip");
       const sharedSkills = sourceText("error.import.transferSharedSkillsSkipped");
-      const exportWarnings = (await exportTo(fromServerId, agentIds, path)).filter((text) => text !== sharedSkills);
+      const exportWarnings = (await exportTo(fromServerId, agentIds, path, reportStep("downloading"))).filter(
+        (text) => text !== sharedSkills,
+      );
       await runCauseEffect(instanceTransfer.keepCopiedSettings(path));
-      const preview = await stageAt(serverId, path);
+      reportStep(serverId === LOCAL_SERVER_ID ? "installing" : "uploading")(0, 0);
+      const preview = await stageAt(serverId, path, reportStep("uploading"));
+      reportStep("installing")(0, 0);
       const input: ApplyInstanceTransferInput = {
         token: preview.token,
         keys: preview.agents.map((agent) => agent.key),

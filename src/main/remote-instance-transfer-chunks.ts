@@ -184,6 +184,7 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
   input: ExportInstanceInput,
   destination: string,
   fullCopy = false,
+  onProgress?: (received: number, total: number) => void,
 ): Effect.fn.Return<{ warnings: string[] }, TransferError> {
   const begin = transferExportBegin(input, fullCopy);
   const file = yield* remote.request(serverId, begin.route, decodeExportState, {
@@ -191,16 +192,20 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
     body: begin.body,
     timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
   });
+  const report = progressReporter(file.size, onProgress);
+  report(0, true);
   const part = `${destination}.part`;
   yield* Effect.gen(function* () {
     const handle = yield* archiveCall(() => open(part, "w"));
     yield* Effect.gen(function* () {
       const whole = createHash("sha256");
       for (const [index, expected] of file.chunks.entries()) {
-        const length = Math.min(file.chunkBytes, file.size - index * file.chunkBytes);
+        const position = index * file.chunkBytes;
+        const length = Math.min(file.chunkBytes, file.size - position);
+        const partProgress = { size: length, onProgress: (received: number) => report(position + received) };
         const bytes = yield* retryPart(
           remote
-            .readInstanceTransferPart(serverId, { exportId: file.exportId, index })
+            .readInstanceTransferPart(serverId, { exportId: file.exportId, index }, partProgress)
             .pipe(
               Effect.flatMap((bytes) =>
                 bytes.length === length && sha256Hex(bytes) === expected
@@ -210,7 +215,8 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
             ),
         );
         whole.update(bytes);
-        yield* archiveCall(() => writeFully(handle, bytes, index * file.chunkBytes));
+        yield* archiveCall(() => writeFully(handle, bytes, position));
+        report(position + bytes.length, true);
       }
       if (whole.digest("hex") !== file.sha256) return yield* invalidPart();
     }).pipe(Effect.ensuring(archiveCall(() => handle.close()).pipe(Effect.ignore)));

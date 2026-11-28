@@ -2,9 +2,9 @@ import type { InstanceTransferResult, OpenBotDesktopApi } from "@openbot/contrac
 import type {
   CopyAgentsAgent,
   CopyAgentsPhase,
+  CopyAgentsProgress,
   CopyAgentsServer,
 } from "@openbot/ui/features/transfer/CopyAgentsDialog";
-import type { TransferUploadState } from "@openbot/ui/features/transfer/InstanceTransferView";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
@@ -20,7 +20,7 @@ interface ServerCopyState {
   fromError: string | null;
   toError: string | null;
   phase: CopyAgentsPhase;
-  progress: TransferUploadState | null;
+  progress: CopyAgentsProgress | null;
   result: InstanceTransferResult | null;
   error: string | null;
 }
@@ -29,6 +29,7 @@ interface RunningCopy {
   fromId: string;
   toId: string;
   result: Promise<InstanceTransferResult>;
+  progress: CopyAgentsProgress | null;
 }
 
 const runningCopies = new Map<string, RunningCopy>();
@@ -47,7 +48,7 @@ export function createServerCopyStore(
     fromError: null,
     toError: null,
     phase: running ? "copying" : "idle",
-    progress: null,
+    progress: running?.progress ?? null,
     result: null,
     error: null,
   });
@@ -57,10 +58,10 @@ export function createServerCopyStore(
     disposed = true;
   });
 
-  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
-    if (target !== copyingTo || state.phase !== "copying") return;
+  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total, copyStep }) => {
+    if (!copyStep || target !== copyingTo || state.phase !== "copying") return;
     setState((draft) => {
-      draft.progress = { sent, total };
+      draft.progress = { step: copyStep, sent, total };
     });
   });
   if (stopProgress) onCleanup(stopProgress);
@@ -167,8 +168,17 @@ export function createServerCopyStore(
       draft.progress = null;
       draft.error = null;
     });
-    const copying = { fromId: state.fromId, toId, result: calls.copy({ fromServerId: state.fromId, agentIds }, toId) };
+    const copying: RunningCopy = {
+      fromId: state.fromId,
+      toId,
+      result: calls.copy({ fromServerId: state.fromId, agentIds }, toId),
+      progress: null,
+    };
     runningCopies.set(serverId, copying);
+    const stopKeeping = calls.onUploadProgress?.(({ serverId: target, sent, total, copyStep }) => {
+      if (copyStep && target === toId) copying.progress = { step: copyStep, sent, total };
+    });
+    if (stopKeeping) void copying.result.then(stopKeeping, stopKeeping);
     void copying.result.then(
       () => desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" }),
       () =>

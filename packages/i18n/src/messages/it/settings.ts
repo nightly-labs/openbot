@@ -880,6 +880,14 @@ export const messages = {
     "{server} ha già agenti con questi nomi: {names}. La copia aggiunge un secondo agente per ciascuno. Ogni copia è un agente separato, con le sue chat, i suoi file e le sue memorie.",
   "settings.transfer.copy.duplicatesConfirm": "Copia i duplicati",
   "settings.transfer.copy.copying": "Copia in corso…",
+  "settings.transfer.copy.preparing": "Preparazione degli agenti su {server}…",
+  "settings.transfer.copy.downloading": "Ricezione degli agenti da {server}…",
+  "settings.transfer.copy.uploading": "Invio degli agenti a {server}…",
+  "settings.transfer.copy.installing": "Aggiunta degli agenti a {server}…",
+  "settings.transfer.copy.receiveLabel": "Download dal server",
+  "settings.transfer.copy.received": "{sent} di {total} ricevuti",
+  "settings.transfer.copy.stalled":
+    "Nessun dato da 30 secondi. OpenBot riprova. Se il server non risponde, la copia si ferma e mostra un errore.",
   "settings.transfer.copy.done": {
     one: "{count} agente copiato su {server}.",
     other: "{count} agenti copiati su {server}.",

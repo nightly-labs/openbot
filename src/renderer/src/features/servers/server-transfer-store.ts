@@ -75,8 +75,8 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
     disposed = true;
   });
 
-  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
-    if (target !== serverId || state.importPhase !== "reading") return;
+  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total, copyStep }) => {
+    if (copyStep || target !== serverId || state.importPhase !== "reading") return;
     setState((draft) => {
       draft.importProgress = { sent, total };
     });
