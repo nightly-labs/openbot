@@ -20,7 +20,7 @@ import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
-import { classifyFailure } from "@openbot/telemetry";
+import { classifyFailure, type NotificationMetadata } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { classifyUserError } from "@openbot/user-errors";
@@ -76,6 +76,7 @@ import {
 } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
 import { agentsPort } from "./agents-port";
+import { showMcpStartFailureToast } from "./mcp-start-failure-toast";
 
 const agentBackdropPage = {
   title: (message: ConversationMessage) => message.text,
@@ -520,22 +521,27 @@ export function AgentEventBridge() {
           return;
         }
         const toastKey = readableAgentError(shownError);
-        if (claimErrorToast(toastKey)) {
-          const { t } = currentText();
-          const mcp = event.code === "mcp_server_not_started";
-          toast.error(mcp ? t("agent.error.mcpNotStarted") : providerErrorTitle(event.code), {
-            ...{ description: toastKey },
-            ...(mcp && serverCanManageMcp(activeServer())
+        if (!claimErrorToast(toastKey)) return;
+        const report: NotificationMetadata = {
+          operation: "provider",
+          source: "provider",
+          cause_code: classifyFailure(event.message),
+        };
+        if (event.code === "mcp_server_not_started") {
+          showMcpStartFailureToast(activeServerId(), toastKey, {
+            ...(serverCanManageMcp(activeServer())
               ? {
                   action: {
-                    label: t("agent.error.openMarketplace"),
+                    label: currentText().t("agent.error.openMarketplace"),
                     onClick: () => setSkillsMarketplaceOpen(true),
                   },
                 }
               : {}),
-            report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
+            report,
           });
+          return;
         }
+        toast.error(providerErrorTitle(event.code), { description: toastKey, report });
       }
     }
   }

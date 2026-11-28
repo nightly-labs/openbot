@@ -94,6 +94,7 @@ export const messages = {
   "agent.error.continueFailed": "De agent kan niet doorgaan. Probeer het opnieuw.",
   "agent.error.copyDetails": "Details kopiëren",
   "agent.error.mcpNotStarted": "MCP-server niet gestart",
+  "agent.error.mcpNotStartedSeveral": "MCP-servers niet gestart",
   "agent.error.openMarketplace": "Marktplaats openen",
   "agent.error.provider": "Fout bij aanbieder",
   "agent.error.run": "{provider} · {model}",

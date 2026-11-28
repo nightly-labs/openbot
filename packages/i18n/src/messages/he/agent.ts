@@ -91,6 +91,7 @@ export const messages = {
   "agent.error.continueFailed": "הסוכן לא הצליח להמשיך. יש לנסות שוב.",
   "agent.error.copyDetails": "העתקת הפרטים",
   "agent.error.mcpNotStarted": "שרת MCP לא הופעל",
+  "agent.error.mcpNotStartedSeveral": "שרתי MCP לא הופעלו",
   "agent.error.openMarketplace": "פתיחת החנות",
   "agent.error.provider": "שגיאת ספק",
   "agent.error.run": "{provider} · {model}",

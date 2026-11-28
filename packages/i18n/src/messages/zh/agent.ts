@@ -85,6 +85,7 @@ export const messages = {
   "agent.error.continueFailed": "助手无法继续，请重试。",
   "agent.error.copyDetails": "复制详情",
   "agent.error.mcpNotStarted": "MCP 服务器未启动",
+  "agent.error.mcpNotStartedSeveral": "MCP 服务器未启动",
   "agent.error.openMarketplace": "打开市场",
   "agent.error.provider": "服务商错误",
   "agent.error.run": "{provider} · {model}",
