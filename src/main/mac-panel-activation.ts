@@ -15,7 +15,13 @@ interface ObjcRuntime {
   sendBool: (receiver: unknown, selector: unknown, value: boolean) => void;
   sendCString: (receiver: unknown, selector: unknown, value: string) => unknown;
   sendSetPointer: (receiver: unknown, selector: unknown, value: unknown) => void;
+  sendUnsigned: (receiver: unknown, selector: unknown) => number | bigint;
+  sendSetUnsigned: (receiver: unknown, selector: unknown, value: number) => void;
 }
+
+const COLLECTION_BEHAVIOR_MANAGED = 1 << 2;
+const COLLECTION_BEHAVIOR_TRANSIENT = 1 << 3;
+const COLLECTION_BEHAVIOR_STATIONARY = 1 << 4;
 
 let runtime: ObjcRuntime | null = null;
 
@@ -32,6 +38,8 @@ function objcRuntime(): ObjcRuntime {
     sendBool: objc.func("objc_msgSend", "void", ["void *", "void *", "bool"]),
     sendCString: objc.func("objc_msgSend", "void *", ["void *", "void *", "const char *"]),
     sendSetPointer: objc.func("objc_msgSend", "void", ["void *", "void *", "void *"]),
+    sendUnsigned: objc.func("objc_msgSend", "uint64", ["void *", "void *"]),
+    sendSetUnsigned: objc.func("objc_msgSend", "void", ["void *", "void *", "uint64"]),
   };
   return runtime;
 }
@@ -86,5 +94,26 @@ export function keepPanelThroughAppHide(window: BrowserWindow): void {
     objc.sendBool(nsWindow, setCanHide, false);
   } catch (error) {
     logger.warn("Unable to keep the panel on screen when OpenBot hides:", toLogValue(error));
+  }
+}
+
+export function keepPanelStationary(window: BrowserWindow): void {
+  if (process.platform !== "darwin") return;
+  try {
+    const objc = objcRuntime();
+    const nsWindow = objc.sendPointer(objc.pointerOf(window.getNativeWindowHandle()), objc.sel("window"));
+    const getBehavior = objc.sel("collectionBehavior");
+    const setBehavior = objc.sel("setCollectionBehavior:");
+    const respondsTo = objc.sel("respondsToSelector:");
+    if (!nsWindow || !objc.sendRespondsTo(nsWindow, respondsTo, setBehavior)) {
+      logger.warn("The panel window has no setCollectionBehavior: method.");
+      return;
+    }
+    const behavior = Number(objc.sendUnsigned(nsWindow, getBehavior));
+    const stationary =
+      (behavior & ~(COLLECTION_BEHAVIOR_MANAGED | COLLECTION_BEHAVIOR_TRANSIENT)) | COLLECTION_BEHAVIOR_STATIONARY;
+    objc.sendSetUnsigned(nsWindow, setBehavior, stationary);
+  } catch (error) {
+    logger.warn("Unable to keep the panel off the Space switch:", toLogValue(error));
   }
 }

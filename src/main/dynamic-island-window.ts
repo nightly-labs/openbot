@@ -20,6 +20,7 @@ import { causeHelpers } from "../backend/effect-boundary";
 import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { forceActivateX11Window } from "./linux-x11-activation";
+import { keepPanelStationary } from "./mac-panel-activation";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
@@ -417,6 +418,7 @@ export class DynamicIslandWindowController {
         skipTransformProcessType: true,
       });
       window.setHiddenInMissionControl(true);
+      keepPanelStationary(window);
     }
     if (this.#options.windowKind === "x11") {
       this.#setShape(window, [], display.scaleFactor);
