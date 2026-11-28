@@ -321,6 +321,7 @@ function grokTurnFailure(error: unknown, detail: string): string {
 const GROK_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
   ["api", false],
   ["idle_timeout", false],
+  ["empty_response", false],
   ["http", true],
 ]);
 
