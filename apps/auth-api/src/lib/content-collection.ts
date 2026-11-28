@@ -10,6 +10,12 @@ export interface CollectionArticle {
   publishedAt: string;
   updatedAt?: string;
   author: string;
+  imageHeadline?: ContentImageHeadline;
+}
+
+export interface ContentImageHeadline {
+  topic: string;
+  lines: readonly [string, string];
 }
 
 export interface ContentCollection<Id extends CollectionId = CollectionId> {
@@ -25,7 +31,7 @@ export interface ContentCollection<Id extends CollectionId = CollectionId> {
   moreTitle: string;
   imageEyebrow: string;
   imageBackgrounds?: true;
-  imageLayout?: "centered";
+  imageLayout?: "centered" | "headline";
   articles: readonly CollectionArticle[];
 }
 

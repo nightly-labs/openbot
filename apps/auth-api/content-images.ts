@@ -10,7 +10,12 @@ import type { RivalMarkName } from "./src/components/compare/rival-mark-shapes";
 import { COMPARISONS } from "./src/content/compare";
 import { articleGradient } from "./src/lib/article-gradient";
 import { CONTENT_COLLECTIONS } from "./src/lib/content";
-import { articleArtPath, CONTENT_ART_SHAPES, type ContentCollection } from "./src/lib/content-collection";
+import {
+  articleArtPath,
+  CONTENT_ART_SHAPES,
+  type ContentCollection,
+  type ContentImageHeadline,
+} from "./src/lib/content-collection";
 
 const require = createRequire(import.meta.url);
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +40,8 @@ export interface ContentImageJob {
   title: string;
   eyebrow: string;
   background?: string | undefined;
-  layout?: "centered" | undefined;
+  layout?: "centered" | "headline" | undefined;
+  headline?: ContentImageHeadline | undefined;
   width: number;
   height: number;
   withTitle: boolean;
@@ -92,6 +98,7 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       eyebrow: collection.imageEyebrow,
       background: collection.imageBackgrounds && `${collection.id}/${article.slug}.jpg`,
       layout: collection.imageLayout,
+      headline: article.imageHeadline,
       width: OG_WIDTH,
       height: OG_HEIGHT,
       withTitle: true,
