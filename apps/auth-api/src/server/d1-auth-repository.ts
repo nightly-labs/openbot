@@ -51,6 +51,7 @@ interface HostBindingRow {
 }
 
 const SESSION_ACTIVITY_UPDATE_INTERVAL_MS = 60 * 60_000;
+export const DELETE_ACCOUNT_ACTIVE_DAYS_SQL = "DELETE FROM account_active_days WHERE account_id = ?";
 
 class AuthDatabase extends Context.Service<AuthDatabase, D1Database>()("auth-api/D1AuthRepository/Database") {}
 export class AuthStoreError extends Schema.TaggedError<AuthStoreError>()("AuthStoreError", {
@@ -475,9 +476,7 @@ export class D1AuthRepository implements AuthRepository {
       );
       if (!row) return yield* new AuthStoreError({ message: "User not found." });
       if (row.analytics_enabled === 0) {
-        yield* storeCall(() =>
-          database.prepare("DELETE FROM account_active_days WHERE account_id = ?").bind(userId).run(),
-        );
+        yield* storeCall(() => database.prepare(DELETE_ACCOUNT_ACTIVE_DAYS_SQL).bind(userId).run());
       }
       return mapUser(row);
     },
