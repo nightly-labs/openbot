@@ -148,6 +148,7 @@ export interface AcpFlavor {
   unsentBackgroundTurns?: true;
   unsentTaskTurns?: AcpTaskTurns;
   wakesAfterPromptEnds?: true;
+  holdsTurnWhileAsking?: true;
   restartNoticeOnReload?: true;
   selfWakeTools?: RegExp;
   messagePerId?: true;
@@ -298,6 +299,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
     reply: (questions, answers) => grokPlanReply(answers[questions[0]?.id ?? ""]?.[0]?.trim()),
   },
   retryNotice: grokRetryNotice,
+  holdsTurnWhileAsking: true,
   turnStallMs: 12 * 60_000,
   openToolStallMs: 30 * 60_000,
   turnFailure: grokTurnFailure,
