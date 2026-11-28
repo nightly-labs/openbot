@@ -561,10 +561,12 @@ export class ConversationRuntime {
       this.#retainPublishedSnapshot(snapshot, digests, signature);
       return;
     }
+    let movedTimes = false;
     if (snapshot.threadId) {
       const cached = this.#cachedSnapshot(snapshot);
       const changedMessages = this.#changedMessages(snapshot, snapshot.threadId, digests);
       const removedMessageIds = this.#removedMessageIds(snapshot);
+      const timesBefore = changedMessages.map((message) => message.createdAt);
       if (
         cached &&
         replacedMessageId !== undefined &&
@@ -597,10 +599,12 @@ export class ConversationRuntime {
           detail,
         });
       } else this.#countUnstoredSend(snapshot, snapshot.threadId);
+      movedTimes = changedMessages.some((message, index) => message.createdAt !== timesBefore[index]);
     }
+    if (movedTimes) sortConversationMessages(snapshot.messages);
     const publishes = this.#publishes;
-    const published = this.#publish(snapshot, signature);
-    if (this.#publishes === publishes + 1) this.#retainPublishedSnapshot(snapshot, digests, published);
+    const published = this.#publish(snapshot, movedTimes ? undefined : signature);
+    if (this.#publishes === publishes + 1 && !movedTimes) this.#retainPublishedSnapshot(snapshot, digests, published);
     else this.#retainPublishedSnapshot(snapshot);
   }
 
@@ -899,6 +903,7 @@ export class ConversationRuntime {
       restorePreviousState,
       () => {
         if (!published) return;
+        sortConversationMessages(published.messages);
         const digests = messageDigests();
         this.#keepSnapshot(agentId, published, digests);
         this.publishConversation(published, conversationContentSignature(published, digests.json));
@@ -923,6 +928,7 @@ export class ConversationRuntime {
       undefined,
       () => {
         if (!published) return;
+        sortConversationMessages(published.messages);
         const digests = messageDigests();
         this.#setSnapshot(agentId, published, digests);
         this.publishConversation(published, conversationContentSignature(published, digests.json));

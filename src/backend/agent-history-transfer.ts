@@ -136,6 +136,7 @@ export class AgentHistoryTransfer {
               activeTurnId: null,
               changedMessages,
               eventType: HISTORY_IMPORTED_EVENT,
+              keepMessageTimes: true,
             }),
           ),
         );
