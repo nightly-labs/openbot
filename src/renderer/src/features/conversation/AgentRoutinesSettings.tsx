@@ -105,6 +105,7 @@ interface RoutineDraft {
   limitPolicy: RoutineLimitPolicy;
   missedPolicy: RoutineMissedPolicy;
   runIn: RoutineRunPlace;
+  runsChangeRoutines: boolean;
   triggerKind: "schedule" | "webhook";
   eventType: string;
   eventFilters: EventFilterDraft[];
@@ -386,6 +387,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
             ? (routine.missedPolicy ?? "skip")
             : current.missedPolicy,
         runIn: current.runIn === (base.runIn ?? "chat") ? (routine.runIn ?? "chat") : current.runIn,
+        runsChangeRoutines:
+          current.runsChangeRoutines === (base.runsChangeRoutines ?? false)
+            ? (routine.runsChangeRoutines ?? false)
+            : current.runsChangeRoutines,
         ...(triggerEdited || scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
@@ -405,6 +410,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       limitPolicy: routine.limitPolicy ?? "wait",
       missedPolicy: routine.missedPolicy ?? "skip",
       runIn: routine.runIn ?? "chat",
+      runsChangeRoutines: routine.runsChangeRoutines ?? false,
       ...triggerDraftOf(routine),
       destination: undefined,
     });
@@ -433,6 +439,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       limitPolicy: "wait",
       missedPolicy: "skip",
       runIn: "chat",
+      runsChangeRoutines: false,
       triggerKind: "schedule",
       eventType: "",
       eventFilters: [],
@@ -576,11 +583,18 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         ...(props.port.runIn && current.runIn !== ((current.id ? draftBase?.runIn : undefined) ?? "chat")
           ? { runIn: current.runIn }
           : {}),
+        ...(props.port.runChanges &&
+        current.runsChangeRoutines !== ((current.id ? draftBase?.runsChangeRoutines : undefined) ?? false)
+          ? { runsChangeRoutines: current.runsChangeRoutines }
+          : {}),
       });
-      const saved =
-        props.port.runIn && result.routine.runIn === undefined
-          ? { ...result.routine, runIn: current.runIn }
-          : result.routine;
+      const saved = {
+        ...result.routine,
+        ...(props.port.runIn && result.routine.runIn === undefined ? { runIn: current.runIn } : {}),
+        ...(props.port.runChanges && result.routine.runsChangeRoutines === undefined
+          ? { runsChangeRoutines: current.runsChangeRoutines }
+          : {}),
+      };
       setRoutines((items) => {
         const next = items.some((routine) => routine.id === saved.id)
           ? items.map((routine) => (routine.id === saved.id ? saved : routine))
@@ -592,8 +606,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       if (draft()?.id === current.id) draftBase = saved;
       const destinationSaved = await saveDestination(saved.id, current.destination);
       const placeSaved = !props.port.runIn || saved.runIn === current.runIn;
+      const runChangesSaved =
+        !props.port.runChanges || (saved.runsChangeRoutines ?? false) === current.runsChangeRoutines;
       if (!placeSaved) setError(t("routine.settings.runInSaveFailed"));
-      if (draftRevision === savingRevision && destinationSaved && placeSaved) setDirty(false);
+      else if (!runChangesSaved) setError(t("routine.settings.runsChangeRoutinesSaveFailed"));
+      if (draftRevision === savingRevision && destinationSaved && placeSaved && runChangesSaved) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
       if (result.secret && draft()?.id === saved.id) {
         const secret = result.secret;
@@ -1227,6 +1244,17 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                     label={t("routine.settings.runInThread")}
                     checked={current().runIn === "thread"}
                     onChange={(thread) => changeDraft((value) => ({ ...value, runIn: thread ? "thread" : "chat" }))}
+                  />
+                </div>
+              </Show>
+
+              <Show when={props.port.runChanges}>
+                <div class="settings-field">
+                  <SwitchField
+                    label={t("routine.settings.runsChangeRoutines")}
+                    description={t("routine.settings.runsChangeRoutinesHint")}
+                    checked={current().runsChangeRoutines}
+                    onChange={(runsChangeRoutines) => changeDraft((value) => ({ ...value, runsChangeRoutines }))}
                   />
                 </div>
               </Show>

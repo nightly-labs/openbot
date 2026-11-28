@@ -499,6 +499,10 @@ import {
 } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import {
+  ROUTINE_RUN_CHANGES_CAPABILITY,
+  ROUTINE_RUN_CHANGES_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-changes-v1";
+import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
   ROUTINE_RUN_COMMAND_ROUTES,
@@ -1379,7 +1383,11 @@ const fakeRoutineRunPlaces: TeamApiRoutineRunPlaces = {
     record("saveRoutineRecord", owner, routineId, input);
     const current = routineRecords.find((routine) => routine.id === routineId);
     if (!current) throw new Error("No routine record to save.");
-    const saved = { ...current, ...(input.runIn ? { runIn: input.runIn } : {}) };
+    const saved = {
+      ...current,
+      ...(input.runIn ? { runIn: input.runIn } : {}),
+      ...(input.runsChangeRoutines === undefined ? {} : { runsChangeRoutines: input.runsChangeRoutines }),
+    };
     routineRecords = routineRecords.map((routine) => (routine.id === routineId ? saved : routine));
     return saved;
   },
@@ -1731,6 +1739,7 @@ const fakeAgents: TeamApiAgents = {
       ...current,
       ...routineChanges(input),
       ...(input.runIn ? { runIn: input.runIn } : {}),
+      ...(input.runsChangeRoutines === undefined ? {} : { runsChangeRoutines: input.runsChangeRoutines }),
       trigger: input.schedule ? { ...current.trigger, schedule: input.schedule } : current.trigger,
     };
     routineRecords = routineRecords.map((routine) => (routine.id === input.routineId ? saved : routine));
@@ -13860,6 +13869,179 @@ try {
         errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
         saves().length === 2,
       [summary(gone), summary(badPlace), summary(missing), summary(hiddenAgent)],
+    );
+  }
+
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, ROUTINE_RUN_CHANGES_CAPABILITY];
+    const updatesBefore = callsOf("updateRoutine").length;
+    const recordsBefore = callsOf("saveRoutineRecord").length;
+    const newSaves = () => [
+      ...callsOf("updateRoutine").slice(updatesBefore),
+      ...callsOf("saveRoutineRecord").slice(recordsBefore),
+    ];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises routine-run-changes-v1 to a protocol 10 peer and not to a protocol 9 peer",
+      list(field(compatibility.body, "capabilities")).includes(ROUTINE_RUN_CHANGES_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_RUN_CHANGES_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", runsChangeRoutines: true },
+    });
+    check(
+      "the run changes set route without the capability gets 400 routineRunChangesUnsupported, and saves nothing",
+      errorIs(unsupported, 400, sourceText("error.team.routineRunChangesUnsupported")) && newSaves().length === 0,
+      summary(unsupported),
+    );
+    const before = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const adminBefore = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member reads the run changes setting of each schedule routine, `once` routines too; an admin also reads the webhook routines; each one is off",
+      before.status === 200 &&
+        isDeepStrictEqual(before.body, {
+          routines: [
+            { routineId: "routine-ada", runsChangeRoutines: false },
+            { routineId: "routine-once", runsChangeRoutines: false },
+          ],
+        }) &&
+        isDeepStrictEqual(adminBefore.body, {
+          routines: [
+            { routineId: "routine-ada", runsChangeRoutines: false },
+            { routineId: "routine-hook", runsChangeRoutines: false },
+            { routineId: "routine-once", runsChangeRoutines: false },
+          ],
+        }),
+      [summary(before), summary(adminBefore)],
+    );
+    const memberHook = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-hook", runsChangeRoutines: true },
+      capabilities,
+    });
+    check(
+      "a member who changes a webhook routine gets 404 routineGone, and the host saves nothing",
+      errorIs(memberHook, 404, sourceText("error.backend.routineGone")) && newSaves().length === 0,
+      summary(memberHook),
+    );
+    const schedule = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-once", runsChangeRoutines: true },
+      capabilities,
+    });
+    const webhook = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-hook", runsChangeRoutines: true },
+      capabilities,
+    });
+    check(
+      "a member with manage access turns the setting on for a `once` routine, and an admin for a webhook routine; the host changes only this setting, with no routine card in the chat",
+      schedule.status === 200 &&
+        isDeepStrictEqual(schedule.body, { routineId: "routine-once", runsChangeRoutines: true }) &&
+        webhook.status === 200 &&
+        isDeepStrictEqual(webhook.body, { routineId: "routine-hook", runsChangeRoutines: true }) &&
+        isDeepStrictEqual(newSaves(), [
+          [
+            { agentId: "agent-ada", routineId: "routine-once", runsChangeRoutines: true },
+            { recordConversationEvent: false },
+          ],
+          [
+            { kind: "agent", id: "agent-ada" },
+            "routine-hook",
+            {
+              name: "Deploy watch",
+              instruction: "Check each deploy.",
+              active: true,
+              timezone: "Europe/Warsaw",
+              runsChangeRoutines: true,
+              trigger: { kind: "webhook", eventType: "deploy", filters: [], secretCiphertext: null },
+            },
+          ],
+        ]),
+      [summary(schedule), summary(webhook), newSaves()],
+    );
+    const same = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-once", runsChangeRoutines: true },
+      capabilities,
+    });
+    const after = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "the setting that is already saved saves nothing, and the list shows the new settings",
+      isDeepStrictEqual(same.body, { routineId: "routine-once", runsChangeRoutines: true }) &&
+        newSaves().length === 2 &&
+        isDeepStrictEqual(after.body, {
+          routines: [
+            { routineId: "routine-ada", runsChangeRoutines: false },
+            { routineId: "routine-hook", runsChangeRoutines: true },
+            { routineId: "routine-once", runsChangeRoutines: true },
+          ],
+        }),
+      [summary(same), summary(after)],
+    );
+    accessLevels = { revision: 12, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewerList = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const viewerSet = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-once", runsChangeRoutines: false },
+      capabilities,
+    });
+    accessLevels = { revision: 13, everyone: {}, roles: [] };
+    check(
+      "a member who can only view the agent reads the settings, gets 403 agentManageDenied on a change, and the host saves nothing",
+      viewerList.status === 200 &&
+        errorIs(viewerSet, 403, sourceText("error.team.agentManageDenied")) &&
+        newSaves().length === 2,
+      [summary(viewerList), summary(viewerSet)],
+    );
+    const gone = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-none", runsChangeRoutines: true },
+      capabilities,
+    });
+    const notBoolean = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", runsChangeRoutines: "yes" },
+      capabilities,
+    });
+    const missing = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities,
+    });
+    const hiddenAgent = await call("POST", ROUTINE_RUN_CHANGES_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    check(
+      "a routine that the agent does not have gets 404 routineGone, a value that is not a boolean gets 400, and an unknown or hidden agent gets 404; the host saves nothing",
+      errorIs(gone, 404, sourceText("error.backend.routineGone")) &&
+        notBoolean.status === 400 &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        newSaves().length === 2,
+      [summary(gone), summary(notBoolean), summary(missing), summary(hiddenAgent)],
     );
   }
 

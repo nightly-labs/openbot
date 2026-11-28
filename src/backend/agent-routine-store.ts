@@ -58,6 +58,7 @@ export class AgentRoutineStore extends RoutineStore {
             ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
             ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
             ...(routine.runIn ? { runIn: routine.runIn } : {}),
+            ...(routine.runsChangeRoutines ? { runsChangeRoutines: true } : {}),
           },
           now,
         ),

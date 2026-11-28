@@ -66,6 +66,7 @@ export interface EventRoutine {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
   pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
@@ -82,6 +83,7 @@ export interface SaveEventRoutineInput {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
 }
 
 export interface SaveEventRoutineResult {
@@ -249,6 +251,7 @@ function isEventRoutine(value: unknown): value is EventRoutine {
     (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.runsChangeRoutines === undefined || typeof value.runsChangeRoutines === "boolean") &&
     (value.pausedByRun === undefined || isRoutinePausedByRun(value.pausedByRun)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)

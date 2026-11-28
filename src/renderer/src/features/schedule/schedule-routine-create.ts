@@ -44,9 +44,10 @@ export function scheduleRoutinePorts(
   const remote = server.kind === "remote";
   const runPlace = localHost || (remote && serverSupportsCapability(server, "routine-run-place-v1"));
   const once = localHost || (remote && serverSupportsCapability(server, "routines-once-v1"));
+  const runChanges = localHost || (remote && serverSupportsCapability(server, "routine-run-changes-v1"));
   const eventApi = runtime ? runtime.admin?.eventRoutines : desktopChatEventRoutinesApi(server, undefined);
   return (agentId) => {
-    const legacy = agentRoutinesPort(agentId, undefined, localHost, api, runPlace, undefined, once);
+    const legacy = agentRoutinesPort(agentId, undefined, localHost, api, runPlace, undefined, once, runChanges);
     return eventApi ? eventRoutinesPort({ kind: "agent", id: agentId }, eventApi, legacy) : legacy;
   };
 }

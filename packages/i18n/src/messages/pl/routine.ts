@@ -387,6 +387,11 @@ export const messages = {
   "routine.settings.missedPolicy.runOnce": "Uruchom raz po otwarciu OpenBot",
   "routine.settings.runInThread": "Uruchamiaj w osobnym wątku",
   "routine.settings.runInSaveFailed": "Rutyna jest zapisana, ale jej ustawienie osobnego wątku nie. Spróbuj ponownie.",
+  "routine.settings.runsChangeRoutines": "Uruchomienia mogą zmieniać rutyny",
+  "routine.settings.runsChangeRoutinesHint":
+    "Uruchomienia tej rutyny mogą zmieniać harmonogram rutyn tego agenta oraz je włączać i wyłączać.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "Rutyna jest zapisana, ale jej ustawienie zmiany rutyn nie. Spróbuj ponownie.",
   "routine.settings.resultDestination": "Wysyłaj odpowiedzi do",
   "routine.settings.resultDestination.none": "Tylko ten czat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

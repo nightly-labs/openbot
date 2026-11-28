@@ -84,7 +84,7 @@ function expectUpgraded(db: DatabaseSync, before: ReturnType<typeof contents>): 
     { activity_id: "conversation.snapshot-updated:2" },
   ]);
   expect(activitiesAt(db, "openbot-thread-agent-helper", 6)).toEqual([{ activity_id: "agent-helper-activity-1" }]);
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 71 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 72 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -131,9 +131,9 @@ describe("thread activity sequence index migration", () => {
     const db = databaseAt(69);
     seedActivities(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(72, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(73, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 72; DELETE FROM schema_migrations WHERE version = 20");
+    db.exec("DELETE FROM schema_migrations WHERE version = 73; DELETE FROM schema_migrations WHERE version = 20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(sequenceIndexColumns(db)).toEqual([]);

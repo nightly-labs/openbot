@@ -95,6 +95,7 @@ import { PUSH_NOTIFICATIONS_ROUTES } from "@openbot/contracts/team-protocol/push
 import { ROUTINE_PAUSE_REASONS_ROUTES } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import { ROUTINE_RECOVERY_ROUTES } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_ROUTES } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_RUN_CHANGES_ROUTES } from "@openbot/contracts/team-protocol/routine-run-changes-v1";
 import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
@@ -141,6 +142,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   ROUTINE_RESULTS_ROUTES.destination,
   ROUTINE_RUN_PLACE_ROUTES.list,
   ROUTINE_PAUSE_REASONS_ROUTES.list,
+  ROUTINE_RUN_CHANGES_ROUTES.list,
   AGENT_ACTIVE_QUEUES_ROUTES.list,
   ROUTINES_ONCE_ROUTES.list,
   HOST_UPDATE_ROUTES.status,

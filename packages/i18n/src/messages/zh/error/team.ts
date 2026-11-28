@@ -75,6 +75,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "当前连接不支持助手颜色。",
   "error.team.chatColorsUnsupported": "当前连接不支持聊天颜色。",
   "error.team.routineRunPlaceUnsupported": "当前连接无法更改自动化任务的运行位置。",
+  "error.team.routineRunChangesUnsupported": "当前连接无法允许自动化任务在运行时更改自动化任务。",
   "error.team.routinePauseReasonsUnsupported": "当前连接无法显示自动化任务暂停的原因。",
   "error.team.activeQueuesUnsupported": "此连接无法显示所有智能体的队列。",
   "error.team.routinesOnceUnsupported": "当前连接无法保存只运行一次的自动化任务。",

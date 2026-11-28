@@ -432,6 +432,11 @@ export const messages = {
   "routine.settings.missedPolicy.runOnce": "التشغيل مرة واحدة عند فتح OpenBot",
   "routine.settings.runInThread": "التشغيل في سلسلة منفصلة",
   "routine.settings.runInSaveFailed": "حُفظت المهمة الدورية، لكن إعداد السلسلة المنفصلة لم يُحفظ. أعد المحاولة.",
+  "routine.settings.runsChangeRoutines": "يمكن للتشغيلات تغيير المهام الدورية",
+  "routine.settings.runsChangeRoutinesHint":
+    "يمكن لتشغيلات هذه المهمة الدورية تغيير جدول المهام الدورية لهذا الوكيل وتشغيلها أو إيقافها.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "حُفظت المهمة الدورية، لكن إعداد تغيير المهام الدورية لم يُحفظ. أعد المحاولة.",
   "routine.settings.resultDestination": "إرسال الإجابات إلى",
   "routine.settings.resultDestination.none": "هذه الدردشة فقط",
   "routine.settings.resultDestination.place": "{connection} · {place}",

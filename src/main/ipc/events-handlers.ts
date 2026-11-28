@@ -10,6 +10,8 @@ import {
   type EventRoutine,
   type EventRoutineOwner,
   type ListEventRoutinesInput,
+  type SaveEventRoutineInput,
+  type SaveEventRoutineResult,
 } from "@openbot/contracts/ipc-events";
 import { EVENTS_CAPABILITY, EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import {
@@ -21,6 +23,12 @@ import {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
+import {
+  decodeRoutineRunChanges,
+  decodeRoutineRunChangesList,
+  ROUTINE_RUN_CHANGES_CAPABILITY,
+  ROUTINE_RUN_CHANGES_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-changes-v1";
 import {
   decodeRoutineRunPlace,
   decodeRoutineRunPlaces,
@@ -45,7 +53,11 @@ import {
   requireReleasedScheduleOn,
   saveOnceEventRoutine,
 } from "@openbot/team-client/routines-once";
-import { withRoutinePauseReasons, withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import {
+  withRoutinePauseReasons,
+  withRoutineRunChanges,
+  withRoutineRunPlaces,
+} from "@openbot/team-client/team-api-requests";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostEventsApi } from "../host-events-api";
@@ -72,6 +84,7 @@ interface EventsRemoteServers {
       | typeof EVENTS_CAPABILITY
       | typeof ROUTINE_RECOVERY_CAPABILITY
       | typeof ROUTINE_PAUSE_REASONS_CAPABILITY
+      | typeof ROUTINE_RUN_CHANGES_CAPABILITY
       | typeof ROUTINE_RUN_PLACE_CAPABILITY
       | typeof ROUTINES_ONCE_CAPABILITY
       | typeof WEBHOOK_TESTS_CAPABILITY
@@ -127,6 +140,39 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       ? owner.id
       : null;
   }
+  function runChangesAgent(serverId: string, owner: EventRoutineOwner): string | null {
+    return owner.kind === "agent" && remoteServers.supportsCapability(serverId, ROUTINE_RUN_CHANGES_CAPABILITY)
+      ? owner.id
+      : null;
+  }
+  async function saveRemote(input: SaveEventRoutineInput, serverId: string): Promise<SaveEventRoutineResult> {
+    const send = onceSend(serverId);
+    if (send) {
+      const once = await saveOnceEventRoutine(send, input);
+      if (once) return once;
+    } else if (input.trigger.kind === "schedule") requireReleasedScheduleOn(input.trigger.schedule, false);
+    const saved = await remote(
+      serverId,
+      recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.saveRoutine : EVENTS_ROUTES.saveRoutine,
+      decodeSaveEventRoutineResult,
+      input,
+    );
+    const agentId = runPlaceAgent(serverId, input.owner);
+    if (agentId === null || input.runIn === undefined) return saved;
+    const placed = remote(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+      agentId,
+      routineId: saved.routine.id,
+      runIn: input.runIn,
+    });
+    const place =
+      input.id === undefined
+        ? await placed.catch(() => {
+            runPlaceLogger.warn("The run place of a new remote routine was not set. The routine runs in the chat.");
+            return { runIn: "chat" as const };
+          })
+        : await placed;
+    return { ...saved, routine: { ...saved.routine, runIn: place.runIn } };
+  }
   function onceSend(serverId: string): RoutinesOncePost | null {
     if (!remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY)) return null;
     return (path, decode, body) =>
@@ -145,44 +191,36 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
         local: (input) => runCauseEffect(events.listRoutines(input)),
         remote: async (input, serverId) => {
           const send = onceSend(serverId);
-          const [released, once] = await Promise.all([
+          const agentId = runChangesAgent(serverId, input.owner);
+          const [released, once, changes] = await Promise.all([
             listReleased(input, serverId),
             send ? listOnceEventRoutines(send, input.owner) : [],
+            agentId === null
+              ? []
+              : remote(serverId, ROUTINE_RUN_CHANGES_ROUTES.list, decodeRoutineRunChangesList, { agentId }),
           ]);
-          return [...released, ...once];
+          return withRoutineRunChanges([...released, ...once], changes);
         },
       }),
       saveRoutine: scopedHandler(parseSaveEventRoutine, {
         local: (input) => runCauseEffect(events.saveRoutine(input)),
-        remote: async (input, serverId) => {
-          const send = onceSend(serverId);
-          if (send) {
-            const once = await saveOnceEventRoutine(send, input);
-            if (once) return once;
-          } else if (input.trigger.kind === "schedule") requireReleasedScheduleOn(input.trigger.schedule, false);
-          const saved = await remote(
-            serverId,
-            recovery(serverId) ? ROUTINE_RECOVERY_ROUTES.saveRoutine : EVENTS_ROUTES.saveRoutine,
-            decodeSaveEventRoutineResult,
-            input,
-          );
-          const agentId = runPlaceAgent(serverId, input.owner);
-          if (agentId === null || input.runIn === undefined) return saved;
-          const placed = remote(serverId, ROUTINE_RUN_PLACE_ROUTES.set, decodeRoutineRunPlace, {
+        remote: async ({ runsChangeRoutines, ...input }, serverId) => {
+          const saved = await saveRemote(input, serverId);
+          const agentId = runChangesAgent(serverId, input.owner);
+          if (agentId === null || runsChangeRoutines === undefined) return saved;
+          const set = remote(serverId, ROUTINE_RUN_CHANGES_ROUTES.set, decodeRoutineRunChanges, {
             agentId,
             routineId: saved.routine.id,
-            runIn: input.runIn,
+            runsChangeRoutines,
           });
-          const place =
+          const entry =
             input.id === undefined
-              ? await placed.catch(() => {
-                  runPlaceLogger.warn(
-                    "The run place of a new remote routine was not set. The routine runs in the chat.",
-                  );
-                  return { runIn: "chat" as const };
+              ? await set.catch(() => {
+                  runPlaceLogger.warn("The run changes setting of a new remote routine was not set. It stays off.");
+                  return { runsChangeRoutines: false };
                 })
-              : await placed;
-          return { ...saved, routine: { ...saved.routine, runIn: place.runIn } };
+              : await set;
+          return { ...saved, routine: { ...saved.routine, runsChangeRoutines: entry.runsChangeRoutines } };
         },
       }),
       deleteRoutine: scopedHandler(parseEventRoutineRef, {

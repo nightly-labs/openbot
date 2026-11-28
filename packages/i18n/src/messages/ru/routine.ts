@@ -388,6 +388,11 @@ export const messages = {
   "routine.settings.runInThread": "Запускать в отдельной ветке",
   "routine.settings.runInSaveFailed":
     "Регулярная задача сохранена, но настройка отдельной ветки — нет. Повторите попытку.",
+  "routine.settings.runsChangeRoutines": "Запуски могут менять регулярные задачи",
+  "routine.settings.runsChangeRoutinesHint":
+    "Запуски этой регулярной задачи могут менять расписание регулярных задач этого агента, а также включать и выключать их.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "Регулярная задача сохранена, но настройка изменения регулярных задач — нет. Повторите попытку.",
   "routine.settings.resultDestination": "Отправлять ответы в",
   "routine.settings.resultDestination.none": "Только этот чат",
   "routine.settings.resultDestination.place": "{connection} · {place}",

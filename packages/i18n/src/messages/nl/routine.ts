@@ -347,6 +347,11 @@ export const messages = {
   "routine.settings.runInThread": "Uitvoeren in een aparte thread",
   "routine.settings.runInSaveFailed":
     "De routine is opgeslagen, maar de instelling voor een aparte thread niet. Probeer het opnieuw.",
+  "routine.settings.runsChangeRoutines": "Runs mogen routines wijzigen",
+  "routine.settings.runsChangeRoutinesHint":
+    "Runs van deze routine mogen de planning van de routines van deze agent wijzigen en ze aan- of uitzetten.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "De routine is opgeslagen, maar de instelling voor het wijzigen van routines niet. Probeer het opnieuw.",
   "routine.settings.resultDestination": "Antwoorden sturen naar",
   "routine.settings.resultDestination.none": "Alleen deze chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

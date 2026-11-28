@@ -111,6 +111,7 @@ export interface DeliveryPromptSources {
   skippedRoutineRuns?: SkippedRoutineRuns | null;
   workflowRunSource?: WorkflowRunSource | null;
   routineTimezone?: string | undefined;
+  routineChangesRoutines?: boolean;
   wokenWaits?: readonly AgentWait[];
   continuesWait?: boolean;
   executionText?: string | undefined;
@@ -544,6 +545,8 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           ? WORKFLOW_RUN_KINDS[sources.workflowRunSource]
           : "scheduled run";
     const canPause = run !== null && !testRun && run.source !== "webhook" && run.agentId === delivery.recipientAgentId;
+    const changesRoutines =
+      run !== null && run.agentId === delivery.recipientAgentId && sources.routineChangesRoutines === true;
     text = [
       "Execute one run of an existing OpenBot routine now.",
       `Routine name: ${delivery.sender.routineName}`,
@@ -551,14 +554,20 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `Scheduled for: ${delivery.sender.scheduledFor}`,
       ...routineLocalTime(delivery.sender.scheduledFor, sources.routineTimezone),
       "The routine already exists, and its schedule is already configured.",
+      ...(changesRoutines
+        ? [
+            "Do not create, delete, or test routines during this run. The user lets this routine change routines: to change the schedule or active of one of your routines, call openbot.update_routine with only those fields. A once date and time are in the timezone of that routine.",
+          ]
+        : canPause
+          ? ["Do not create, delete, or test routines, and do not change other routines, during this run."]
+          : ["Do not create, update, delete, or test routines during this run."]),
       ...(canPause
         ? [
-            "Do not create, delete, or test routines, and do not change other routines, during this run.",
             `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
             `A failure or a blocker, such as a file or a service that you cannot reach, is not a stop condition: keep this routine on, and call the ${ROUTINE_REPORT_FAILURE_TOOL} tool.`,
             `Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report, so do not call the ${ROUTINE_NO_UPDATE_TOOL} tool after a pause.`,
           ]
-        : ["Do not create, update, delete, or test routines during this run."]),
+        : []),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       ...(sources.skippedRoutineRuns ? [skippedRoutineRunsNote(sources.skippedRoutineRuns)] : []),
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",

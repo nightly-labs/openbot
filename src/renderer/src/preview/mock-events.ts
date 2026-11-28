@@ -50,7 +50,12 @@ export function createMockEvents(
             : clone(input.trigger),
         ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
         ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
-        ...(input.owner.kind === "agent" ? { runIn: input.runIn ?? existing?.runIn ?? "chat" } : {}),
+        ...(input.owner.kind === "agent"
+          ? {
+              runIn: input.runIn ?? existing?.runIn ?? "chat",
+              runsChangeRoutines: input.runsChangeRoutines ?? existing?.runsChangeRoutines ?? false,
+            }
+          : {}),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       };

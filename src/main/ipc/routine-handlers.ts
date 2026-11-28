@@ -15,6 +15,12 @@ import {
   ROUTINE_PAUSE_REASONS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import {
+  decodeRoutineRunChanges,
+  decodeRoutineRunChangesList,
+  ROUTINE_RUN_CHANGES_CAPABILITY,
+  ROUTINE_RUN_CHANGES_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-changes-v1";
+import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
   ROUTINE_RUN_COMMAND_ROUTES,
@@ -42,7 +48,11 @@ import {
   requireReleasedScheduleOn,
   updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
-import { withRoutinePauseReasons, withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import {
+  withRoutinePauseReasons,
+  withRoutineRunChanges,
+  withRoutineRunPlaces,
+} from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -86,73 +96,84 @@ export function routineIpcHandlers({
       listRoutines: scopedHandler(parseAgentId, {
         local: (agentId) => service.listRoutines(agentId),
         remote: (agentId, serverId) =>
-          withOnceRoutines(
+          withRemoteRunChangesList(
             remoteServers,
             serverId,
-            Effect.gen(function* () {
-              const routines = syncedOrRequest(remoteServers.sync.routines.values(serverId, agentId), () =>
-                remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
-              );
-              const runPlaces = remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY);
-              const pauseReasons = remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY);
-              if (!runPlaces && !pauseReasons) return yield* routines;
-              const [list, places, reasons] = yield* Effect.all(
-                [
-                  routines,
-                  runPlaces
-                    ? remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
-                        method: "POST",
-                        body: { agentId },
-                      })
-                    : Effect.succeed([]),
-                  pauseReasons
-                    ? remoteServers.request(serverId, ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, {
-                        method: "POST",
-                        body: { agentId },
-                      })
-                    : Effect.succeed([]),
-                ],
-                { concurrency: "unbounded" },
-              );
-              return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
-            }),
-            (send) => listOnceAgentRoutines(send, agentId),
+            agentId,
+            withOnceRoutines(
+              remoteServers,
+              serverId,
+              Effect.gen(function* () {
+                const routines = syncedOrRequest(remoteServers.sync.routines.values(serverId, agentId), () =>
+                  remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
+                );
+                const runPlaces = remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY);
+                const pauseReasons = remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY);
+                if (!runPlaces && !pauseReasons) return yield* routines;
+                const [list, places, reasons] = yield* Effect.all(
+                  [
+                    routines,
+                    runPlaces
+                      ? remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
+                          method: "POST",
+                          body: { agentId },
+                        })
+                      : Effect.succeed([]),
+                    pauseReasons
+                      ? remoteServers.request(serverId, ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, {
+                          method: "POST",
+                          body: { agentId },
+                        })
+                      : Effect.succeed([]),
+                  ],
+                  { concurrency: "unbounded" },
+                );
+                return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
+              }),
+              (send) => listOnceAgentRoutines(send, agentId),
+            ),
           ),
       }),
       createRoutine: scopedHandler(parseCreateRoutine, {
         local: (parsed) => service.createRoutine(parsed),
-        remote: (input, serverId) => {
-          if (isOnceSchedule(input.schedule)) {
-            const once = remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY);
-            requireReleasedScheduleOn(input.schedule, once);
-            return createOnceAgentRoutine(remoteOnceSend(remoteServers, serverId), input);
-          }
-          const { runIn, ...parsed } = input;
-          return runCauseEffect(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
-                method: "POST",
-                body: parsed,
-              })
-              .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn, true))),
-          );
+        remote: async ({ runsChangeRoutines, ...input }, serverId) => {
+          const created = async () => {
+            if (isOnceSchedule(input.schedule)) {
+              const once = remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY);
+              requireReleasedScheduleOn(input.schedule, once);
+              return createOnceAgentRoutine(remoteOnceSend(remoteServers, serverId), input);
+            }
+            const { runIn, ...parsed } = input;
+            return runCauseEffect(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
+                  method: "POST",
+                  body: parsed,
+                })
+                .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn, true))),
+            );
+          };
+          return withRemoteRunChanges(remoteServers, serverId, await created(), runsChangeRoutines, true);
         },
       }),
       updateRoutine: scopedHandler(parseUpdateRoutine, {
         local: (parsed) => service.updateRoutine(parsed),
-        remote: (input, serverId) => {
-          if (remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY))
-            return updateAgentRoutineOnce(remoteOnceSend(remoteServers, serverId), input);
-          requireReleasedScheduleOn(input.schedule, false);
-          const { runIn, ...parsed } = input;
-          return runCauseEffect(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeRoutine, {
-                method: "PATCH",
-                body: parsed,
-              })
-              .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn))),
-          );
+        remote: async ({ runsChangeRoutines, ...input }, serverId) => {
+          const updated = async () => {
+            if (remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY))
+              return updateAgentRoutineOnce(remoteOnceSend(remoteServers, serverId), input);
+            requireReleasedScheduleOn(input.schedule, false);
+            const { runIn, ...parsed } = input;
+            return runCauseEffect(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeRoutine, {
+                  method: "PATCH",
+                  body: parsed,
+                })
+                .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn))),
+            );
+          };
+          return withRemoteRunChanges(remoteServers, serverId, await updated(), runsChangeRoutines);
         },
       }),
       deleteRoutine: scopedHandler(parseDeleteRoutine, {
@@ -237,6 +258,49 @@ function withRemoteRunPlace(
       }),
     ),
   );
+}
+
+async function withRemoteRunChangesList(
+  remoteServers: RemoteServerManager,
+  serverId: string,
+  agentId: string,
+  routines: Promise<Routine[]>,
+): Promise<Routine[]> {
+  if (!remoteServers.supportsCapability(serverId, ROUTINE_RUN_CHANGES_CAPABILITY)) return routines;
+  const [list, entries] = await Promise.all([
+    routines,
+    runCauseEffect(
+      remoteServers.request(serverId, ROUTINE_RUN_CHANGES_ROUTES.list, decodeRoutineRunChangesList, {
+        method: "POST",
+        body: { agentId },
+      }),
+    ),
+  ]);
+  return withRoutineRunChanges(list, entries);
+}
+
+async function withRemoteRunChanges(
+  remoteServers: RemoteServerManager,
+  serverId: string,
+  routine: Routine,
+  runsChangeRoutines: boolean | undefined,
+  created = false,
+): Promise<Routine> {
+  if (runsChangeRoutines === undefined || !remoteServers.supportsCapability(serverId, ROUTINE_RUN_CHANGES_CAPABILITY))
+    return routine;
+  const set = runCauseEffect(
+    remoteServers.request(serverId, ROUTINE_RUN_CHANGES_ROUTES.set, decodeRoutineRunChanges, {
+      method: "POST",
+      body: { agentId: routine.agentId, routineId: routine.id, runsChangeRoutines },
+    }),
+  );
+  const entry = created
+    ? await set.catch(() => {
+        runPlaceLogger.warn("The run changes setting of a new remote routine was not set. It stays off.");
+        return { runsChangeRoutines: false };
+      })
+    : await set;
+  return { ...routine, runsChangeRoutines: entry.runsChangeRoutines };
 }
 
 export function remoteOnceSend(remoteServers: RemoteServerManager, serverId: string): RoutinesOncePost {

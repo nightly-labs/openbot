@@ -368,6 +368,10 @@ export const messages = {
   "routine.settings.missedPolicy.runOnce": "להריץ פעם אחת כש-OpenBot נפתח",
   "routine.settings.runInThread": "הרצה בשרשור נפרד",
   "routine.settings.runInSaveFailed": "השגרה נשמרה, אבל ההגדרה של השרשור הנפרד לא נשמרה. יש לנסות שוב.",
+  "routine.settings.runsChangeRoutines": "הרצות יכולות לשנות שגרות",
+  "routine.settings.runsChangeRoutinesHint":
+    "הרצות של השגרה הזו יכולות לשנות את התזמון של השגרות של הסוכן הזה ולהפעיל או לכבות אותן.",
+  "routine.settings.runsChangeRoutinesSaveFailed": "השגרה נשמרה, אבל ההגדרה של שינוי שגרות לא נשמרה. יש לנסות שוב.",
   "routine.settings.resultDestination": "שליחת תשובות אל",
   "routine.settings.resultDestination.none": "הצ'אט הזה בלבד",
   "routine.settings.resultDestination.place": "{connection} · {place}",

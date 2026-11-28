@@ -62,6 +62,7 @@ import { migration as migration0068 } from "./0068-workflow-paused";
 import { migration as migration0069 } from "./0069-messaging-sender-mode";
 import { migration as migration0070 } from "./0070-thread-activity-sequence-index";
 import { migration as migration0071 } from "./0071-sync-change-sequence";
+import { migration as migration0072 } from "./0072-agent-routine-run-changes";
 import type { OpenBotMigration } from "./migration";
 
 /** Every migration, in order. A new migration is a new file with the next version, added at the end. */
@@ -130,4 +131,5 @@ export const MIGRATIONS: readonly OpenBotMigration[] = [
   migration0069,
   migration0070,
   migration0071,
+  migration0072,
 ];

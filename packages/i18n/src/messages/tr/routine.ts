@@ -342,6 +342,11 @@ export const messages = {
   "routine.settings.missedPolicy.runOnce": "OpenBot açıldığında bir kez çalıştır",
   "routine.settings.runInThread": "Ayrı bir dizide çalıştır",
   "routine.settings.runInSaveFailed": "Rutin kaydedildi ama ayrı dizi ayarı kaydedilmedi. Tekrar deneyin.",
+  "routine.settings.runsChangeRoutines": "Çalıştırmalar rutinleri değiştirebilir",
+  "routine.settings.runsChangeRoutinesHint":
+    "Bu rutinin çalıştırmaları, bu ajanın rutinlerinin zamanlamasını değiştirebilir ve onları açıp kapatabilir.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "Rutin kaydedildi ama rutinleri değiştirme ayarı kaydedilmedi. Tekrar deneyin.",
   "routine.settings.resultDestination": "Yanıtları şuraya gönder",
   "routine.settings.resultDestination.none": "Yalnızca bu sohbet",
   "routine.settings.resultDestination.place": "{connection} · {place}",

@@ -76,6 +76,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "צבעי סוכנים אינם נתמכים בחיבור הזה.",
   "error.team.chatColorsUnsupported": "צבעי צ'אטים אינם נתמכים בחיבור הזה.",
   "error.team.routineRunPlaceUnsupported": "החיבור הזה אינו יכול לשנות היכן שגרה רצה.",
+  "error.team.routineRunChangesUnsupported": "החיבור הזה אינו יכול לאפשר להרצות של שגרה לשנות שגרות.",
   "error.team.routinePauseReasonsUnsupported": "החיבור הזה אינו יכול להציג מדוע שגרה מושהית.",
   "error.team.activeQueuesUnsupported": "חיבור זה לא יכול להציג את התורים של כל הסוכנים.",
   "error.team.routinesOnceUnsupported": "החיבור הזה אינו יכול לשמור שגרות חד-פעמיות.",

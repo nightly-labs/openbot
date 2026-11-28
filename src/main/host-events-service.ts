@@ -671,6 +671,7 @@ export class HostEventsService implements HostEventsApi {
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
           ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
+          ...(input.runsChangeRoutines === undefined ? {} : { runsChangeRoutines: input.runsChangeRoutines }),
         }),
       );
       if (existing && (existing.trigger.kind === "webhook") !== (trigger.kind === "webhook"))

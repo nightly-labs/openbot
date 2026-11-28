@@ -59,6 +59,7 @@ export interface RoutineTables {
   limit: number;
   limitMessage: string;
   runInColumn: boolean;
+  runChangesColumn: boolean;
 }
 
 export interface OwnedRoutine extends RoutineFields {
@@ -101,6 +102,7 @@ export interface RoutineInputFields {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
 }
 
 export interface RoutineUpdateFields {
@@ -112,6 +114,7 @@ export interface RoutineUpdateFields {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
 }
 
 interface RoutineWebhookFields {
@@ -139,6 +142,7 @@ export interface RoutineRecordInput {
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
   runIn?: RoutineRunPlace;
+  runsChangeRoutines?: boolean;
   trigger:
     | { kind: "schedule"; schedule: RoutineSchedule }
     | { kind: "webhook"; eventType: string | null; filters: EventFilter[]; secretCiphertext: string | null };
@@ -171,9 +175,9 @@ export class RoutineStore {
   ) {}
 
   protected get routineColumns(): string {
-    const { routineTable, eventPrefix, ownerColumn, runInColumn } = this.tables;
+    const { routineTable, eventPrefix, ownerColumn, runInColumn, runChangesColumn } = this.tables;
     return `routine_id, ${ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy,
-            ${runInColumn ? "run_in, " : ""}created_at, updated_at,
+            ${runInColumn ? "run_in, " : ""}${runChangesColumn ? "runs_change_routines, " : ""}created_at, updated_at,
             (SELECT payload_json FROM orchestration_events
              WHERE sequence = ${routineTable}.last_event_sequence AND event_type = '${eventPrefix}.paused-by-run')
               AS paused_by_run`;
@@ -279,6 +283,7 @@ export class RoutineStore {
           sequence,
         );
         this.#writeRunIn(db, routineId, input.runIn ?? "chat");
+        this.#writeRunChanges(db, routineId, input.runsChangeRoutines ?? false);
         this.#insertTrigger(db, routineId, input.timezone, schedule, createdAt, sequence, now);
         return this.#require(routineId, ownerId);
       },
@@ -328,6 +333,8 @@ export class RoutineStore {
           ownerId,
         );
         if (input.runIn) this.#writeRunIn(db, input.routineId, input.runIn);
+        if (input.runsChangeRoutines !== undefined)
+          this.#writeRunChanges(db, input.routineId, input.runsChangeRoutines);
         if (input.schedule) {
           db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(input.routineId);
           this.#insertTrigger(db, input.routineId, current.timezone, schedule, updatedAt, sequence, now);
@@ -375,6 +382,9 @@ export class RoutineStore {
     const missedPolicy =
       input.missedPolicy ?? current?.missedPolicy ?? (schedule ? defaultMissedPolicy(schedule) : "skip");
     const runIn = this.tables.runInColumn ? (input.runIn ?? current?.runIn ?? "chat") : undefined;
+    const runsChangeRoutines = this.tables.runChangesColumn
+      ? (input.runsChangeRoutines ?? current?.runsChangeRoutines ?? false)
+      : undefined;
     const timestamp = now.toISOString();
     const running =
       current?.active &&
@@ -404,6 +414,7 @@ export class RoutineStore {
             limitPolicy,
             missedPolicy,
             ...(runIn ? { runIn } : {}),
+            ...(runsChangeRoutines === undefined ? {} : { runsChangeRoutines }),
             trigger: eventTrigger,
           },
         },
@@ -434,6 +445,7 @@ export class RoutineStore {
           sequence,
         );
         if (runIn) this.#writeRunIn(db, id, runIn);
+        if (runsChangeRoutines !== undefined) this.#writeRunChanges(db, id, runsChangeRoutines);
         if (schedule) {
           if (current?.trigger.kind === "webhook") {
             revokeRoutineWebhooks(db, this.tables.ownerKind, [id], { forget: false }, now);
@@ -680,6 +692,7 @@ export class RoutineStore {
           `SELECT trigger.trigger_id, trigger.next_run_at, trigger.schedule_json, routine.routine_id,
                   routine.${ownerColumn}, routine.name, routine.instruction, routine.active, routine.timezone,
                   routine.limit_policy, routine.missed_policy, ${this.tables.runInColumn ? "routine.run_in, " : ""}
+                  ${this.tables.runChangesColumn ? "routine.runs_change_routines, " : ""}
                   routine.created_at, routine.updated_at
            FROM ${triggerTable} trigger
            JOIN ${routineTable} routine ON routine.routine_id = trigger.routine_id
@@ -1181,6 +1194,7 @@ export class RoutineStore {
       limitPolicy,
       missedPolicy,
       ...this.#runIn(row),
+      ...this.#runChanges(row),
       ...(active ? {} : pausedByRunColumn(row)),
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
@@ -1192,6 +1206,19 @@ export class RoutineStore {
     const runIn = requiredStringColumn(row, "run_in");
     if (!isOneOf(ROUTINE_RUN_PLACES, runIn)) throw new Error("The stored routine run place is invalid.");
     return { runIn };
+  }
+
+  #runChanges(row: DynamicRecord): { runsChangeRoutines?: boolean } {
+    if (!this.tables.runChangesColumn) return {};
+    return { runsChangeRoutines: requiredNumberColumn(row, "runs_change_routines") === 1 };
+  }
+
+  #writeRunChanges(db: OpenBotDatabase["connection"], routineId: string, runsChangeRoutines: boolean): void {
+    if (!this.tables.runChangesColumn) return;
+    db.prepare(`UPDATE ${this.tables.routineTable} SET runs_change_routines = ? WHERE routine_id = ?`).run(
+      runsChangeRoutines ? 1 : 0,
+      routineId,
+    );
   }
 
   #writeRunIn(db: OpenBotDatabase["connection"], routineId: string, runIn: RoutineRunPlace): void {

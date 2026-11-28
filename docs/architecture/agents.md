@@ -204,6 +204,22 @@ A joined host serves the reasons on the optional `routine-pause-reasons-v1` capa
 (`packages/contracts/src/team-protocol/routine-pause-reasons-v1.ts`, host route `routeRoutinePauseReasons`
 in `src/main/team-api/route-routine-pause-reasons.ts`), which the remote adapters merge into their lists
 as they merge the run places. A client of an older host shows only "Paused".
+
+A person can let the runs of one agent routine change routines: the `runsChangeRoutines` switch
+("Runs can change routines", migration 72 adds `projection_agent_routines.runs_change_routines`, off for
+every routine). `RoutineScheduler.handleTool` gets the routine ids of the turn's routine deliveries from
+the tool router (`#turnRoutineIds`). In such a turn, `create_routine`, `delete_routine` and `test_routine`
+fail. `update_routine` with only `active: false` on the run's own routine works as before (the pause
+above). Any other `update_routine` works only when every routine of the turn has the switch on, the target
+is a routine of the same agent, and the call changes only `schedule` and `active`; this includes the run's
+own routine, so a run can move its own next run (#5851). Webhook routine tools stay person-only. The run
+prompt (`delivery-content.ts`) names the rule that applies. No agent tool sets the switch: only the
+routine settings do, on this computer's host and on a joined host with the optional
+`routine-run-changes-v1` capability (`packages/contracts/src/team-protocol/routine-run-changes-v1.ts`, host
+route `routeRoutineRunChanges` in `src/main/team-api/route-routine-run-changes.ts`). The remote adapters
+read and set it as they do the run places. Unlike the run place routes, these routes include `once`
+routines, because the `routines-once-v1` codec does not carry the switch. An instance transfer does not
+copy the switch, so a moved routine has it off.
 `AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set
 (migration 54; a unique index keeps one thread for each routine of an agent, also when it is
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the

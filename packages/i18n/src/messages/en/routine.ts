@@ -359,6 +359,11 @@ export const messages = defineMessages("routine", {
   "routine.settings.missedPolicy.runOnce": "Run once when OpenBot opens",
   "routine.settings.runInThread": "Run in a separate thread",
   "routine.settings.runInSaveFailed": "The routine is saved, but its separate thread setting is not. Try again.",
+  "routine.settings.runsChangeRoutines": "Runs can change routines",
+  "routine.settings.runsChangeRoutinesHint":
+    "Runs of this routine can change the schedule of this agent's routines and turn them on or off.",
+  "routine.settings.runsChangeRoutinesSaveFailed":
+    "The routine is saved, but its setting for changing routines is not. Try again.",
   "routine.settings.resultDestination": "Send answers to",
   "routine.settings.resultDestination.none": "Only this chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

@@ -348,6 +348,10 @@ export const messages = {
   "routine.settings.missedPolicy.runOnce": "OpenBot 启动后运行一次",
   "routine.settings.runInThread": "在单独的话题中运行",
   "routine.settings.runInSaveFailed": "自动化任务已保存，但单独话题设置未保存，请重试。",
+  "routine.settings.runsChangeRoutines": "运行时可更改自动化任务",
+  "routine.settings.runsChangeRoutinesHint":
+    "此自动化任务运行时可以更改该助手的自动化任务的时间安排，并开启或关闭它们。",
+  "routine.settings.runsChangeRoutinesSaveFailed": "自动化任务已保存，但更改自动化任务的设置未保存，请重试。",
   "routine.settings.resultDestination": "回答发送到",
   "routine.settings.resultDestination.none": "仅该对话",
   "routine.settings.resultDestination.place": "{connection} · {place}",
