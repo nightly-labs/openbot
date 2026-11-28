@@ -254,6 +254,7 @@
         }
       ],
       "./plugins/with-shortcuts",
+      "./plugins/with-carplay",
       "./plugins/with-watch-targets",
       "./plugins/with-xcode-warning-fixes"
     ],

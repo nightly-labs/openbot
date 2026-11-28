@@ -10,6 +10,7 @@ import { ChatListPaneProvider } from "@/features/agents/components/chat-list-pan
 import { ConnectedScreen } from "@/features/agents/screens/connected-screen";
 import { whenUnlocked } from "@/features/app-lock/model/app-lock";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { CarPlaySync } from "@/features/carplay/carplay-sync";
 import { AudioWaveformHost } from "@/features/chat/components/audio-waveform-host";
 import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
 import { OutboxProvider } from "@/features/chat/context/outbox-context";
@@ -495,6 +496,7 @@ export default function AuthenticatedLayout() {
               </AuthenticatedSplit>
               <MermaidRendererHost />
               <AudioWaveformHost />
+              <CarPlaySync />
             </QueuedMessagesProvider>
           </AppDrawerShell>
         </OutboxProvider>

@@ -193,6 +193,8 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
+import { useCarPlayConnected } from "@/features/carplay/carplay-native";
+import { deleteServerCarPlayData } from "@/features/carplay/carplay-reset";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
 import {
@@ -496,7 +498,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [connectionWaits] = useState(() => new ConnectionWaits());
   const loadGeneration = useRef(0);
   const directoryGeneration = useRef(0);
-  const foreground = useAppForeground();
+  const appForeground = useAppForeground();
+  const carPlayConnected = useCarPlayConnected();
+  const foreground = appForeground || carPlayConnected;
   const watchAwake = useWatchAwake();
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
@@ -687,6 +691,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         clearTimeout(firstConnectionTimers.current.get(serverId));
         firstConnectionTimers.current.delete(serverId);
         deleteServerAvatars(serverId);
+        deleteServerCarPlayData(serverId);
         connectionWaits.drop(
           serverId,
           new ConnectionUnavailableError(currentText().t("mobile.workspace.error.transportNotReady")),
@@ -890,7 +895,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     activeServerId,
     agents: directoryAgents,
     liveState,
-    foreground,
+    foreground: appForeground,
     post: postLiveActivityAction,
     loadAgentAvatar,
     supportsPush: supportsLiveActivityPush,
@@ -912,7 +917,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   usePushNotifications({
     servers,
     serversReady: serverDirectoryState === "ready",
-    foreground,
+    foreground: appForeground,
     post: postLiveActivityAction,
     supportsPush: supportsPushNotifications,
     supportsThreads: supportsThreadNotifications,
@@ -1766,8 +1771,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const activeServerOnline = servers.some((server) => server.id === activeServerId && server.state === "online");
   useEffect(() => {
     const supported = hasCapability(serverCapabilities.current, activeServerId, FOCUS_USE_CAPABILITY);
-    focusUse.setTarget(foreground && activeServerOnline && supported ? activeServerId : null);
-  }, [focusUse, foreground, activeServerOnline, activeServerId]);
+    focusUse.setTarget(appForeground && activeServerOnline && supported ? activeServerId : null);
+  }, [focusUse, appForeground, activeServerOnline, activeServerId]);
   useEffect(() => () => focusUse.dispose(), [focusUse]);
 
   useEffect(() => {
@@ -2175,7 +2180,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
   useSyncedNotificationLevelsLoader({
     servers,
-    foreground,
+    foreground: appForeground,
     supports: hostRequests.checks.canSetAgentNotificationLevel,
     load: hostRequests.actions.loadAgentNotificationLevels,
   });
@@ -3205,7 +3210,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           <OwnerTransferPrompts
             directory={directory}
             revision={directoryLoads}
-            active={foreground}
+            active={appForeground}
             onAccepted={refreshMemberships}
           />
           <WatchSync
