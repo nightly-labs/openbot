@@ -53,7 +53,12 @@ import {
   type PlanUpdateStep,
   startClaudePlanTurn,
 } from "./agent/plan-updates";
-import { isBalanceDiagnostic, isPlanLimitDiagnostic, isSpentBalanceDiagnostic } from "./agent/provider-diagnostics";
+import {
+  isBalanceDiagnostic,
+  isMcpSignInDiagnostic,
+  isPlanLimitDiagnostic,
+  isSpentBalanceDiagnostic,
+} from "./agent/provider-diagnostics";
 import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
@@ -458,6 +463,18 @@ const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
 
 const CLAUDE_STOP_CONFIRM_MS = 10_000;
 
+const CLAUDE_MCP_START_WAIT_MS = 30_000;
+
+const CLAUDE_MCP_STATUS_TIMEOUT_MS = 2_000;
+
+const CLAUDE_MCP_STATUS_POLL_MS = 500;
+
+const CLAUDE_MCP_RECONNECT_TIMEOUT_MS = 10_000;
+
+const CLAUDE_MCP_FIRST_RECONNECT_DELAY_MS = 1_000;
+
+const CLAUDE_MCP_LAST_RECONNECT_DELAY_MS = 4_000;
+
 const CLAUDE_COMPACT_COMMAND = "/compact";
 
 const CLAUDE_CACHE_TTL_MS = { short: 5 * 60_000, long: 60 * 60_000 } as const;
@@ -598,6 +615,7 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   getContextUsage?(options: { detail: "summary" }): Promise<unknown>;
   initializationResult?(): Promise<unknown>;
   mcpServerStatus?(): Promise<unknown>;
+  reconnectMcpServer?(serverName: string): Promise<void>;
   setModel(model?: string): Promise<void>;
   setPermissionMode(mode: PermissionMode): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null; fastMode?: boolean }): Promise<void>;
@@ -874,7 +892,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const query = runtime.query;
     yield* Effect.forkIn(
       providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
-        Effect.timeout("2 seconds"),
+        Effect.timeout(CLAUDE_MCP_STATUS_TIMEOUT_MS),
         Effect.orElseSucceed(() => null),
         Effect.flatMap((rows) =>
           Effect.sync(() => {
@@ -1797,6 +1815,55 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.add(runtime);
     if (config.persistSession) this.#takenPrompts.set(threadId, runtime.promptIds);
     yield* Effect.forkIn(this.#watchStall(runtime), this.#scope);
+    if (handoff && !resume && !config.persistSession)
+      yield* this.#settleMcpStartup(runtime, new Set(Object.keys(handoff.servers)));
+  });
+
+  readonly #settleMcpStartup = Effect.fnUntraced(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    names: ReadonlySet<string>,
+  ) {
+    const query = runtime.query;
+    if (names.size === 0 || !query.mcpServerStatus || !query.reconnectMcpServer) return;
+    const deadline = Date.now() + CLAUDE_MCP_START_WAIT_MS;
+    let delay = CLAUDE_MCP_FIRST_RECONNECT_DELAY_MS;
+    let nextReconnectAt = 0;
+    let reconnected = false;
+    while (this.#threads.get(runtime.id) === runtime) {
+      const read = yield* providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
+        Effect.timeoutOption(CLAUDE_MCP_STATUS_TIMEOUT_MS),
+        Effect.orElseSucceed(() => null),
+      );
+      if (read === null || (Option.isSome(read) && !Array.isArray(read.value))) return;
+      const startup = Option.isSome(read) ? claudeMcpStartup(read.value, names) : null;
+      if (startup && startup.pending === 0 && startup.failed.length === 0) {
+        if (reconnected) queryLogger.info("Claude connected its MCP servers again before an unattended run.");
+        return;
+      }
+      if (Date.now() >= deadline) {
+        queryLogger.warn("An unattended Claude run starts without some MCP servers.", {
+          failed: startup?.failed.length ?? null,
+          pending: startup?.pending ?? null,
+        });
+        return;
+      }
+      if (startup && startup.failed.length > 0 && Date.now() >= nextReconnectAt) {
+        reconnected = true;
+        yield* Effect.forEach(
+          startup.failed,
+          (name) =>
+            providerCall(() => query.reconnectMcpServer?.(name) ?? Promise.resolve()).pipe(
+              Effect.timeout(Math.max(0, Math.min(CLAUDE_MCP_RECONNECT_TIMEOUT_MS, deadline - Date.now()))),
+              Effect.ignore,
+            ),
+          { concurrency: "unbounded", discard: true },
+        );
+        nextReconnectAt = Date.now() + delay;
+        delay = Math.min(delay * 2, CLAUDE_MCP_LAST_RECONNECT_DELAY_MS);
+      }
+      yield* Effect.sleep(Math.max(0, Math.min(CLAUDE_MCP_STATUS_POLL_MS, deadline - Date.now())));
+    }
   });
 
   readonly #startTurnEffect = Effect.fn("ClaudeAgentClient.startTurn")(function* (
@@ -3845,6 +3912,20 @@ function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet
     message.is_error !== true &&
     !message.result
   );
+}
+
+function claudeMcpStartup(rows: unknown, names: ReadonlySet<string>): { pending: number; failed: string[] } | null {
+  if (!Array.isArray(rows)) return null;
+  let pending = 0;
+  const failed: string[] = [];
+  for (const row of rows) {
+    const name = getString(row, "name");
+    if (!name || !names.has(name)) continue;
+    const status = getString(row, "status");
+    if (status === "pending") pending += 1;
+    if (status === "failed" && !isMcpSignInDiagnostic(getString(row, "error") ?? "")) failed.push(name);
+  }
+  return { pending, failed };
 }
 
 function failedClaudeMcpServers(servers: unknown): string[] {
