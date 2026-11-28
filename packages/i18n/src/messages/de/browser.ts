@@ -177,7 +177,7 @@ export const messages = {
   "browser.signIn.description":
     "Manche Websites lehnen eine Anmeldung von einem Server ab. Melde dich auf diesem Computer an, und OpenBot sendet die Anmeldung für {site} an {server}. Alle Agenten und Mitglieder auf {server} können sie dann im Browser verwenden.",
   "browser.signIn.windowOpen":
-    "Melde dich in dem geöffneten Fenster an. OpenBot sendet die Anmeldung, wenn sie fertig ist. Wenn das Fenster offen bleibt, wähle Fertig.",
+    "Melde dich in dem geöffneten Fenster an und schließe alle Schritte ab, etwa einen Bestätigungscode. Wähle dann Fertig.",
   "browser.signIn.windowClosed":
     "Das Anmeldefenster ist geschlossen. Wähle Fertig, um die Anmeldung zu senden, oder öffne das Fenster erneut.",
   "browser.signIn.reopen": "Anmeldefenster öffnen",
@@ -185,8 +185,6 @@ export const messages = {
   "browser.signIn.sent": "Bei {site} auf {server} angemeldet",
   "browser.signIn.notFound":
     "OpenBot hat keine Anmeldung für {site} gefunden. Melde dich im Fenster an und wähle dann Fertig.",
-  "browser.signIn.stillSignedOut":
-    "{server} zeigt für {site} noch eine Anmeldeseite. Schließe die Anmeldung im Fenster ab.",
   "browser.signIn.failed": "OpenBot konnte die Anmeldung nicht senden.",
   "browser.httpSignIn.title": "Bei {site} anmelden",
   "browser.httpSignIn.description": "Diese Website fragt nach ihrem eigenen Benutzernamen und Passwort.",

@@ -153,7 +153,7 @@ export function createMockBrowser(
     },
     openPictureInPicture: async (bounds) => bounds ?? { x: 16, y: 16, width: 420, height: 300 },
     closePictureInPicture: async () => undefined,
-    openLocalSignIn: async () => ({ signedIn: false }),
+    openLocalSignIn: async () => undefined,
     finishLocalSignIn: async ({ send }) => (send ? { cookies: 12, signedIn: true } : null),
     answerHttpSignIn: async ({ tabId }) => {
       if (!browserTabs.some((tab) => tab.id === tabId && tab.httpSignIn))

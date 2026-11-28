@@ -48,6 +48,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { BrowserHost } from "../../backend/browser-host";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -87,6 +88,8 @@ import {
 } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { optionalPayload, stringPayload } from "./validation";
+
+const logger = createOpenBotLogger("browser-sign-in");
 
 export interface BrowserIpcDependencies {
   browserPictureInPicture: Pick<BrowserPictureInPicture, "open" | "close" | "dock" | "hide">;
@@ -217,6 +220,22 @@ export function browserIpcHandlers({
       throw new Error(sourceText("error.backend.browserUserControlUnsupported"));
     await runCauseEffect(
       remoteServers.request(serverId, route, decodeBrowserUserControlSnapshot, { method: "POST", body: { tabId } }),
+    );
+  };
+  const openSignedInPageOnServer = async (target: { serverId: string; tabId: string; host: string }) => {
+    const page = localSignIn.page();
+    if (!page || !isBrowserSignedInPage(page, target.host)) return;
+    if (!remoteServers.supportsCapability(target.serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) return;
+    const tabs = await runCauseEffect(
+      remoteServers.request(target.serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
+    );
+    const tab = tabs.find((entry) => entry.id === target.tabId);
+    if (!tab || isBrowserSignedInPage(tab.url, target.host)) return;
+    await runCauseEffect(
+      remoteServers.request(target.serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
+        method: "POST",
+        body: { tabId: target.tabId, url: page },
+      }),
     );
   };
   const teachRequest = async <Result>(
@@ -362,13 +381,11 @@ export function browserIpcHandlers({
           remote: (serverId) => {
             if (!remoteServers.supportsCapability(serverId, BROWSER_SIGN_IN_CAPABILITY))
               throw new Error(sourceText("error.backend.browserSignInUnsupported"));
-            return runCauseEffect(localSignIn.open({ serverId, tabId }, url)).then((end) => ({
-              signedIn: end === "signed-in",
-            }));
+            return runCauseEffect(localSignIn.open({ serverId, tabId }, url));
           },
         }),
       ),
-      finishLocalSignIn: payloadHandler(parseLocalSignInFinish, async ({ send, check }) => {
+      finishLocalSignIn: payloadHandler(parseLocalSignInFinish, async ({ send }) => {
         const target = localSignIn.target();
         if (!send || !target) {
           await runCauseEffect(localSignIn.discard());
@@ -394,32 +411,9 @@ export function browserIpcHandlers({
               }),
             ).then((result) => result.cookies);
         if (set === 0) return { cookies: 0, signedIn: false };
-        if (check) {
-          const signedIn = async () => {
-            const tabs = await runCauseEffect(
-              remoteServers.request(target.serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
-            );
-            const tab = tabs.find((entry) => entry.id === target.tabId);
-            return tab !== undefined && isBrowserSignedInPage(tab.url, target.host);
-          };
-          let done = await signedIn();
-          const page = localSignIn.page();
-          if (
-            !done &&
-            page &&
-            isBrowserSignedInPage(page, target.host) &&
-            remoteServers.supportsCapability(target.serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)
-          ) {
-            await runCauseEffect(
-              remoteServers.request(target.serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
-                method: "POST",
-                body: { tabId: target.tabId, url: page },
-              }),
-            );
-            done = await signedIn();
-          }
-          if (!done) return { cookies: set, signedIn: false };
-        }
+        await openSignedInPageOnServer(target).catch((error: unknown) =>
+          logger.warn("Unable to open the signed-in page in the server tab", toLogValue(error)),
+        );
         await runCauseEffect(localSignIn.discard());
         return { cookies: set, signedIn: true };
       }),

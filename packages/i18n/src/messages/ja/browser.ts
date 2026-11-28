@@ -169,7 +169,7 @@ export const messages = {
   "browser.signIn.description":
     "一部のサイトはサーバーからのサインインを拒否します。このコンピュータでサインインすると、OpenBot が {site} のサインインを {server} に送信します。{server} のすべてのエージェントとメンバーがブラウザでそれを使用できます。",
   "browser.signIn.windowOpen":
-    "開いたウィンドウでサインインしてください。サインインが完了すると、OpenBot が送信します。ウィンドウが開いたままの場合は、完了を選択してください。",
+    "開いたウィンドウでサインインし、確認コードなどのすべての手順を完了してください。その後、完了を選択してください。",
   "browser.signIn.windowClosed":
     "サインインウィンドウは閉じています。完了を選択してサインインを送信するか、ウィンドウをもう一度開いてください。",
   "browser.signIn.reopen": "サインインウィンドウを開く",
@@ -177,8 +177,6 @@ export const messages = {
   "browser.signIn.sent": "{server} で {site} にサインインしました",
   "browser.signIn.notFound":
     "OpenBot は {site} のサインインを見つけられませんでした。ウィンドウでサインインしてから、完了を選択してください。",
-  "browser.signIn.stillSignedOut":
-    "{server} にはまだ {site} のサインインページが表示されています。ウィンドウでサインインを完了してください。",
   "browser.signIn.failed": "OpenBot はサインインを送信できませんでした。",
   "browser.httpSignIn.title": "{site} にサインイン",
   "browser.httpSignIn.description": "このサイトは独自のユーザー名とパスワードを求めています。",

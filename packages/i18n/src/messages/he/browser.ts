@@ -178,14 +178,12 @@ export const messages = {
   "browser.signIn.title": "התחברות אל {site}",
   "browser.signIn.description":
     "אתרים מסוימים דוחים התחברות משרת. יש להתחבר במחשב הזה, ו-OpenBot ישלח את ההתחברות אל {site} ב-{server}. כל הסוכנים והחברים ב-{server} יוכלו אז להשתמש בה בדפדפן.",
-  "browser.signIn.windowOpen":
-    "יש להתחבר בחלון שנפתח. OpenBot ישלח את ההתחברות כשהיא תושלם. אם החלון נשאר פתוח, יש לבחור ב״סיום״.",
+  "browser.signIn.windowOpen": "יש להתחבר בחלון שנפתח ולהשלים את כל השלבים, כמו קוד אימות. לאחר מכן יש לבחור ב״סיום״.",
   "browser.signIn.windowClosed": "חלון ההתחברות סגור. יש לבחור ב״סיום״ כדי לשלוח את ההתחברות, או לפתוח את החלון שוב.",
   "browser.signIn.reopen": "פתיחת חלון ההתחברות",
   "browser.signIn.sending": "שולח אל {server}…",
   "browser.signIn.sent": "התחברת אל {site} ב-{server}",
   "browser.signIn.notFound": "OpenBot לא מצא התחברות אל {site}. יש להתחבר בחלון ואז לבחור ב״סיום״.",
-  "browser.signIn.stillSignedOut": "{server} עדיין מציג דף התחברות אל {site}. יש להשלים את ההתחברות בחלון.",
   "browser.signIn.failed": "OpenBot לא הצליח לשלוח את ההתחברות.",
   "browser.httpSignIn.title": "התחברות אל {site}",
   "browser.httpSignIn.description": "האתר הזה מבקש שם משתמש וסיסמה משלו.",

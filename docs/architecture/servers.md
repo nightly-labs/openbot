@@ -1041,14 +1041,14 @@ the `browser-takeover-requested` event and in `pendingBrowserTakeovers`, only fo
 the desktop app shows the button for a web tab. With the reason, the card asks only for the sign-in
 on this computer and has no "I'm done" button. A sign-in that sets cookies completes the takeover of
 that tab.
-The window also sends by itself (`src/main/browser-sign-in-page.ts`): after a page with a sign-in
-address or a visible password field, a new `HttpOnly` cookie of the site, and then a page of the site
-that is not a sign-in step. For the pages only, the site also includes the other subdomains of the
-same registrable domain (`tldts`, private suffixes kept apart), because some sites sign in on one
-subdomain and then show the page on another (#11219). The cookies and the page storage keep the
-scope above. This is a guess, so after that send the desktop reads the server's tab list. When the
-tab still shows a sign-in step, it opens the window's page in the tab (with `browser-navigation`) and reads the list again. The window closes only when the tab left the sign-in
-steps; otherwise it stays open and waits for the next cookie. Done sends without this check.
+The window does not send by itself. A site can show more steps after it sets its session cookie, for
+example a verification code on a page with no sign-in word in its address, so only Done sends
+(#17404). After a send that set cookies, when the window shows a page of the site that is not a
+sign-in step (`src/main/browser-sign-in-page.ts`) and the server tab still shows a sign-in step, the
+desktop opens the window's page in the tab (with `browser-navigation`). For the pages only, the site
+also includes the other subdomains of the same registrable domain (`tldts`, private suffixes kept
+apart), because some sites sign in on one subdomain and then show the page on another (#11219). The
+cookies and the page storage keep the scope above.
 The desktop discards the window's session after a send that set cookies, on Cancel, and at shutdown.
 A failed send keeps it, so Done can try again. The web client has no menu item: a web page cannot
 read the cookies of another site.
@@ -1058,7 +1058,7 @@ read the cookies of another site.
 Some sites keep the sign-in in the page storage (localStorage), not in a cookie (#8686). `storage` is
 null, or the origin of the window's page and its pairs, at most 1000 pairs and 262,144 characters in
 all. The window reads the page storage in its isolated world when the page is on the tab's host,
-at each check and at Done, and keeps the last copy, so a closed window still sends it. The host sets
+after each page load and at Done, and keeps the last copy, so a closed window still sends it. The host sets
 the cookies as `browser-sign-in` does. It writes the pairs only when the tab shows the same origin,
 keeps the other pairs of that origin, and loads the tab again when it set a cookie or a pair. A
 desktop uses this route when the server advertises the capability, and `browser-sign-in` with

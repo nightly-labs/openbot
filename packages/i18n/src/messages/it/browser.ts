@@ -173,15 +173,13 @@ export const messages = {
   "browser.signIn.description":
     "Alcuni siti rifiutano un accesso da un server. Accedi su questo computer e OpenBot invia l’accesso a {site} a {server}. Tutti gli agenti e i membri di {server} potranno usarlo nel browser.",
   "browser.signIn.windowOpen":
-    "Accedi nella finestra che si è aperta. OpenBot invia l’accesso quando è completo. Se la finestra resta aperta, seleziona Fine.",
+    "Accedi nella finestra che si è aperta e completa tutti i passaggi, come un codice di verifica. Poi seleziona Fine.",
   "browser.signIn.windowClosed":
     "La finestra di accesso è chiusa. Seleziona Fine per inviare l’accesso, o apri di nuovo la finestra.",
   "browser.signIn.reopen": "Apri la finestra di accesso",
   "browser.signIn.sending": "Invio a {server}…",
   "browser.signIn.sent": "Accesso a {site} su {server} eseguito",
   "browser.signIn.notFound": "OpenBot non ha trovato un accesso per {site}. Accedi nella finestra, poi seleziona Fine.",
-  "browser.signIn.stillSignedOut":
-    "{server} mostra ancora una pagina di accesso di {site}. Completa l’accesso nella finestra.",
   "browser.signIn.failed": "OpenBot non è riuscito a inviare l’accesso.",
   "browser.httpSignIn.title": "Accedi a {site}",
   "browser.httpSignIn.description": "Questo sito chiede un proprio nome utente e una propria password.",

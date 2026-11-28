@@ -13,13 +13,13 @@ function parsedUrl(url: string): URL | null {
   }
 }
 
-export function isBrowserSignInAddress(url: string): boolean {
+function isBrowserSignInAddress(url: string): boolean {
   const parsed = parsedUrl(url);
   if (!parsed) return false;
   return SIGN_IN_WORD.test(parsed.pathname) || SIGN_IN_WORD.test(parsed.search);
 }
 
-export function isBrowserSignInSite(url: string, host: string): boolean {
+function isBrowserSignInSite(url: string, host: string): boolean {
   const parsed = parsedUrl(url);
   if (!parsed) return false;
   if (browserSignInCookieFitsHost(parsed.hostname, host)) return true;

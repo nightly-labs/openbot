@@ -46,12 +46,24 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/welcome") {
     response.end(
-      `<!doctype html><meta charset="utf-8"><title>Welcome</title><form method="post" action="/account"><input type="password" name="secret" value="fixture"></form>`,
+      `<!doctype html><meta charset="utf-8"><title>Welcome</title><form method="post" action="/account"><input type="password" name="secret" value="fixture"></form><script>setTimeout(() => { document.title = "welcome-ready"; }, 1500);</script>`,
     );
     return;
   }
   if (url.pathname === "/account" && request.method === "POST") {
-    response.writeHead(302, { "Set-Cookie": `session=${SESSION_VALUE}; Path=/; HttpOnly`, Location: "/feed" });
+    response.writeHead(302, { "Set-Cookie": `session=${SESSION_VALUE}; Path=/; HttpOnly`, Location: "/code" });
+    response.end();
+    return;
+  }
+  if (url.pathname === "/code" && request.method === "GET") {
+    response.setHeader("Set-Cookie", "step=code; Path=/; HttpOnly");
+    response.end(
+      `<!doctype html><meta charset="utf-8"><title>code</title><form method="post" action="/code"><input name="code" inputmode="numeric"></form><script>setTimeout(() => { document.title = "code-ready"; }, 1500);</script>`,
+    );
+    return;
+  }
+  if (url.pathname === "/code" && request.method === "POST") {
+    response.writeHead(302, { Location: "/feed" });
     response.end();
     return;
   }
@@ -242,7 +254,7 @@ async function main(): Promise<void> {
     const firstSession = firstWindow.webContents.session;
     const secondCreated = nextWindow();
     const second = runCauseEffect(signIns.open({ ...target, tabId: "other-tab" }, `${origin}/home`));
-    assert.equal(await first, "closed");
+    await first;
     assert.equal(firstWindow.isDestroyed(), true);
     const secondWindow = await secondCreated;
     assert.notEqual(secondWindow.webContents.session, firstSession, "The other tab reused the sign-in session.");
@@ -251,33 +263,39 @@ async function main(): Promise<void> {
     await second;
     recordCases("other-tab-replaces-sign-in");
 
-    const autoTarget = { ...target, tabId: "auto-tab" };
-    const autoCreated = nextWindow();
-    const autoOpened = runCauseEffect(signIns.open(autoTarget, `${origin}/welcome`));
-    const autoWindow = await autoCreated;
-    const autoContents = autoWindow.webContents;
-    await loaded(autoContents);
-    await submitWhenSignInSeen(autoContents);
-    assert.equal(await autoOpened, "signed-in");
-    assert.equal(autoWindow.isDestroyed(), false, "The window closed after the sign-in.");
-    assert.equal(new URL(autoContents.getURL()).pathname, "/feed");
-    assert.deepEqual(await autoContents.session.cookies.get({ name: "session" }).then(names), ["session"]);
-    recordCases("auto-sign-in-ends-wait", "auto-sign-in-keeps-window");
+    const waitTarget = { ...target, tabId: "wait-tab" };
+    const waitCreated = nextWindow();
+    let waitEnded = false;
+    const waitOpened = runCauseEffect(signIns.open(waitTarget, `${origin}/welcome`)).then(() => {
+      waitEnded = true;
+    });
+    const waitWindow = await waitCreated;
+    const waitContents = waitWindow.webContents;
+    await titled(waitContents, "welcome-ready");
+    const codeReady = titled(waitContents, "code-ready");
+    await submitAndLoad(waitContents);
+    assert.equal(new URL(waitContents.getURL()).pathname, "/code");
+    await codeReady;
+    assert.equal(waitEnded, false, "The wait ended at the code step.");
+    assert.equal(waitWindow.isDestroyed(), false, "The window closed at the code step.");
+    recordCases("code-step-keeps-window");
 
-    const again = runCauseEffect(signIns.open(autoTarget, `${origin}/welcome`));
-    assert.equal(autoWindow.isDestroyed(), false);
-    await Promise.all([loaded(autoContents), autoContents.loadURL(`${origin}/welcome`)]);
-    await submitWhenSignInSeen(autoContents);
-    assert.equal(await again, "signed-in");
-    recordCases("auto-sign-in-waits-again");
+    await submitAndLoad(waitContents);
+    assert.equal(new URL(waitContents.getURL()).pathname, "/feed");
+    assert.equal(waitContents.getTitle(), "signed-in");
+    assert.deepEqual(await waitContents.session.cookies.get({ name: "session" }).then(names), ["session"]);
+    assert.equal(waitEnded, false, "The wait ended without Done.");
+    assert.equal(waitWindow.isDestroyed(), false, "The window closed without Done.");
+    recordCases("signed-in-page-keeps-window");
 
-    const autoClosed = closed(autoWindow);
-    const ended = runCauseEffect(signIns.open(autoTarget, `${origin}/feed`));
-    autoWindow.close();
-    await autoClosed;
-    assert.equal(await ended, "closed");
+    const waitClosed = closed(waitWindow);
+    waitWindow.close();
+    await waitClosed;
+    await waitOpened;
+    assert.equal(waitEnded, true);
+    assert.deepEqual(names(await runCauseEffect(signIns.collect())), ["session", "step"]);
     await runCauseEffect(signIns.discard());
-    recordCases("auto-sign-in-close-ends-wait");
+    recordCases("close-ends-wait", "close-keeps-session-for-done");
 
     const report = {
       status: "passed",
@@ -322,17 +340,21 @@ function loaded(contents: WebContents): Promise<void> {
   return new Promise((resolve) => contents.once("did-finish-load", () => resolve()));
 }
 
-async function submitWhenSignInSeen(contents: WebContents): Promise<void> {
-  await new Promise<void>((resolve) => {
-    const poll = setInterval(() => {
-      if (!signIns.signInSeen()) return;
-      clearInterval(poll);
-      resolve();
-    }, 50);
-  });
-  const navigated = new Promise<void>((resolve) => contents.once("did-navigate", () => resolve()));
+async function submitAndLoad(contents: WebContents): Promise<void> {
+  const done = loaded(contents);
   await contents.executeJavaScript("document.forms[0].submit(); true");
-  await navigated;
+  await done;
+}
+
+function titled(contents: WebContents, title: string): Promise<void> {
+  return new Promise((resolve) => {
+    const listener = (_event: Electron.Event, value: string) => {
+      if (value !== title) return;
+      contents.off("page-title-updated", listener);
+      resolve();
+    };
+    contents.on("page-title-updated", listener);
+  });
 }
 
 function closed(window: BrowserWindow): Promise<void> {

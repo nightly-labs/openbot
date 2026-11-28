@@ -35,7 +35,7 @@ Worker. A Slack or Discord install sends its sealed grant to the host on the sam
 computer cannot open it. Neither computer logs the code, and the host keeps the grant.
 When a member of a joined server selects "Sign in on this computer" in that server's browser, the
 desktop app opens the site in a window on their computer, with a session in memory only. When the
-window finds a completed sign-in, or when the member selects Done, it sends the cookies of that site,
+member selects Done, it sends the cookies of that site,
 and of no other site, to the host through the same encrypted host connection, not through the account
 Worker. The host sets them in the browser session of the tab: the shared session, which every agent
 and member of the server can use, the session of an agent that has a browser session of its own, or

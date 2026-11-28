@@ -10,7 +10,6 @@ import {
   type BrowserEnvironment,
   type BrowserHttpSignIn,
   type BrowserLiveViewEvent,
-  type BrowserLocalSignInEnd,
   type BrowserLocalSignInResult,
   type BrowserPermissionRequest,
   type BrowserPictureInPictureEvent,
@@ -68,11 +67,6 @@ export function decodeBrowserBounds(value: unknown): BrowserBounds {
     width: requiredNumber(bounds, "width"),
     height: requiredNumber(bounds, "height"),
   };
-}
-
-export function decodeBrowserLocalSignInEnd(value: unknown): BrowserLocalSignInEnd {
-  const end = decodeRecord(value, "browser sign-in end");
-  return { signedIn: requiredBoolean(end, "signedIn") };
 }
 
 export function decodeBrowserLocalSignInResult(value: unknown): BrowserLocalSignInResult | null {
