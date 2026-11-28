@@ -72,6 +72,8 @@ export const messages = {
   "error.connector.onePasswordUnreachable":
     "OpenBot לא הצליח להתחבר ל-1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
   "error.connector.onePasswordRateLimited": "1Password קיבל יותר מדי בקשות. יש להמתין כמה דקות ולנסות שוב.",
+  "error.connector.onePasswordRequestLimit":
+    "1Password קיבל יותר מדי בקשות מחשבונות שירות. יש לנסות שוב בעוד שעה. אם זה עדיין נכשל, חשבון 1Password הגיע למגבלה היומית שלו: יש לנסות שוב בעוד 24 שעות. כל חשבונות השירות בחשבון נספרים במגבלה הזו.",
   "error.connector.onePasswordNoVault": "חשבון השירות לא יכול לקרוא אף כספת. יש לתת לו גישה לכספת ולנסות שוב.",
   "error.connector.onePasswordReadFailed":
     "OpenBot לא יכול לקרוא את פרטי ההתחברות שלך ב-1Password. יש לנתק את 1Password ולחבר אותו שוב.",

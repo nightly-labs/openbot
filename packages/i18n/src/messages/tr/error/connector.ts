@@ -65,6 +65,8 @@ export const messages = {
     "OpenBot 1Password'e bağlanamadı. İnternet bağlantısını kontrol edin, ardından tekrar deneyin.",
   "error.connector.onePasswordRateLimited":
     "1Password çok fazla istek aldı. Birkaç dakika bekleyin, ardından tekrar deneyin.",
+  "error.connector.onePasswordRequestLimit":
+    "1Password hizmet hesaplarından çok fazla istek aldı. 1 saat sonra tekrar deneyin. Yine başarısız olursa 1Password hesabınız günlük sınırına ulaşmıştır: 24 saat sonra tekrar deneyin. Hesabınızdaki tüm hizmet hesapları bu sınıra dahildir.",
   "error.connector.onePasswordNoVault":
     "Hizmet hesabı bir kasayı okuyamıyor. Ona bir kasaya erişim verin, ardından tekrar deneyin.",
   "error.connector.onePasswordReadFailed":

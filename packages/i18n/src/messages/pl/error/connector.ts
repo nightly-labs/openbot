@@ -66,6 +66,8 @@ export const messages = {
     "OpenBot nie mógł połączyć się z 1Password. Sprawdź połączenie z internetem i spróbuj ponownie.",
   "error.connector.onePasswordRateLimited":
     "1Password otrzymał zbyt wiele żądań. Poczekaj kilka minut i spróbuj ponownie.",
+  "error.connector.onePasswordRequestLimit":
+    "1Password otrzymał zbyt wiele żądań od kont usług. Spróbuj ponownie za 1 godzinę. Jeśli nadal się nie uda, Twoje konto 1Password osiągnęło dzienny limit: spróbuj ponownie za 24 godziny. Wszystkie konta usług Twojego konta liczą się do tego limitu.",
   "error.connector.onePasswordNoVault":
     "Konto usługi nie może odczytać żadnego sejfu. Daj mu dostęp do sejfu i spróbuj ponownie.",
   "error.connector.onePasswordReadFailed":

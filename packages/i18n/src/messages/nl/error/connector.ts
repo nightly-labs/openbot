@@ -67,6 +67,8 @@ export const messages = {
     "OpenBot kon geen verbinding maken met 1Password. Controleer de internetverbinding en probeer het opnieuw.",
   "error.connector.onePasswordRateLimited":
     "1Password heeft te veel verzoeken ontvangen. Wacht een paar minuten en probeer het opnieuw.",
+  "error.connector.onePasswordRequestLimit":
+    "1Password heeft te veel verzoeken van serviceaccounts ontvangen. Probeer het over 1 uur opnieuw. Mislukt het dan nog, dan heeft je 1Password-account zijn daglimiet bereikt: probeer het over 24 uur opnieuw. Alle serviceaccounts van je account tellen mee voor deze limiet.",
   "error.connector.onePasswordNoVault":
     "Het serviceaccount kan geen kluis lezen. Geef het toegang tot een kluis en probeer het opnieuw.",
   "error.connector.onePasswordReadFailed":

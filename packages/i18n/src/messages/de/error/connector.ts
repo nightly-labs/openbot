@@ -68,6 +68,8 @@ export const messages = {
     "OpenBot konnte keine Verbindung zu 1Password herstellen. Prüfe die Internetverbindung und versuche es erneut.",
   "error.connector.onePasswordRateLimited":
     "1Password hat zu viele Anfragen erhalten. Warte ein paar Minuten und versuche es erneut.",
+  "error.connector.onePasswordRequestLimit":
+    "1Password hat zu viele Anfragen von Dienstkonten erhalten. Versuche es in 1 Stunde erneut. Wenn es weiter fehlschlägt, hat dein 1Password-Konto sein Tageslimit erreicht: Versuche es in 24 Stunden erneut. Alle Dienstkonten deines Kontos zählen zu diesem Limit.",
   "error.connector.onePasswordNoVault":
     "Das Dienstkonto kann keinen Tresor lesen. Gib ihm Zugriff auf einen Tresor und versuche es erneut.",
   "error.connector.onePasswordReadFailed":

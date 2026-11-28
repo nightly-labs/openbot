@@ -63,6 +63,8 @@ export const messages = {
   "error.connector.onePasswordUnreachable":
     "OpenBot이 1Password에 연결하지 못했어요. 인터넷 연결을 확인한 후 다시 시도해 주세요.",
   "error.connector.onePasswordRateLimited": "1Password에 요청이 너무 많아요. 몇 분 기다린 후 다시 시도해 주세요.",
+  "error.connector.onePasswordRequestLimit":
+    "서비스 계정에서 1Password로 보낸 요청이 너무 많아요. 1시간 후에 다시 시도해 주세요. 그래도 실패하면 1Password 계정이 일일 한도에 도달한 거예요. 24시간 후에 다시 시도해 주세요. 계정의 모든 서비스 계정이 이 한도에 포함돼요.",
   "error.connector.onePasswordNoVault":
     "서비스 계정이 볼트를 읽을 수 없어요. 볼트에 대한 접근 권한을 부여한 후 다시 시도해 주세요.",
   "error.connector.onePasswordReadFailed":

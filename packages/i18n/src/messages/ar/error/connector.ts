@@ -73,6 +73,8 @@ export const messages = {
   "error.connector.onePasswordUnreachable":
     "تعذّر على OpenBot الاتصال بـ 1Password. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.connector.onePasswordRateLimited": "تلقّى 1Password طلبات كثيرة جدًا. انتظر بضع دقائق، ثم حاول مرة أخرى.",
+  "error.connector.onePasswordRequestLimit":
+    "تلقّى 1Password طلبات كثيرة جدًا من حسابات الخدمة. حاول مرة أخرى بعد ساعة. إذا استمر الفشل، فقد بلغ حساب 1Password حده اليومي: حاول مرة أخرى بعد 24 ساعة. تُحتسب جميع حسابات الخدمة في حسابك ضمن هذا الحد.",
   "error.connector.onePasswordNoVault": "لا يمكن لحساب الخدمة قراءة أي خزنة. امنحه الوصول إلى خزنة، ثم حاول مرة أخرى.",
   "error.connector.onePasswordReadFailed":
     "لا يستطيع OpenBot قراءة بيانات تسجيل الدخول في 1Password. اقطع اتصال 1Password، ثم اتصل به مرة أخرى.",

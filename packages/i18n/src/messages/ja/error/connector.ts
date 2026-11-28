@@ -67,6 +67,8 @@ export const messages = {
     "OpenBot は 1Password に接続できませんでした。インターネット接続を確認してから、もう一度お試しください。",
   "error.connector.onePasswordRateLimited":
     "1Password へのリクエストが多すぎます。数分待ってから、もう一度お試しください。",
+  "error.connector.onePasswordRequestLimit":
+    "サービスアカウントから 1Password へのリクエストが多すぎます。1 時間後にもう一度お試しください。それでも失敗する場合は、1Password アカウントが 1 日の上限に達しています。24 時間後にもう一度お試しください。アカウント内のすべてのサービスアカウントがこの上限に含まれます。",
   "error.connector.onePasswordNoVault":
     "サービスアカウントは保管庫を読み取れません。保管庫へのアクセス権を付与してから、もう一度お試しください。",
   "error.connector.onePasswordReadFailed":
