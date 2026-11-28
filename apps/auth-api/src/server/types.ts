@@ -4,11 +4,13 @@ import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
+import type { HostState } from "./host-state-object";
 import { observedD1 } from "./observed-d1";
 import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
   DB: D1Database;
+  CF_VERSION_METADATA?: WorkerVersionMetadata;
   AVATARS: R2Bucket;
   SKILLS: R2Bucket;
   SITES: R2Bucket;
@@ -68,6 +70,8 @@ export interface WorkerBindings {
   REMOTE_AUTH_WEBHOOK_URL?: string;
   REMOTE_AUTH_WEBHOOK_URLS?: string;
   REMOTE_AUTH_WEBHOOK_SECRET?: string;
+  HOST_STATE?: DurableObjectNamespace<HostState>;
+  HOST_STATE_MODE?: string;
   SIGNAL_ENTRY_ZONE_ID?: string;
   SIGNAL_ENTRY_DNS_TOKEN?: string;
   SLACK_ROUTE_PRIVATE_JWK?: string;
@@ -247,7 +251,7 @@ export interface EmailChallengeRecord {
   deliveryState: EmailChallengeDeliveryState;
 }
 
-export type SessionReads = "replica" | "primary";
+export type SessionReads = "replica" | "primary" | "strict";
 
 export interface AuthRepository {
   listAccountSessions(
@@ -285,8 +289,23 @@ export interface AuthRepository {
     limit: number,
   ): Effect.Effect<{ allowed: boolean; count: number; windowStart: number }, AuthStoreError>;
   authenticate(sessionToken: string, now: number, reads?: SessionReads): Effect.Effect<AuthUser | null, AuthStoreError>;
-  authenticateDesktopSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
+  authenticateDesktopSession(
+    sessionToken: string,
+    now: number,
+    reads?: SessionReads,
+  ): Effect.Effect<AuthUser | null, AuthStoreError>;
+  authenticateSessionId(
+    sessionId: string,
+    userId: string,
+    now: number,
+    reads?: SessionReads,
+  ): Effect.Effect<AuthUser | null, AuthStoreError>;
+  sessionForToken(
+    sessionToken: string,
+    now: number,
+  ): Effect.Effect<{ sessionId: string; user: AuthUser; expiresAt: number } | null, AuthStoreError>;
   revokeSession(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
+  forgetSessionToken(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
   revokeMobileSession(sessionToken: string, now: number): Effect.Effect<boolean, AuthStoreError>;
   updateUserName(userId: string, name: string, now: number): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAnalytics(
@@ -353,7 +372,11 @@ export interface AuthRepository {
     session: { id: string; token: string; expiresAt: number };
     device: MobileAuthDeviceIdentity;
   }): Effect.Effect<MobileAuthSessionResult | null, AuthStoreError>;
-  authenticateMobileSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
+  authenticateMobileSession(
+    sessionToken: string,
+    now: number,
+    reads?: SessionReads,
+  ): Effect.Effect<AuthUser | null, AuthStoreError>;
   listMobileAuthDevices(
     userId: string,
     now: number,

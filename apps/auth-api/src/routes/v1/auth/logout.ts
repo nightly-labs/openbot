@@ -24,6 +24,7 @@ export const Route = createFileRoute("/v1/auth/logout")({
               return apiError(401, "unauthorized", "The session is invalid.");
             }
             yield* requestRemoteControlPlane().endAccountSession(user.id, yield* sha256(token));
+            yield* service.sessionEnded(token);
             return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
           }),
           authErrorResponse,

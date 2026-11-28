@@ -16,6 +16,8 @@ export const messages = {
   "error.remote.testPanelFailed": "Host nie mógł otworzyć panelu testowego.",
   "error.remote.sessionCapacity": "Host ma już cztery aktywne sesje.",
   "error.remote.linuxNeedsX11": "Zdalny pulpit w systemie Linux wymaga sesji X11. Wayland nie jest obsługiwany.",
+  "error.remote.macosUpdateRequired":
+    "Zdalny pulpit wymaga systemu macOS {version} lub nowszego na hoście. Zaktualizuj macOS na hoście, a następnie spróbuj ponownie.",
   "error.remote.runtimeMissing":
     "Brakuje środowiska Sunshine i Moonlight Web lub nie jest ono obsługiwane na tym hoście. Zainstaluj pełne wydanie OpenBot na Macu, hoście Windows x64 lub hoście Linux x64, a następnie uruchom ponownie OpenBot.",
   "error.remote.testActive": "Test zdalnego pulpitu jest aktywny. Spróbuj ponownie po jego zakończeniu.",

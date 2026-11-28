@@ -152,6 +152,15 @@ export function lowestPlanLimitsFirst(rows: readonly PlanLimitRow[]): PlanLimitR
   return [...rows].sort((left, right) => left.remainingPercent - right.remainingPercent);
 }
 
+export function mostLeftAccountPerProvider(rows: readonly PlanLimitRow[]): PlanLimitRow[] {
+  const best = new Map<AgentProviderId, PlanLimitRow>();
+  for (const row of rows) {
+    const current = best.get(row.provider);
+    if (!current || row.remainingPercent > current.remainingPercent) best.set(row.provider, row);
+  }
+  return lowestPlanLimitsFirst([...best.values()]);
+}
+
 export const PLAN_LIMIT_RESET_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",

@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
 import type { Server } from "bun";
 import { Effect, type ManagedRuntime } from "effect";
@@ -26,6 +26,7 @@ import {
   decodeTrustedBatch,
 } from "./handoff-bodies";
 import type { RemoteTicketClaims } from "./protocol";
+import { sameSecret } from "./same-secret";
 import type { SignalService, SignalSibling, SignalSocketCounts, SignalTokens } from "./signal-service";
 import type { TrustedResumeTokenEntry } from "./state-snapshot";
 import { type RemoteTokenService, RemoteTokenUnavailableError } from "./tokens";
@@ -85,10 +86,6 @@ export interface DrainReport {
   waves: number;
   discordHandedOver: boolean;
   queueHandedOver: number;
-}
-
-export function sameSecret(actual: string, expected: string): boolean {
-  return timingSafeEqual(createHash("sha256").update(actual).digest(), createHash("sha256").update(expected).digest());
 }
 
 function connectionRefused(error: unknown): boolean {

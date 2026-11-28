@@ -3,14 +3,16 @@ import { readFile } from "node:fs/promises";
 import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-protocol/ingress-queue";
 import type { Server } from "bun";
 import { Context, Effect, Layer, ManagedRuntime, Schema, Semaphore } from "effect";
+import { goAwayRoute } from "./admin-go-away";
 import { applyAuthEvent, createRemoteApiApp, decodeAuthEvent, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
 import type { DiscordApi } from "./discord-api";
 import { DiscordGateway, type DiscordGatewayHandoff } from "./discord-gateway";
 import { SignalEntry } from "./entry";
-import { SignalHandoff, sameSecret } from "./handoff";
+import { SignalHandoff } from "./handoff";
 import type { RouteWake } from "./ingress-queue";
 import { makeResumeBatcher } from "./resume-batch";
+import { sameSecret } from "./same-secret";
 import { SignalService } from "./signal-service";
 import {
   openSnapshot,
@@ -555,6 +557,7 @@ const healthServer = Bun.serve({
       });
     },
     ...handoff.routes(),
+    "/admin/go-away": { POST: goAwayRoute(signal, config.adminToken) },
   },
   fetch: () => new Response("Not found", { status: 404 }),
 });

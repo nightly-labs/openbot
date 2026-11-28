@@ -363,6 +363,7 @@ interface PeerState {
   sessionId: string;
   ticket: string;
   resumeToken: string | null;
+  resumeFrom: string | null;
   signalUrl: string;
   socket: WebSocket | null;
   signalLock: Semaphore.Semaphore;
@@ -398,6 +399,7 @@ interface PeerState {
   hostWaitingSince: number | null;
   hostWaitTicketMs: number;
   hostWaitTicketTimer: ReturnType<typeof setTimeout> | null;
+  goAwayTimer: ReturnType<typeof setTimeout> | null;
   ticketRequest: boolean;
   signalReady: boolean;
   answeredRequest: boolean;
@@ -645,9 +647,11 @@ export function createRemoteTeamPeer(
         if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
         if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
         if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
+        if (state.goAwayTimer !== null) clearTimeout(state.goAwayTimer);
         stopPathWatch(state);
         state.hostWaitTimer = null;
         state.hostWaitTicketTimer = null;
+        state.goAwayTimer = null;
         state.disconnectedTimer = null;
         state.iceRecoveryTimer = null;
         state.reconnectTimer = null;
@@ -827,6 +831,18 @@ export function createRemoteTeamPeer(
     else openSignal(state, actions);
   }
 
+  function scheduleGoAway(state: PeerState, actions: ActionsRef, withinMs: number): void {
+    if (state.goAwayTimer !== null) return;
+    state.goAwayTimer = setTimeout(
+      () => {
+        state.goAwayTimer = null;
+        if (active && !state.closed && peer === state)
+          void runPeerEffect(followHost(state, actions)).catch(() => undefined);
+      },
+      Math.floor(Math.random() * withinMs),
+    );
+  }
+
   function followHost(state: PeerState, actions: ActionsRef) {
     return Effect.fn("RemotePeer.followHost")(function* () {
       if (state.ticketRequest || state.closed || peer !== state) return;
@@ -862,6 +878,7 @@ export function createRemoteTeamPeer(
           state.ticket = bootstrap.ticket;
           if (moved) {
             state.signalUrl = bootstrap.signalUrl;
+            state.resumeFrom = state.resumeToken ?? state.resumeFrom;
             state.resumeToken = null;
             state.hostWaitingSince = null;
             state.hostWaitTicketMs = HOST_WAIT_TICKET_MS;
@@ -1045,6 +1062,7 @@ export function createRemoteTeamPeer(
         sessionId: bootstrap.sessionId,
         ticket: bootstrap.ticket,
         resumeToken: null,
+        resumeFrom: null,
         signalUrl: bootstrap.signalUrl,
         socket: null,
         signalLock: Semaphore.makeUnsafe(1),
@@ -1080,6 +1098,7 @@ export function createRemoteTeamPeer(
         hostWaitingSince: null,
         hostWaitTicketMs: HOST_WAIT_TICKET_MS,
         hostWaitTicketTimer: null,
+        goAwayTimer: null,
         ticketRequest: false,
         signalReady: false,
         answeredRequest: false,
@@ -1195,6 +1214,8 @@ export function createRemoteTeamPeer(
         version: SIGNAL_PROTOCOL_VERSION,
         peer: "client",
         token: state.resumeToken ?? state.ticket,
+        goAway: true,
+        ...(!state.resumeToken && state.resumeFrom ? { resumeFrom: state.resumeFrom } : {}),
         ...(waitForHost ? { waitForHost: true } : {}),
       };
       socket.send(JSON.stringify(hello));
@@ -1263,7 +1284,8 @@ export function createRemoteTeamPeer(
         message.type === "webhook-ready" ||
         message.type === "webhook-delivery" ||
         message.type === "github-ready" ||
-        message.type === "github-delivery"
+        message.type === "github-delivery" ||
+        message.type === "ingress-routes-result"
       )
         return;
       if (message.type === "account-profile-changed") {
@@ -1299,11 +1321,16 @@ export function createRemoteTeamPeer(
         const text = SIGNAL_ERROR_TEXT.get(message.code) ?? sourceText("error.remote.signalRefused");
         return yield* referenced(text, reference);
       }
+      if (message.type === "go-away") {
+        scheduleGoAway(state, actions, message.withinMs);
+        return;
+      }
       if (message.type === "host-waiting") {
         state.reconnectAttempt = 0;
         state.failedOpens = 0;
         state.signalAnswered = true;
         state.resumeToken = message.resumeToken;
+        state.resumeFrom = null;
         if (state.hostWaitingSince === null) {
           state.hostWaitingSince = Date.now();
           state.hostWaitTicketTimer = setTimeout(() => {
@@ -1356,6 +1383,7 @@ export function createRemoteTeamPeer(
         const restartsIce = state.restartIceOnReady || !online || relayed;
         state.restartIceOnReady = false;
         state.resumeToken = message.resumeToken;
+        state.resumeFrom = null;
         state.connectionId = message.connectionId ?? state.connectionId;
         state.iceServers = message.iceServers;
         if (!turnRefresh) state.reconnectGraceMs = message.reconnectGraceMs ?? DEFAULT_RECONNECT_GRACE_MS;
@@ -2465,6 +2493,7 @@ export function createRemoteTeamPeer(
       if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
       if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
       if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
+      if (state.goAwayTimer !== null) clearTimeout(state.goAwayTimer);
       if (state.eventAckTimer !== null) clearTimeout(state.eventAckTimer);
       stopPathWatch(state);
       state.socket?.close();

@@ -2,6 +2,7 @@ import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
 import { OPENBOT_SECURITY_HEADERS, OPENBOT_SITE_URL } from "../lib/site-metadata";
+import { checkAccessToken, isAccessToken } from "./access-tokens";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData, pruneExpiredRateLimits } from "./auth-data-retention";
@@ -22,6 +23,7 @@ import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
 import { mediaGatewayFromBinding } from "./media-gateway";
 import { d1OverloadedRecently, observedD1 } from "./observed-d1";
+import { sharedPageCache } from "./page-cache";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
   deliverPendingRemoteAuthEvents,
@@ -40,11 +42,36 @@ type WorkerExecutionContext = Pick<ExecutionContext, "waitUntil">;
 type RemoteAuthEventDelivery = typeof deliverPendingRemoteAuthEvents;
 type WorkerFetchBindings = Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
   Partial<
-    Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">
+    Pick<
+      WorkerBindings,
+      | "SITES"
+      | "SITE_LOCAL_ORIGIN"
+      | "DB"
+      | "OPENPANEL_CLIENT_ID"
+      | "OPENPANEL_CLIENT_SECRET"
+      | "SITE_REPORT_HASH_SECRET"
+      | "CF_VERSION_METADATA"
+    >
   >;
 
 const OVERLOAD_RETRY_AFTER_MIN_SECONDS = 10;
 const OVERLOAD_RETRY_AFTER_SPREAD_SECONDS = 20;
+
+const expiredAccessTokenResponse = Effect.fn("Worker.expiredAccessTokenResponse")(function* (
+  request: Request,
+  secret: string | undefined,
+) {
+  const authorization = request.headers.get("Authorization");
+  if (!secret || !authorization?.startsWith("Bearer ")) return null;
+  const token = authorization.slice("Bearer ".length);
+  if (!isAccessToken(token)) return null;
+  const check = yield* checkAccessToken(secret, token, Date.now());
+  if (check.status !== "expired") return null;
+  return Response.json(
+    { error: { code: "access_token_expired", message: "The access token has expired." } },
+    { status: 401, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
+  );
+});
 
 function withOverloadRetryAfter(response: Response): Response {
   if (response.status !== 500 || response.headers.has("Retry-After") || !d1OverloadedRecently(Date.now())) {
@@ -72,6 +99,7 @@ export function createWorkerHandler(
     const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
     const hostRedirect = canonicalHostRedirect(request) ?? passkeyWalletHostResponse(request, OPENBOT_SITE_URL);
     if (hostRedirect) return hostRedirect;
+    if (isMissingAssetRequest(request)) return missingAssetResponse();
     if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
       return runApiEffect(checkoutReturnResponse(request, bindings));
     }
@@ -79,6 +107,8 @@ export function createWorkerHandler(
       Effect.gen(function* () {
         const localSiteResponse = yield* serveLocalHostedSite(request, bindings);
         if (localSiteResponse) return localSiteResponse;
+        const expiredAccessToken = yield* expiredAccessTokenResponse(request, bindings.SITE_REPORT_HASH_SECRET);
+        if (expiredAccessToken) return expiredAccessToken;
         yield* enforceMarketplaceIngress(request, bindings);
         return null;
       }).pipe(
@@ -104,9 +134,14 @@ export function createWorkerHandler(
     if (earlyResponse) return earlyResponse;
     const markdown = await pageMarkdownResponse(request, fetchHandler);
     if (markdown) return markdown;
-    const response = Promise.resolve(fetchHandler(request)).then((result) =>
-      withOverloadRetryAfter(permanentTrailingSlashRedirect(request, result)),
-    );
+    const sharedPage = sharedPageCache(request, bindings.CF_VERSION_METADATA?.id, context);
+    const cachedPage = await sharedPage?.cached();
+    if (cachedPage) return cachedPage;
+    const response = Promise.resolve(fetchHandler(request)).then((result) => {
+      const finished = withOverloadRetryAfter(permanentTrailingSlashRedirect(request, result));
+      sharedPage?.remember(finished);
+      return finished;
+    });
     if (context && isEmailSignInStart(request)) {
       context.waitUntil(
         response.then(
@@ -430,6 +465,19 @@ function serveLocalHostedSite(
     { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true", ACCOUNT_ORIGIN: configuredOrigin.origin },
     Date.now(),
   );
+}
+
+function isMissingAssetRequest(request: Request): boolean {
+  return (
+    (request.method === "GET" || request.method === "HEAD") && new URL(request.url).pathname.startsWith("/assets/")
+  );
+}
+
+function missingAssetResponse(): Response {
+  return new Response(null, {
+    status: 404,
+    headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+  });
 }
 
 function isEmailSignInStart(request: Request): boolean {

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { handleBrowserApi } from "../../../server/browser-api";
 import { readHostLogo } from "../../../server/host-logo";
+import type { RemoteControlPlane } from "../../../server/remote-control-plane";
 import {
   hostedServerErrorResponse,
   requestAccountAttribution,
@@ -20,9 +21,13 @@ import {
 import { requestSourceIp } from "../../../server/source-ip";
 
 function handle({ request }: { request: Request }) {
+  let remote: RemoteControlPlane | null = null;
   return handleBrowserApi(request, {
     auth: requestAuthService(),
-    remote: requestRemoteControlPlane(),
+    get remote() {
+      remote ??= requestRemoteControlPlane();
+      return remote;
+    },
     companySignIn: requestCompanySignIn,
     hostLogo: (hostId, version) => readHostLogo(requestAvatarBucket(), hostId, version),
     hosting: requestHostedServerService,

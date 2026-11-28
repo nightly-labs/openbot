@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
+import { ACCESS_TOKEN_ROUTE } from "../../server/access-tokens";
+import { ownAccountReadsFor } from "../../server/auth-service";
 import { runApiResponse } from "../../server/effect-runtime";
-import { apiError, authErrorResponse, bearerToken, json, requestAuthService } from "../../server/request-auth";
+import {
+  apiError,
+  authErrorResponse,
+  bearerCredential,
+  json,
+  requestAuthService,
+  requestUser,
+} from "../../server/request-auth";
 
 export const Route = createFileRoute("/v1/me")({
   server: {
@@ -9,10 +18,12 @@ export const Route = createFileRoute("/v1/me")({
       GET: ({ request }) =>
         runApiResponse(
           Effect.gen(function* () {
-            const token = bearerToken(request);
-            if (!token) return apiError(401, "unauthorized", "Sign in is required.");
-            const user = yield* requestAuthService().authenticate(token);
-            return user ? json(user) : apiError(401, "unauthorized", "The session is invalid.");
+            if (!bearerCredential(request)) return apiError(401, "unauthorized", "Sign in is required.");
+            const user = yield* requestUser(request, ownAccountReadsFor(request));
+            if (!user) return apiError(401, "unauthorized", "The session is invalid.");
+            return json(
+              requestAuthService().issuesAccessTokens ? { ...user, accessTokenRoute: ACCESS_TOKEN_ROUTE } : user,
+            );
           }),
           authErrorResponse,
         ),
