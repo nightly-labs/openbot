@@ -28,13 +28,14 @@ export class ConnectionWaits {
   readonly #waits = new Map<string, Set<ConnectionWait>>();
 
   whenConnected = (serverId: string): Promise<void> =>
-    this.#resuming.has(serverId)
-      ? new Promise<void>((resolve, reject) => {
-          const waits = this.#waits.get(serverId) ?? new Set();
-          waits.add({ resolve, reject });
-          this.#waits.set(serverId, waits);
-        })
-      : Promise.resolve();
+    this.#resuming.has(serverId) ? this.whenOnlineAgain(serverId) : Promise.resolve();
+
+  whenOnlineAgain = (serverId: string): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      const waits = this.#waits.get(serverId) ?? new Set();
+      waits.add({ resolve, reject });
+      this.#waits.set(serverId, waits);
+    });
 
   setResuming(serverId: string, resuming: boolean): void {
     if (resuming) this.#resuming.add(serverId);
