@@ -147,6 +147,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude가 더 빠르게 답하지만 토큰당 비용이 더 높아요. Claude 구독에서는 요금제 사용량이 남아 있어도 빠른 모드가 항상 사용 크레딧을 써요.",
   "composer.fastMode.confirm": "켜기",
+  "composer.unsavedKey.title": "키를 먼저 저장할까요?",
+  "composer.unsavedKey.description":
+    "양식에 키를 입력했지만 저장하지 않았습니다. 지금 메시지를 보내면 양식이 닫히고 키가 사라집니다.",
+  "composer.unsavedKey.save": "저장 후 보내기",
+  "composer.unsavedKey.send": "키 없이 보내기",
   "composer.context.label": "컨텍스트 {percent} 사용",
   "composer.context.labelEstimated": "컨텍스트 약 {percent} 사용",
   "composer.context.labelCompacting": "컨텍스트 압축 중",

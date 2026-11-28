@@ -226,6 +226,7 @@ export function ConversationTimeline() {
     setOpenReactionMessageId,
     setRequiredInteractionElement,
     registerPromptComposerAnswer,
+    keepUnsavedKey,
     showScrollToLatest,
     unreadDividerVisible,
     updateScrollFade,
@@ -1785,6 +1786,7 @@ export function ConversationTimeline() {
                 <ConversationQuestionPrompt
                   elementRef={setRequiredInteractionElement}
                   registerComposerAnswer={registerPromptComposerAnswer}
+                  onUnsavedKeyChange={keepUnsavedKey}
                 />
               </div>
             </Show>

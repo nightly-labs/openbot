@@ -161,6 +161,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude répond plus vite, mais chaque token coûte plus cher. Avec un abonnement Claude, le mode rapide utilise toujours des crédits d’utilisation, même s’il reste de l’utilisation dans votre forfait.",
   "composer.fastMode.confirm": "Activer",
+  "composer.unsavedKey.title": "Enregistrer la clé d'abord ?",
+  "composer.unsavedKey.description":
+    "Vous avez saisi une clé dans le formulaire, mais vous ne l'avez pas enregistrée. Si vous envoyez votre message maintenant, le formulaire se ferme et la clé est perdue.",
+  "composer.unsavedKey.save": "Enregistrer et envoyer",
+  "composer.unsavedKey.send": "Envoyer sans la clé",
   "composer.context.label": "Contexte rempli à {percent}",
   "composer.context.labelEstimated": "Contexte rempli à environ {percent}",
   "composer.context.labelCompacting": "Compactage du contexte",

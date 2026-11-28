@@ -157,6 +157,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "O Claude responde mais rápido, mas cada token custa mais. Com uma assinatura do Claude, o modo rápido sempre usa créditos de uso, mesmo quando o seu plano ainda tem uso disponível.",
   "composer.fastMode.confirm": "Ativar",
+  "composer.unsavedKey.title": "Salvar a chave primeiro?",
+  "composer.unsavedKey.description":
+    "Você digitou uma chave no formulário, mas não a salvou. Se enviar sua mensagem agora, o formulário fecha e a chave se perde.",
+  "composer.unsavedKey.save": "Salvar e enviar",
+  "composer.unsavedKey.send": "Enviar sem a chave",
   "composer.context.label": "Contexto: {percent} usado",
   "composer.context.labelEstimated": "Contexto: cerca de {percent} usado",
   "composer.context.labelCompacting": "Compactando o contexto",

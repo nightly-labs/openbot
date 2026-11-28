@@ -156,6 +156,11 @@ export const messages = {
   "composer.fastMode.confirmDescription":
     "Claude antwoordt sneller, maar elk token kost meer. Met een Claude-abonnement gebruikt de snelle modus altijd gebruikstegoed, ook als je abonnement nog gebruik over heeft.",
   "composer.fastMode.confirm": "Inschakelen",
+  "composer.unsavedKey.title": "Eerst de sleutel opslaan?",
+  "composer.unsavedKey.description":
+    "Je hebt een sleutel in het formulier getypt, maar niet opgeslagen. Als je je bericht nu verstuurt, sluit het formulier en gaat de sleutel verloren.",
+  "composer.unsavedKey.save": "Opslaan en versturen",
+  "composer.unsavedKey.send": "Zonder sleutel versturen",
   "composer.context.label": "Context {percent} vol",
   "composer.context.labelEstimated": "Context ongeveer {percent} vol",
   "composer.context.labelCompacting": "Context comprimeren",

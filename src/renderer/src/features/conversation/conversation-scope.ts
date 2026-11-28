@@ -1193,6 +1193,32 @@ export function createConversationViewScope(props: ConversationProps) {
     setPromptComposerAnswer(() => answer);
     return () => setPromptComposerAnswer((current) => (current === answer ? undefined : current));
   };
+  const [unsavedKey, setUnsavedKey] = createSignal<() => Promise<boolean>>();
+  const [heldKeySend, setHeldKeySend] = createSignal<() => void>();
+  const keepUnsavedKey = (save: (() => Promise<boolean>) | undefined) => {
+    setUnsavedKey(() => save);
+    if (!save) setHeldKeySend(undefined);
+  };
+  const unsavedKeyDialogOpen = () => heldKeySend() !== undefined && unsavedKey() !== undefined;
+  const holdForUnsavedKey = (resend: () => void) => {
+    if (!unsavedKey()) return false;
+    setHeldKeySend(() => resend);
+    return true;
+  };
+  async function saveKeyAndSend(): Promise<void> {
+    const save = unsavedKey();
+    const resend = heldKeySend();
+    if (!save || !resend) return;
+    const saved = await save();
+    setHeldKeySend(undefined);
+    if (saved) resend();
+  }
+  function sendWithoutKey(): void {
+    const resend = heldKeySend();
+    setHeldKeySend(undefined);
+    resend?.();
+  }
+  const cancelUnsavedKeySend = () => setHeldKeySend(undefined);
   const openPromptKey = () => promptRequestKey(props.prompt?.turnId, props.prompt?.requestId);
   const openChatKey = () => {
     const open = props.threads?.open;
@@ -1327,6 +1353,7 @@ export function createConversationViewScope(props: ConversationProps) {
     pendingSends,
     attachmentPicker: () => attachmentPicker,
     promptComposerAnswer: composerPromptAnswer,
+    holdForUnsavedKey,
   });
   const {
     updateTeamTyping,
@@ -2974,6 +3001,10 @@ export function createConversationViewScope(props: ConversationProps) {
     ultrafast,
     fastModeChange,
     fastModeConfirmationOpen,
+    unsavedKeyDialogOpen,
+    saveKeyAndSend,
+    sendWithoutKey,
+    cancelUnsavedKeySend,
     confirmFastMode,
     cancelFastModeConfirmation,
     setComposerFocusRequest,
@@ -2983,6 +3014,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setRequiredInteractionElement,
     registerPromptComposerAnswer,
     keepUnsentPromptAnswer,
+    keepUnsavedKey,
     handleRoutineSettingsRequest,
     setShowComposerActions,
     settingsModel,

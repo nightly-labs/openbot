@@ -7,7 +7,7 @@ import {
 } from "@openbot/contracts/ui-blocks";
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, CreditCard, Field, KeyRound, NativeSelect, UserRound } from "@openbot/ui";
-import { createSignal, createUniqueId, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
+import { createEffect, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { UiBlockCard } from "../conversation/ui-blocks/UiBlockCard";
 import {
@@ -36,6 +36,7 @@ export interface VaultRequestCardProps {
   busy?: boolean | undefined;
   onSave?: ((input: VaultSaveInput, scope?: string) => Promise<void>) | undefined;
   onSkip?: (() => void) | undefined;
+  onUnsavedKeyChange?: ((save: (() => Promise<boolean>) | undefined) => void) | undefined;
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
 
@@ -143,13 +144,21 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
   const [apiKey, setApiKey] = createSignal("");
   const [scopeChoice, setScopeChoice] = createSignal(untrack(() => props.scope?.value ?? ""));
   const [saveFailure, setSaveFailure] = createSignal<string>();
-  onCleanup(() => props.elementRef?.(undefined));
+  onCleanup(() => {
+    props.elementRef?.(undefined);
+    props.onUnsavedKeyChange?.(undefined);
+  });
   const pending = () => props.status === "pending";
   const keyForm = () => props.kind === "apiKey" && pending();
 
-  async function saveApiKey(): Promise<void> {
+  createEffect(
+    () => keyForm() && Boolean(props.onSave) && apiKey().trim() !== "",
+    (unsaved) => props.onUnsavedKeyChange?.(unsaved ? saveApiKey : undefined),
+  );
+
+  async function saveApiKey(): Promise<boolean> {
     const save = props.onSave;
-    if (!save || props.busy || apiKey().trim() === "") return;
+    if (!save || !keyForm() || props.busy || apiKey().trim() === "") return false;
     setSaveFailure(undefined);
     try {
       await save(
@@ -157,8 +166,10 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
         props.scope ? scopeChoice() : undefined,
       );
       setApiKey("");
+      return true;
     } catch (cause) {
       setSaveFailure(errorMessage(cause, t("vault.failed")));
+      return false;
     }
   }
 

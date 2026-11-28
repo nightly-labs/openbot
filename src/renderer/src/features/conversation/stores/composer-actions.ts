@@ -162,6 +162,7 @@ export interface ComposerActionsDeps {
   attachmentPicker: () => HTMLInputElement | undefined;
   persistQueueEdit: boolean;
   promptComposerAnswer: () => QuestionPromptComposerAnswer | undefined;
+  holdForUnsavedKey: (resend: () => void) => boolean;
 }
 
 export async function importPastedFiles(
@@ -784,6 +785,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     submittedSnapshot?: ComposerDraft,
     voice?: VoiceSend,
     steer = false,
+    keyChoiceMade = false,
   ): Promise<boolean> {
     if (deps.attachmentBusy(targetOverride)) return false;
     if (!draftOverride && deps.currentEditingDeliveryId()) {
@@ -815,6 +817,13 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     if (
       target.serverId === (deps.props.server?.id ?? LOCAL_SERVER_ID) &&
       deps.props.agentStatus.providers?.some((status) => status.id === provider && status.state === "outdated")
+    )
+      return false;
+    if (
+      !keyChoiceMade &&
+      !voice &&
+      targetShown(target) &&
+      deps.holdForUnsavedKey(() => void submitMessage(undefined, undefined, undefined, undefined, steer, true))
     )
       return false;
     stopTeamTyping();
