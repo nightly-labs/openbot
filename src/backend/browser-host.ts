@@ -1224,6 +1224,9 @@ export class BrowserHost {
     this: BrowserHost,
     tabId: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    const tab = this.#tabs.get(tabId);
+    const protection = tab?.secret;
+    if (tab && protection?.submitted) return yield* this.#reloadProtected(tab, protection);
     yield* this.#leaveSilentPage(tabId);
     yield* this.#reloadPage(tabId);
   }).bind(this);
@@ -2132,17 +2135,20 @@ export class BrowserHost {
   }
 
   #reloadProtected(tab: BrowserHostTab, protection: NonNullable<BrowserHostTab["secret"]>) {
-    return this.#enqueue(
-      tab.id,
-      (current) =>
-        Effect.gen(function* () {
-          if (current.contents.isLoadingMainFrame())
-            yield* waitForLoading(current.contents, 10_000).pipe(Effect.ignore);
-          if (current.secret !== protection) return;
-          yield* untilStopped(current, reloadWithGet(current));
-        }),
-      true,
-    );
+    return Effect.gen({ self: this }, function* () {
+      yield* this.#leaveSilentPage(tab.id, undefined, true);
+      yield* this.#enqueue(
+        tab.id,
+        (current) =>
+          Effect.gen(function* () {
+            if (current.contents.isLoadingMainFrame())
+              yield* waitForLoading(current.contents, 10_000).pipe(Effect.ignore);
+            if (current.secret !== protection) return;
+            yield* untilStopped(current, reloadWithGet(current));
+          }),
+        true,
+      );
+    });
   }
 
   #reloadShownSecret(tab: BrowserHostTab) {
@@ -4765,12 +4771,18 @@ export class BrowserHost {
     this: BrowserHost,
     tabId: string,
     direction?: BrowserNavigationDirection | "reload",
+    afterSignIn = false,
   ) {
     const tab = this.#tabs.get(tabId);
-    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return false;
+    if (!tab || tab.closing || tab.pendingRestore || tab.contents.isDestroyed()) return false;
+    const protection = tab.secret;
+    const blockedBySignIn = () =>
+      tab.secret !== protection || (protection !== undefined && !(afterSignIn && signInEnded(protection)));
+    if (blockedBySignIn()) return false;
     if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return false;
     if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return false;
     if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return false;
+    if (blockedBySignIn() || tab.closing || tab.contents.isDestroyed()) return false;
     logger.warn("Ending the renderer of a browser tab whose page does not answer before it navigates");
     const contents = tab.contents;
     yield* Effect.callback<void>((resume) => {
@@ -5109,6 +5121,10 @@ function paddedCaptureDataUrl(image: NativeImage): string {
   for (let row = 0; row < size.height; row++)
     pixels.copy(padded, row * width * 4, row * size.width * 4, (row + 1) * size.width * 4);
   return nativeImage.createFromBitmap(padded, { width, height }).toDataURL();
+}
+
+function signInEnded(protection: NonNullable<BrowserHostTab["secret"]>): boolean {
+  return protection.submitted && !protection.running;
 }
 
 function reloadWithGet(tab: BrowserHostTab): Effect.Effect<void, BrowserOperationError> {

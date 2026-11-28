@@ -146,6 +146,121 @@ async function failedFillEndsView(browser: BrowserHost): Promise<string | null> 
   }
 }
 
+const STUCK_SUBMIT_ENDINGS = ["reload", "done", "view"] as const;
+
+function settlesWithin(work: Promise<unknown>, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    void work.then(
+      () => {
+        clearTimeout(timer);
+        resolve(true);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(false);
+      },
+    );
+  });
+}
+
+async function runStuckSubmitScenario(browser: BrowserHost): Promise<void> {
+  const results: Record<string, { passed: boolean; [detail: string]: boolean | number | string }> = {};
+  for (const ending of STUCK_SUBMIT_ENDINGS) {
+    const tab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/hangs-on-submit", "secret-thread", "secret-agent"),
+    );
+    try {
+      const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+      if (!contents) throw new Error("Missing stuck sign-in fixture.");
+      await waitForPresentedFrame(contents);
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: `stuck-submit-${ending}`,
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "click",
+            submitTarget: { kind: "css", selector: "#sign-in" },
+          },
+        }),
+      );
+      const failure = await runCauseEffect(handoff.submit("fixture-password-902114", true)).then(
+        () => "",
+        (error: unknown) => (error instanceof Error ? error.message : String(error)),
+      );
+      await runCauseEffect(browser.beginTakeover(tab.id));
+      const title = () => browser.listTabs().find((item) => item.id === tab.id)?.title;
+      const protectedAtTakeover = title() === "Secure authentication";
+      const started = Date.now();
+      let frames = 0;
+      let finished = true;
+      if (ending === "reload") finished = await settlesWithin(runCauseEffect(browser.reload(tab.id)), 30_000);
+      else if (ending === "done") browser.endTakeover(tab.id, true);
+      else {
+        const view = runCauseEffect(
+          browser.startView(tab.id, () => {
+            frames += 1;
+          }),
+        );
+        finished = await settlesWithin(view, 30_000);
+        if (finished) {
+          const deadline = Date.now() + 10_000;
+          while (frames === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+          await runCauseEffect((await view)());
+        }
+      }
+      const deadline = Date.now() + 30_000;
+      while (title() === "Secure authentication" && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      const released = title() !== "Secure authentication";
+      const recoveryMs = Date.now() - started;
+      if (ending !== "done") browser.endTakeover(tab.id, true);
+      const snapshot = await runCauseEffect(browser.snapshot(tab.id)).then(
+        (read) => read,
+        () => null,
+      );
+      const snapshotWorks = snapshot !== null;
+      const reloadedFixture = snapshot?.url.endsWith("/hangs-on-submit") === true && title() === "Stuck sign in";
+      const timedOut = failure.includes("Authentication submission timed out");
+      results[ending] = {
+        passed:
+          timedOut &&
+          protectedAtTakeover &&
+          finished &&
+          released &&
+          snapshotWorks &&
+          reloadedFixture &&
+          (ending !== "view" || frames > 0),
+        timedOut,
+        protectedAtTakeover,
+        finished,
+        released,
+        reloadedFixture,
+        snapshotWorks,
+        frames,
+        recoveryMs,
+      };
+    } finally {
+      await runCauseEffect(browser.close(tab.id));
+    }
+  }
+  const report = {
+    status: Object.values(results).every((result) => result.passed) ? "passed" : "issues_found",
+    ...results,
+  };
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(".openbot-build/browser-secret-stuck-submit.json", JSON.stringify(report, null, 2));
+  if (report.status !== "passed")
+    throw new Error(`A tab stayed stuck after its sign-in page stopped answering: ${JSON.stringify(report)}`);
+}
+
 async function runLiveViewScenario(browser: BrowserHost): Promise<void> {
   const tab = await runCauseEffect(
     browser.open("https://authentication.openbot.test/long-form", "secret-thread", "secret-agent"),
@@ -282,6 +397,13 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         <iframe title="Sign in" width="400" height="200" src="https://${url.pathname === "/framed" ? FRAME_HOSTS[0] : FRAME_HOSTS[1]}/frame-form"></iframe>
         <script>addEventListener('message', (event) => { if (event.origin.startsWith('https://login.')) location.href = event.data === true ? '/complete' : '/wrong'; });</script>
         </body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
+    if (url.pathname === "/hangs-on-submit")
+      return new Response(
+        `<!doctype html><title>Stuck sign in</title><body>
+        <label>Password<input id="password" type="password"></label>
+        <button id="sign-in" type="button" onclick="while (true) {}">Sign in</button></body>`,
         { headers: { "Content-Type": "text/html" } },
       );
     if (url.pathname === "/stuck") stuckPageLoads += 1;
@@ -1209,6 +1331,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       throw new Error(`A tab stayed locked after its saved login ended: ${JSON.stringify(lostReport)}`);
     await runLiveViewScenario(browser);
     await runFrameScenario(browser);
+    await runStuckSubmitScenario(browser);
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {
     protocol.unhandle("https");
