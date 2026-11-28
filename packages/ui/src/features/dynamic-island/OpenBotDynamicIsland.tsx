@@ -79,6 +79,7 @@ export interface OpenBotDynamicIslandProps {
   presentation: DynamicIslandPresentation;
   state: DynamicIslandViewState;
   displayMode?: "notch" | "island";
+  builtInDisplay?: boolean;
   notchSize?: DynamicIslandNotchSize | undefined;
   variant?: AppVariant;
   widthPercent?: number;
@@ -598,7 +599,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
       <AmbientMotion when={ambientMotion()}>
         <DynamicIsland
           label={
-            props.displayMode === "island"
+            props.displayMode === "island" && props.builtInDisplay !== true
               ? t("island.label.externalDisplay", { label: t(config().label) })
               : t(config().label)
           }
