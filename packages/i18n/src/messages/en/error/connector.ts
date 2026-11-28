@@ -72,6 +72,8 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordUnreachable":
     "OpenBot cannot reach 1Password. Check the internet connection, then try again.",
   "error.connector.onePasswordRateLimited": "1Password received too many requests. Wait a few minutes, then try again.",
+  "error.connector.onePasswordRequestLimit":
+    "1Password received too many requests from service accounts. Try again in 1 hour. If it still fails, your 1Password account reached its daily limit: try again in 24 hours. All service accounts of your account count toward this limit.",
   "error.connector.onePasswordNoVault":
     "The service account cannot read a vault. Give it access to a vault, then try again.",
   "error.connector.onePasswordReadFailed":

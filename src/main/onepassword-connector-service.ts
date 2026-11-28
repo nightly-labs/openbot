@@ -225,7 +225,7 @@ function passingFailureText(error: unknown): string | null {
     (error instanceof Error && error.constructor.name === "RateLimitExceededError") ||
     /rate limit exceeded/i.test(message)
   )
-    return sourceText("error.connector.onePasswordRateLimited");
+    return sourceText("error.connector.onePasswordRequestLimit");
   if (/error sending request|request timeout/i.test(message))
     return sourceText("error.connector.onePasswordUnreachable");
   return null;

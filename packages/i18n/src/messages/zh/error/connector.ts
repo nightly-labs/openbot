@@ -57,6 +57,8 @@ export const messages = {
   "error.connector.onePasswordTokenRejected": "1Password 未接受该服务账号令牌。",
   "error.connector.onePasswordUnreachable": "OpenBot 无法连接到 1Password，请检查网络连接后重试。",
   "error.connector.onePasswordRateLimited": "1Password 收到的请求过多，请等待几分钟后重试。",
+  "error.connector.onePasswordRequestLimit":
+    "1Password 收到的服务账号请求过多。请在 1 小时后重试。如果仍然失败，说明你的 1Password 账号已达到每日上限：请在 24 小时后重试。你账号中的所有服务账号都计入此上限。",
   "error.connector.onePasswordNoVault": "该服务账号无法读取任何保险库。请授予其保险库访问权限后重试。",
   "error.connector.onePasswordReadFailed":
     "OpenBot 无法读取你在 1Password 中的登录信息。请断开 1Password，然后重新连接。",

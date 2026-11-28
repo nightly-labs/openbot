@@ -42,6 +42,7 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.recipientHidden",
   "error.provider.customEndpointKeyRefused",
   "error.connector.protonPassPlan",
+  "error.connector.onePasswordRateLimited",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

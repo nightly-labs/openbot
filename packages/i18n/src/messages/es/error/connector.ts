@@ -67,6 +67,8 @@ export const messages = {
     "OpenBot no pudo conectarse a 1Password. Comprueba la conexión a Internet e inténtalo de nuevo.",
   "error.connector.onePasswordRateLimited":
     "1Password recibió demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.",
+  "error.connector.onePasswordRequestLimit":
+    "1Password recibió demasiadas solicitudes de cuentas de servicio. Inténtalo de nuevo en 1 hora. Si sigue fallando, tu cuenta de 1Password alcanzó su límite diario: inténtalo de nuevo en 24 horas. Todas las cuentas de servicio de tu cuenta cuentan para este límite.",
   "error.connector.onePasswordNoVault":
     "La cuenta de servicio no puede leer ninguna bóveda. Dale acceso a una bóveda e inténtalo de nuevo.",
   "error.connector.onePasswordReadFailed":
