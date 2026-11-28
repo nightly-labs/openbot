@@ -2658,7 +2658,7 @@ const voiceTranscription: TeamApiVoiceTranscription = {
   },
 };
 
-const clientBrowser = new ClientBrowserHub({ commandMs: 1_500, presenceMs: 60_000 });
+const clientBrowser = new ClientBrowserHub({ commandMs: 1_500, presenceMs: 60_000, reconnectMs: 3_000 });
 
 const liveVoiceListeners = new Set<(event: VoiceLiveEvent, memberId: string | null) => void>();
 let liveVoiceStarts = 0;
@@ -16935,8 +16935,68 @@ try {
       json: { sharing: true, tabs: [tab] },
     });
     const sharedAgain = clientBrowser.tabs(bobId) !== null;
-    bobSocket.socket.close();
-    bobOld.socket.close();
+    const socketClosed = (socket: WebSocket) =>
+      new Promise<void>((resolveClosed) => {
+        if (socket.readyState === WebSocket.CLOSED) return resolveClosed();
+        socket.addEventListener("close", () => resolveClosed(), { once: true });
+        socket.close();
+      });
+    await Promise.all([socketClosed(bobSocket.socket), socketClosed(bobOld.socket)]);
+    await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const keptOverDrop = clientBrowser.tabs(bobId) !== null;
+    const waitingOverDrop = runTool([bobId], "snapshot", { tabId: chromeTabId });
+    const bobBack = await openChromeSocket(bobToken, [CLIENT_BROWSER_CAPABILITY]);
+    const redelivered = await bobBack.until(() => bobBack.events.length === 1);
+    const answeredOverDrop = await call("POST", CLIENT_BROWSER_ROUTES.result, {
+      token: bobToken,
+      ...v10,
+      json: { id: bobBack.events[0]?.id, ok: true, result: { text: "after the drop", image: null, tab: null } },
+    });
+    const resultOverDrop = await waitingOverDrop;
+    check(
+      "a short drop of the member's event connection keeps the shared tabs, and a command waits for the connection to come back",
+      keptOverDrop &&
+        bobBack.ready &&
+        redelivered &&
+        isDeepStrictEqual(
+          bobBack.events.map((event) => event.command),
+          [{ kind: "snapshot", tabId: "41" }],
+        ) &&
+        answeredOverDrop.status === 200 &&
+        resultOverDrop.success &&
+        text(resultOverDrop) === "after the drop",
+      [keptOverDrop, bobBack.events, summary(answeredOverDrop), resultOverDrop],
+    );
+    const adaChrome = field(
+      (
+        await call("POST", TEAM_API_ROUTES.auth.login, {
+          json: { username: "ada", password: ADA_PASSWORD },
+        })
+      ).body,
+      "sessionToken",
+    );
+    assert.ok(typeof adaChrome === "string", "ada has no Chrome session.");
+    const adaChromeSocket = await openChromeSocket(adaChrome, [CLIENT_BROWSER_CAPABILITY]);
+    const adaShared = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: adaChrome,
+      ...v10,
+      json: { sharing: true, tabs: [tab] },
+    });
+    await socketClosed(adaChromeSocket.socket);
+    await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const adaKeptOverDrop = clientBrowser.tabs(adaId) !== null;
+    const adaLogout = await call("POST", TEAM_API_ROUTES.auth.logout, { token: adaChrome, json: {} });
+    const adaSharedAfterLogout = clientBrowser.tabs(adaId) !== null;
+    check(
+      "a sign-out while the event connection is away ends the shared tabs at once",
+      adaChromeSocket.ready &&
+        adaShared.status === 200 &&
+        adaKeptOverDrop &&
+        adaLogout.status === 204 &&
+        !adaSharedAfterLogout,
+      [summary(adaShared), adaKeptOverDrop, summary(adaLogout), adaSharedAfterLogout],
+    );
+    bobBack.socket.close();
     adaSocket.socket.close();
     const closed = await new Promise<boolean>((resolveClosed) => {
       const deadline = setTimeout(() => resolveClosed(false), 5_000);
@@ -16947,10 +17007,14 @@ try {
         resolveClosed(true);
       }, 20);
     });
-    check("the shared tabs end when the last event connection of the member's session closes", sharedAgain && closed, {
-      sharedAgain,
-      closed,
-    });
+    check(
+      "the shared tabs end when the last event connection of the member's session closes and does not come back",
+      sharedAgain && closed,
+      {
+        sharedAgain,
+        closed,
+      },
+    );
   }
 
   {

@@ -26,13 +26,17 @@ interface Presence {
   tabs: ClientTab[];
   order: number;
   expiry: ReturnType<typeof setTimeout>;
+  reconnecting: ReturnType<typeof setTimeout> | null;
 }
 
 interface Pending {
   memberId: string;
   sessionId: string;
+  undelivered: ClientBrowserCommandEvent | null;
   answer: (answer: ClientBrowserAnswer) => void;
 }
+
+const RECONNECT_WAIT_MS = 10_000;
 
 function refused(id: string, code: "not-shared" | "timeout"): ClientBrowserAnswer {
   return { id, ok: false, error: "", code };
@@ -42,10 +46,16 @@ export class ClientBrowserHub implements ClientBrowser {
   readonly #presence = new Map<string, Presence>();
   readonly #pending = new Map<string, Pending>();
   readonly #deliver = new Set<Deliver>();
-  readonly #timing: { commandMs: number; presenceMs: number };
+  readonly #timing: { commandMs: number; presenceMs: number; reconnectMs: number };
   #order = 0;
 
-  constructor(timing = { commandMs: CLIENT_BROWSER_COMMAND_TIMEOUT_MS, presenceMs: CLIENT_BROWSER_PRESENCE_TTL_MS }) {
+  constructor(
+    timing = {
+      commandMs: CLIENT_BROWSER_COMMAND_TIMEOUT_MS,
+      presenceMs: CLIENT_BROWSER_PRESENCE_TTL_MS,
+      reconnectMs: RECONNECT_WAIT_MS,
+    },
+  ) {
     this.#timing = timing;
   }
 
@@ -57,12 +67,42 @@ export class ClientBrowserHub implements ClientBrowser {
     if (kept) clearTimeout(kept.expiry);
     const expiry = setTimeout(() => this.sessionEnded(sessionId), this.#timing.presenceMs);
     expiry.unref?.();
-    this.#presence.set(sessionId, { memberId, tabs: presence.tabs, order: kept?.order ?? ++this.#order, expiry });
+    this.#presence.set(sessionId, {
+      memberId,
+      tabs: presence.tabs,
+      order: kept?.order ?? ++this.#order,
+      expiry,
+      reconnecting: kept?.reconnecting ?? null,
+    });
+  }
+
+  connectionLost(sessionId: string): void {
+    const presence = this.#presence.get(sessionId);
+    if (!presence || presence.reconnecting) return;
+    presence.reconnecting = setTimeout(() => this.sessionEnded(sessionId), this.#timing.reconnectMs);
+    presence.reconnecting.unref?.();
+  }
+
+  connectionBack(memberId: string, sessionId: string): void {
+    const presence = this.#presence.get(sessionId);
+    if (!presence || presence.memberId !== memberId || !presence.reconnecting) return;
+    clearTimeout(presence.reconnecting);
+    presence.reconnecting = null;
+    for (const pending of this.#pending.values())
+      if (
+        pending.sessionId === sessionId &&
+        pending.undelivered &&
+        this.#send(memberId, sessionId, pending.undelivered)
+      )
+        pending.undelivered = null;
   }
 
   sessionEnded(sessionId: string): void {
     const presence = this.#presence.get(sessionId);
-    if (presence) clearTimeout(presence.expiry);
+    if (presence) {
+      clearTimeout(presence.expiry);
+      if (presence.reconnecting) clearTimeout(presence.reconnecting);
+    }
     this.#presence.delete(sessionId);
     for (const [id, pending] of this.#pending)
       if (pending.sessionId === sessionId) {
@@ -110,13 +150,20 @@ export class ClientBrowserHub implements ClientBrowser {
       }
       const { sessionId } = current;
       return Effect.callback<ClientBrowserAnswer>((resume) => {
-        this.#pending.set(event.id, { memberId, sessionId, answer: (answer) => resume(Effect.succeed(answer)) });
-        let delivered = false;
-        for (const deliver of this.#deliver) delivered = deliver(memberId, sessionId, event) || delivered;
-        if (!delivered) {
-          this.#pending.delete(event.id);
-          resume(Effect.succeed(refused(event.id, "not-shared")));
+        const pending: Pending = {
+          memberId,
+          sessionId,
+          undelivered: null,
+          answer: (answer) => resume(Effect.succeed(answer)),
+        };
+        this.#pending.set(event.id, pending);
+        if (this.#send(memberId, sessionId, event)) return;
+        if (this.#presence.get(sessionId)?.reconnecting) {
+          pending.undelivered = event;
+          return;
         }
+        this.#pending.delete(event.id);
+        resume(Effect.succeed(refused(event.id, "not-shared")));
       }).pipe(
         Effect.timeoutOrElse({
           duration: this.#timing.commandMs,
@@ -150,6 +197,12 @@ export class ClientBrowserHub implements ClientBrowser {
     for (const [id, pending] of this.#pending) pending.answer(refused(id, "not-shared"));
     this.#pending.clear();
     this.#deliver.clear();
+  }
+
+  #send(memberId: string, sessionId: string, event: ClientBrowserCommandEvent): boolean {
+    let delivered = false;
+    for (const deliver of this.#deliver) delivered = deliver(memberId, sessionId, event) || delivered;
+    return delivered;
   }
 
   #sessions(memberId: string): { sessionId: string; presence: Presence }[] {

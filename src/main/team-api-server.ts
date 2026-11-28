@@ -654,6 +654,7 @@ export class TeamApiServer {
   readonly #options: Omit<TeamApiOptions, "sidebarLayout"> & { sidebarLayout: TeamApiSidebarLayout };
   readonly #rateLimits = new Map<string, RateEntry>();
   readonly #eventClients = new Map<Ws.WebSocket, EventClientState>();
+  readonly #clientBrowserReconnects = new Map<string, string>();
   readonly #syncLogSources: TeamSyncLogSources = {
     agents: () => this.#options.agents,
     channels: () => this.#options.channels,
@@ -887,6 +888,7 @@ export class TeamApiServer {
           client.close(1008, "Team access was revoked");
         } else if (client.readyState === webSockets.WebSocket.OPEN) client.ping();
       }
+      this.#endRevokedClientBrowserReconnects();
     }, 15_000);
     this.#heartbeat.unref?.();
     this.#publishPresence();
@@ -1017,8 +1019,18 @@ export class TeamApiServer {
         client.close(1008, "Team access was revoked");
       }
     }
+    this.#endRevokedClientBrowserReconnects();
     this.#sync.changedAll();
     this.#publishPresence();
+  }
+
+  #endRevokedClientBrowserReconnects(): void {
+    for (const [sessionId, token] of this.#clientBrowserReconnects) {
+      const waiting = this.#options.clientBrowser?.shares(sessionId) === true;
+      if (waiting && this.#options.store.authenticate(token)) continue;
+      this.#clientBrowserReconnects.delete(sessionId);
+      if (waiting) this.#options.clientBrowser?.sessionEnded(sessionId);
+    }
   }
 
   refreshIdentity(): void {
@@ -2454,6 +2466,10 @@ export class TeamApiServer {
             const appearanceWasSent = connection.capabilities.has(HOST_APPEARANCE_CAPABILITY);
             const remoteChatContentWasSent = connection.capabilities.has(REMOTE_CHAT_CONTENT_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
+            if (connection.sessionId && connection.capabilities.has(CLIENT_BROWSER_CAPABILITY)) {
+              this.#clientBrowserReconnects.delete(connection.sessionId);
+              this.#options.clientBrowser?.connectionBack(connection.memberId, connection.sessionId);
+            }
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
             }
@@ -2514,7 +2530,10 @@ export class TeamApiServer {
         this.#options.liveActivityPush?.disconnected(sessionId);
         this.#options.pushNotifications?.disconnected(sessionId);
         this.#options.browser.releaseUserControlHeldBy({ kind: "session", sessionId });
-        this.#options.clientBrowser?.sessionEnded(sessionId);
+        if (this.#options.store.authenticate(connection.token)) {
+          this.#clientBrowserReconnects.set(sessionId, connection.token);
+          this.#options.clientBrowser?.connectionLost(sessionId);
+        } else this.#options.clientBrowser?.sessionEnded(sessionId);
         const liveVoice = this.#options.liveVoice;
         if (liveVoice)
           for (const voice of this.#liveVoiceSessions.ofTeamSession(sessionId)) {
