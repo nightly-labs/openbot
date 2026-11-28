@@ -47,12 +47,13 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     const entry = task(agentId, id);
     return entry !== undefined && entry.state !== "closed" && !hidden().has(id);
   };
+  const resting = (agentId: string, id: string): boolean => task(agentId, id)?.state === "closed" && !hidden().has(id);
   const openIds = (agentId: string): string[] => storedTabs(agentId).open.filter((id) => shown(agentId, id));
   const sideIds = (agentId: string): string[] => storedTabs(agentId).side.filter((id) => shown(agentId, id));
-  const keptIds = (agentId: string): string[] =>
-    tasks.snapshot(agentId) ? openIds(agentId) : storedTabs(agentId).open.filter((id) => !hidden().has(id));
-  const keptSideIds = (agentId: string): string[] =>
-    tasks.snapshot(agentId) ? sideIds(agentId) : storedTabs(agentId).side.filter((id) => !hidden().has(id));
+  const kept = (agentId: string, ids: readonly string[]): string[] =>
+    ids.filter((id) => !hidden().has(id) && (!tasks.snapshot(agentId) || task(agentId, id) !== undefined));
+  const keptIds = (agentId: string): string[] => kept(agentId, storedTabs(agentId).open);
+  const keptSideIds = (agentId: string): string[] => kept(agentId, storedTabs(agentId).side);
   const hasDraft = (agentId: string) => drafts().has(agentId);
   const tabOrder = (agentId: string): string[] => [
     MAIN_THREAD_ID,
@@ -92,10 +93,24 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     });
   }
 
-  function setOrder(agentId: string, order: readonly string[], active: string): void {
+  function withRestingTabs(agentId: string, open: readonly string[], dropped: readonly string[]): string[] {
+    const before = keptIds(agentId);
+    const result = [...open];
+    before.forEach((id, index) => {
+      if (!resting(agentId, id) || result.includes(id) || dropped.includes(id)) return;
+      const neighbor = before.slice(0, index).findLast((other) => result.includes(other));
+      result.splice(neighbor === undefined ? 0 : result.indexOf(neighbor) + 1, 0, id);
+    });
+    return result;
+  }
+
+  function setOrder(agentId: string, order: readonly string[], active: string, dropped: readonly string[] = []): void {
     const open = order.filter((id) => id !== MAIN_THREAD_ID && id !== DRAFT_THREAD_ID);
     setDraft(agentId, order.includes(DRAFT_THREAD_ID));
-    writeTabs(agentId, { open, active: active === MAIN_THREAD_ID ? null : active });
+    writeTabs(agentId, {
+      open: withRestingTabs(agentId, open, dropped),
+      active: active === MAIN_THREAD_ID ? null : active,
+    });
   }
 
   function open(agentId: string, id: string): void {
@@ -127,18 +142,19 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     const index = order.indexOf(id);
     const next = order.filter((entry) => entry !== id);
     const current = activeId(agentId);
-    setOrder(agentId, next, current === id ? (next[Math.max(0, index - 1)] ?? MAIN_THREAD_ID) : current);
+    setOrder(agentId, next, current === id ? (next[Math.max(0, index - 1)] ?? MAIN_THREAD_ID) : current, [id]);
   }
 
   function closeOthers(agentId: string, id: string): void {
-    setOrder(agentId, id === MAIN_THREAD_ID ? [MAIN_THREAD_ID] : [MAIN_THREAD_ID, id], id);
+    setOrder(agentId, id === MAIN_THREAD_ID ? [MAIN_THREAD_ID] : [MAIN_THREAD_ID, id], id, keptIds(agentId));
   }
 
   function closeToTheRight(agentId: string, id: string): void {
     const order = tabOrder(agentId);
     const next = order.slice(0, order.indexOf(id) + 1);
     const current = activeId(agentId);
-    setOrder(agentId, next, next.includes(current) ? current : id);
+    const stored = keptIds(agentId);
+    setOrder(agentId, next, next.includes(current) ? current : id, stored.slice(stored.indexOf(id) + 1));
   }
 
   function move(agentId: string, id: string, index: number): void {
@@ -238,7 +254,10 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
       if (index < 0) return;
       const open = openIds(agentId).filter((other) => other !== id);
       open.splice(Math.max(0, index - 1), 0, id);
-      writeTabs(agentId, { open, active: wasActive ? id : (before.active ?? null) });
+      writeTabs(agentId, {
+        open: withRestingTabs(agentId, open, []),
+        active: wasActive ? id : (before.active ?? null),
+      });
     }
 
     if (restore && !(await tasks.closeTask(agentId, id, server))) {
@@ -433,7 +452,7 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
       if (added.length === 0) return;
       for (const id of added) seen.add(id);
       untrack(() => {
-        const ids = openIds(agentId);
+        const ids = keptIds(agentId);
         const open = [...ids, ...added.filter((id) => !ids.includes(id))];
         writeTabs(agentId, { open, active: storedTabs(agentId).active });
       });
