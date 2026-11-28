@@ -18,7 +18,8 @@ export const messages = defineMessages("extension", {
   "extension.connection.identityChanged": "{server} has a new identity. Sign out and sign in again to trust it.",
   "extension.connection.updateExtension": "Update the OpenBot extension to use {server}.",
   "extension.connection.updateServer": "{server} needs an update to work with this extension.",
-  "extension.connection.noServers": "Your account has no servers yet. Set one up in the OpenBot app.",
+  "extension.connection.noServers":
+    "Open OpenBot on your computer with this account, and turn on Publish this server in Server settings → Members. Or join a server in the OpenBot app.",
   "extension.connection.noServersTitle": "No servers available",
   "extension.connection.servers": "Servers",
   "extension.connection.remote": "Remote",
