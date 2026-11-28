@@ -1,14 +1,32 @@
 import { AppLogo } from "@openbot/brand";
 import { AGENT_TEMPLATE_CARD, type AgentTemplatePreview } from "@openbot/contracts/ipc";
-import { avatarHeadColor, createStaticAvatarSvg } from "@openbot/ui/bloub-avatar";
+import { bloubAvatarProfile } from "@openbot/ui/bloub-avatar";
 import { render } from "@solidjs/web";
 import { flush } from "solid-js";
-import { loadImage, loadSvg, withAlpha } from "../../avatar-canvas";
+import { loadImage, loadSvg } from "../../avatar-canvas";
+import { feltCardArt } from "./felt-card-art";
+
+/*
+ * The share card: the image X and other sites show for an `openbot.run/agents/<id>` link.
+ *
+ * It is drawn here, at publish time, because this is where the agent's avatar is. The Worker only
+ * checks its size and stores it.
+ *
+ * The layout is the "Filcowe karty agentów" frame of the design file: a felt agent on a paper planet,
+ * on black, with the name, the role and the site in a centred column on the right. The felt body
+ * comes in the agent's shape and colour, and its eyes are a separate layer in the agent's expression.
+ * An agent with a photo shows the photo, cut round, in place of the felt body.
+ */
 
 const { width: WIDTH, height: HEIGHT } = AGENT_TEMPLATE_CARD;
-const HERO = { x: 40, y: 40, size: 550, radius: 40 };
-const AVATAR_SIZE = 300;
-const COLUMN = { x: 650, width: 490 };
+/** The felt body and its eyes share this square, as in the design file. */
+const BODY = { x: 0, y: 34, size: 510 };
+const PHOTO_SIZE = 300;
+const COLUMN = { x: 619, width: 518, centre: 317, bottom: 482 };
+const NAME = { size: 75, lineHeight: 91, maxLines: 2, minSize: 52 };
+const ROLE = { size: 33, lineHeight: 40, maxLines: 2, gap: 22 };
+const SITE = { size: 24, lineHeight: 29, gap: 10 };
+const TEXT = { name: "#ffffff", role: "#e0e0e0", site: "#b8b8b8" };
 export const FONT = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 export async function renderAgentTemplateCard(preview: AgentTemplatePreview): Promise<Uint8Array> {
@@ -17,149 +35,138 @@ export async function renderAgentTemplateCard(preview: AgentTemplatePreview): Pr
   canvas.height = HEIGHT;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("The share card cannot be drawn.");
-  await Promise.all([document.fonts.load(`700 64px ${FONT}`), document.fonts.load(`500 26px ${FONT}`)]);
 
-  const colors = themeColors();
-  context.fillStyle = colors.canvas;
+  const profile = bloubAvatarProfile(preview.avatarSeed, preview.avatarHue);
+  const art = feltCardArt(profile);
+  const [planet, body, eyes] = await Promise.all([
+    loadUrl(art.planet),
+    preview.avatarImage ? null : loadUrl(art.body),
+    preview.avatarImage ? null : loadUrl(art.eyes),
+    document.fonts.load(`800 ${NAME.size}px ${FONT}`),
+    document.fonts.load(`500 ${ROLE.size}px ${FONT}`),
+  ]);
+
+  context.fillStyle = "#000000";
   context.fillRect(0, 0, WIDTH, HEIGHT);
-  drawHero(context, avatarHeadColor(preview.avatarSeed, preview.avatarHue), colors.canvas);
-  await drawAvatar(context, preview);
-  await drawColumn(context, preview, colors);
+  drawCover(context, planet);
+  if (preview.avatarImage) await drawPhoto(context, preview.avatarImage);
+  if (body) context.drawImage(body, BODY.x, BODY.y, BODY.size, BODY.size);
+  if (eyes) context.drawImage(eyes, BODY.x, BODY.y, BODY.size, BODY.size);
+  drawColumn(context, preview);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("The share card cannot be encoded.");
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-interface ThemeColors {
-  canvas: string;
-  primary: string;
-  secondary: string;
-  muted: string;
-  logo: string;
-  logoEye: string;
+async function loadUrl(url: string): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  return image;
 }
 
-function themeColors(): ThemeColors {
-  const style = getComputedStyle(document.documentElement);
-  const token = (name: string) => {
-    const value = style.getPropertyValue(name).trim();
-    if (!value) throw new Error(`The share card needs the ${name} token.`);
-    return value;
-  };
-  return {
-    canvas: token("--openbot-bg-native-canvas"),
-    primary: token("--openbot-text-primary"),
-    secondary: token("--openbot-text-secondary"),
-    muted: token("--openbot-text-muted"),
-    logo: token("--openbot-logo-production"),
-    logoEye: token("--openbot-logo-production-eye"),
-  };
+/** The planet fills the card and is cut at the centre, like a Figma "Fill" image. */
+function drawCover(context: CanvasRenderingContext2D, image: HTMLImageElement): void {
+  const scale = Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight);
+  const width = image.naturalWidth * scale;
+  const height = image.naturalHeight * scale;
+  context.drawImage(image, (WIDTH - width) / 2, (HEIGHT - height) / 2, width, height);
 }
 
-function drawHero(context: CanvasRenderingContext2D, color: string, canvas: string): void {
-  const { x, y, size, radius } = HERO;
+async function drawPhoto(
+  context: CanvasRenderingContext2D,
+  photo: NonNullable<AgentTemplatePreview["avatarImage"]>,
+): Promise<void> {
+  const image = await loadImage(new Blob([new Uint8Array(photo.bytes)], { type: photo.mimeType }));
+  const cx = BODY.x + BODY.size / 2;
+  const cy = BODY.y + BODY.size / 2;
+  const radius = PHOTO_SIZE / 2;
+  const scale = Math.max(PHOTO_SIZE / image.naturalWidth, PHOTO_SIZE / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  context.save();
+  context.shadowColor = "rgba(0, 0, 0, 0.55)";
+  context.shadowBlur = 28;
+  context.shadowOffsetY = 14;
+  context.beginPath();
+  context.arc(cx, cy, radius, 0, Math.PI * 2);
+  context.fillStyle = "#000000";
+  context.fill();
+  context.restore();
   context.save();
   context.beginPath();
-  context.roundRect(x, y, size, size, radius);
+  context.arc(cx, cy, radius, 0, Math.PI * 2);
   context.clip();
-  context.fillStyle = canvas;
-  context.fillRect(x, y, size, size);
-  const glow = (cx: number, cy: number, r: number, alpha: number) => {
-    const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, r);
-    gradient.addColorStop(0, withAlpha(color, alpha));
-    gradient.addColorStop(1, withAlpha(color, 0));
-    context.fillStyle = gradient;
-    context.fillRect(x, y, size, size);
-  };
-  glow(x + size * 0.3, y + size * 0.85, size * 0.8, 0.55);
-  glow(x + size * 0.9, y + size * 0.2, size * 0.6, 0.35);
-  glow(x + size / 2, y + size / 2, size * 0.45, 0.4);
+  context.drawImage(image, cx - drawWidth / 2, cy - drawHeight / 2, drawWidth, drawHeight);
   context.restore();
 }
 
-async function drawAvatar(context: CanvasRenderingContext2D, preview: AgentTemplatePreview): Promise<void> {
-  const cx = HERO.x + HERO.size / 2;
-  const cy = HERO.y + HERO.size / 2;
-  if (preview.avatarImage) {
-    const { bytes, mimeType } = preview.avatarImage;
-    const image = await loadImage(new Blob([new Uint8Array(bytes)], { type: mimeType }));
-    const radius = AVATAR_SIZE / 2;
-    const scale = Math.max(AVATAR_SIZE / image.naturalWidth, AVATAR_SIZE / image.naturalHeight);
-    const drawWidth = image.naturalWidth * scale;
-    const drawHeight = image.naturalHeight * scale;
-    context.save();
-    context.beginPath();
-    context.arc(cx, cy, radius, 0, Math.PI * 2);
-    context.clip();
-    context.drawImage(image, cx - drawWidth / 2, cy - drawHeight / 2, drawWidth, drawHeight);
-    context.restore();
-    return;
-  }
-  const size = AVATAR_SIZE * 1.28;
-  const svg = createStaticAvatarSvg(preview.avatarSeed, preview.avatarHue);
-  const image = await loadSvg(svg, size);
-  context.drawImage(image, cx - size / 2, cy - size / 2 - AVATAR_SIZE * 0.08, size, size);
-}
-
-async function drawColumn(
-  context: CanvasRenderingContext2D,
-  preview: AgentTemplatePreview,
-  colors: ThemeColors,
-): Promise<void> {
+/** The name, the role and the site, centred on the right and kept above the planet's ground. */
+function drawColumn(context: CanvasRenderingContext2D, preview: AgentTemplatePreview): void {
   const { x, width } = COLUMN;
+  const centre = x + width / 2;
+  context.textAlign = "center";
+  context.textBaseline = "top";
+
+  const nameSize = fittedNameSize(context, preview.name, width);
+  const nameLineHeight = Math.round((NAME.lineHeight * nameSize) / NAME.size);
+  context.font = `800 ${nameSize}px ${FONT}`;
+  const name = wrapLines(context, preview.name, width, NAME.maxLines);
+
+  context.font = `500 ${ROLE.size}px ${FONT}`;
+  const roleText = (preview.title || preview.description).replace(/\s+/gu, " ").trim();
+  const role = roleText ? wrapLines(context, roleText, width, ROLE.maxLines) : [];
+
+  const nameHeight = name.length * nameLineHeight;
+  const roleHeight = role.length > 0 ? ROLE.gap + role.length * ROLE.lineHeight : 0;
+  const height = nameHeight + roleHeight + SITE.gap + SITE.lineHeight;
+  let y = Math.min(COLUMN.centre - height / 2, COLUMN.bottom - height);
+
+  context.font = `800 ${nameSize}px ${FONT}`;
+  context.fillStyle = TEXT.name;
+  for (const line of name) {
+    context.fillText(line, centre, y + (nameLineHeight - nameSize) / 2);
+    y += nameLineHeight;
+  }
+  if (role.length > 0) {
+    y += ROLE.gap;
+    context.font = `500 ${ROLE.size}px ${FONT}`;
+    context.fillStyle = TEXT.role;
+    for (const line of role) {
+      context.fillText(line, centre, y + (ROLE.lineHeight - ROLE.size) / 2);
+      y += ROLE.lineHeight;
+    }
+  }
+  y += SITE.gap;
+  context.font = `500 ${SITE.size}px ${FONT}`;
+  context.fillStyle = TEXT.site;
+  context.fillText("openbot.run", centre, y + (SITE.lineHeight - SITE.size) / 2);
+  context.textAlign = "start";
   context.textBaseline = "alphabetic";
-
-  await drawLogo(context, x, 92, 44, colors);
-  context.fillStyle = colors.primary;
-  context.font = `600 28px ${FONT}`;
-  context.fillText("OpenBot", x + 58, 124);
-
-  let y = 154;
-  context.font = `700 60px ${FONT}`;
-  context.fillStyle = colors.primary;
-  for (const line of wrapLines(context, preview.name, width, 2)) {
-    y += 68;
-    context.fillText(line, x, y);
-  }
-  if (preview.title) {
-    y += 58;
-    context.font = `500 28px ${FONT}`;
-    context.fillStyle = colors.muted;
-    context.fillText(wrapLines(context, preview.title, width, 1)[0] ?? "", x, y);
-  }
-
-  const pillTop = 510;
-  const lineHeight = 36;
-  y += 60;
-  const lines = Math.max(0, Math.min(4, Math.floor((pillTop - 28 - y) / lineHeight) + 1));
-  context.font = `400 25px ${FONT}`;
-  context.fillStyle = colors.secondary;
-  for (const line of wrapLines(context, preview.description.replace(/\s+/gu, " "), width, lines)) {
-    context.fillText(line, x, y);
-    y += lineHeight;
-  }
-
-  const label = "Add to OpenBot";
-  context.font = `600 24px ${FONT}`;
-  const pillWidth = context.measureText(label).width + 64;
-  context.fillStyle = colors.primary;
-  context.beginPath();
-  context.roundRect(x, pillTop, pillWidth, 60, 30);
-  context.fill();
-  context.fillStyle = colors.canvas;
-  context.fillText(label, x + 32, pillTop + 38);
-  context.font = `500 24px ${FONT}`;
-  context.fillStyle = colors.muted;
-  context.fillText("openbot.run", x + pillWidth + 24, pillTop + 38);
 }
 
+/** The largest size, down to a floor, at which the longest word of the name fits on one line. */
+function fittedNameSize(context: CanvasRenderingContext2D, name: string, width: number) {
+  const longest = name
+    .trim()
+    .split(/\s+/u)
+    .reduce((widest, word) => (word.length > widest.length ? word : widest), "");
+  let size = NAME.size;
+  for (; size > NAME.minSize; size -= 1) {
+    context.font = `800 ${size}px ${FONT}`;
+    if (context.measureText(longest).width <= width) break;
+  }
+  return size;
+}
+
+/** The app mark from `@openbot/brand`, with its CSS colours written onto the shapes. */
 export async function drawLogo(
   context: CanvasRenderingContext2D,
   x: number,
   y: number,
   size: number,
-  colors: Pick<ThemeColors, "logo" | "logoEye">,
+  colors: { logo: string; logoEye: string },
 ): Promise<void> {
   const host = document.createElement("span");
   const dispose = render(() => <AppLogo variant="production" />, host);
@@ -178,6 +185,7 @@ export async function drawLogo(
   context.drawImage(await loadSvg(svg, size), x, y, size, size);
 }
 
+/** Lines that fit `width`, at most `max`; the last one ends in an ellipsis when text is left over. */
 function wrapLines(context: CanvasRenderingContext2D, text: string, width: number, max: number): string[] {
   const lines: string[] = [];
   let line = "";
@@ -199,6 +207,7 @@ function wrapLines(context: CanvasRenderingContext2D, text: string, width: numbe
   return lines.map((item) => (context.measureText(item).width > width ? ellipsize(context, item, width) : item));
 }
 
+/** Cuts at a word where it can, so the line does not end in half a word. */
 export function ellipsize(context: CanvasRenderingContext2D, text: string, width: number): string {
   let value = text;
   while (value && context.measureText(`${value}…`).width > width) {
