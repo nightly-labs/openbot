@@ -383,6 +383,10 @@ export const messages = {
   "chat.message.attachment": "Archivo adjunto",
   "chat.message.showFull": "Ver mensaje completo",
   "chat.message.showLess": "Ver menos",
+  "chat.message.stoppedBeforeText":
+    "El agente se detuvo antes de escribir una respuesta. Envía un mensaje para continuar.",
+  "chat.message.failedBeforeText":
+    "La respuesta falló antes de que el agente escribiera texto. Envía un mensaje para intentarlo de nuevo.",
   "chat.actions.userLabel": "Acciones del mensaje del usuario",
   "chat.actions.label": "Acciones del mensaje de {name}",
   "chat.actions.addReaction": "Añadir reacción",

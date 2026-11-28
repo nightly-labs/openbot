@@ -378,6 +378,8 @@ export const messages = {
   "chat.message.attachment": "Ek",
   "chat.message.showFull": "Mesajın tamamını göster",
   "chat.message.showLess": "Daha az göster",
+  "chat.message.stoppedBeforeText": "Ajan bir yanıt yazmadan durdu. Devam etmek için bir mesaj gönderin.",
+  "chat.message.failedBeforeText": "Yanıt, ajan metin yazmadan başarısız oldu. Tekrar denemek için bir mesaj gönderin.",
   "chat.actions.userLabel": "Kullanıcı mesajı işlemleri",
   "chat.actions.label": "{name} mesaj işlemleri",
   "chat.actions.addReaction": "Tepki ekle",

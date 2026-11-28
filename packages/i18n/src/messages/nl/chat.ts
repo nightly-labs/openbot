@@ -370,6 +370,10 @@ export const messages = {
   "chat.message.attachment": "Bijlage",
   "chat.message.showFull": "Hele bericht tonen",
   "chat.message.showLess": "Minder tonen",
+  "chat.message.stoppedBeforeText":
+    "De agent is gestopt voordat die een antwoord schreef. Verstuur een bericht om verder te gaan.",
+  "chat.message.failedBeforeText":
+    "Het antwoord is mislukt voordat de agent tekst schreef. Verstuur een bericht om het nog eens te proberen.",
   "chat.actions.userLabel": "Acties voor gebruikersbericht",
   "chat.actions.label": "Acties voor bericht van {name}",
   "chat.actions.addReaction": "Reactie toevoegen",

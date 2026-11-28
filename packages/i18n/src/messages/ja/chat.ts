@@ -354,6 +354,10 @@ export const messages = {
   "chat.message.attachment": "添付ファイル",
   "chat.message.showFull": "メッセージ全体を表示",
   "chat.message.showLess": "折りたたむ",
+  "chat.message.stoppedBeforeText":
+    "エージェントは返信を書く前に停止しました。続けるにはメッセージを送信してください。",
+  "chat.message.failedBeforeText":
+    "エージェントがテキストを書く前に返信が失敗しました。もう一度試すにはメッセージを送信してください。",
   "chat.actions.userLabel": "ユーザーのメッセージの操作",
   "chat.actions.label": "{name} のメッセージの操作",
   "chat.actions.addReaction": "リアクションを追加",

@@ -361,6 +361,8 @@ export const messages = defineMessages("chat", {
   "chat.message.attachment": "Attachment",
   "chat.message.showFull": "Show full message",
   "chat.message.showLess": "Show less",
+  "chat.message.stoppedBeforeText": "The agent stopped before it wrote a reply. Send a message to continue.",
+  "chat.message.failedBeforeText": "The reply failed before the agent wrote any text. Send a message to try again.",
   "chat.actions.userLabel": "User message actions",
   "chat.actions.label": "{name} message actions",
   "chat.actions.addReaction": "Add reaction",

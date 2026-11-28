@@ -1661,6 +1661,12 @@
   font-weight: var(--openbot-weight-medium);
 }
 
+.message-ended-label {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 .attachment-file-visual {
   --file-reference-color: var(--openbot-file-default);
   --file-reference-soft: var(--openbot-file-default-soft);

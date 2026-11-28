@@ -521,6 +521,8 @@ export const messages = {
   "chat.message.attachment": "مرفق",
   "chat.message.showFull": "عرض الرسالة كاملة",
   "chat.message.showLess": "عرض أقل",
+  "chat.message.stoppedBeforeText": "توقف الوكيل قبل أن يكتب ردًا. أرسل رسالة للمتابعة.",
+  "chat.message.failedBeforeText": "فشل الرد قبل أن يكتب الوكيل أي نص. أرسل رسالة لإعادة المحاولة.",
   "chat.actions.userLabel": "إجراءات رسالة المستخدم",
   "chat.actions.label": "إجراءات رسالة {name}",
   "chat.actions.addReaction": "إضافة تفاعل",

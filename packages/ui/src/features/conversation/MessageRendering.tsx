@@ -70,6 +70,7 @@ import {
   type MessageImageFile,
   messageImageFiles,
 } from "./MarkdownMessageText";
+import { emptyEndedAnswerLabel } from "./new-message-tally";
 import { ReplyQuote } from "./ReplyQuote";
 import {
   nextStreamingReveal,
@@ -701,6 +702,9 @@ export function MessageBody(props: {
     <>
       <Show when={props.message.kind === "error" && props.message.status}>
         {(status) => <p class="message-error-label">{status()}</p>}
+      </Show>
+      <Show when={emptyEndedAnswerLabel(props.message)}>
+        {(label) => <p class="message-ended-label">{t(label())}</p>}
       </Show>
       <Show when={props.referencedMessage}>
         {(referenced) => (

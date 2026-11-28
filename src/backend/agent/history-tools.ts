@@ -245,6 +245,7 @@ interface HistoryEntry {
   sentTo?: string[];
   createdAt: string;
   answeredBy?: { id: string; name: string };
+  status?: "interrupted" | "failed";
   text: string;
   offset: number;
   nextOffset: number | null;
@@ -525,6 +526,7 @@ export class HistoryTools {
         createdAt: message.createdAt,
         ...(answeredBy ? { answeredBy: { id: answeredBy.id, name: redact(answeredBy.name) } } : {}),
         ...(row.beforeReset ? { beforeNewChat: true as const } : {}),
+        ...(message.status === "interrupted" || message.status === "failed" ? { status: message.status } : {}),
         text: excerpt,
         offset,
         nextOffset: offset + excerpt.length < text.length ? offset + excerpt.length : null,
