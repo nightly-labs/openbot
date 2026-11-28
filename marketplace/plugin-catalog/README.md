@@ -44,7 +44,7 @@ Rules for a new entry:
   own link on any Composio host.
   No `workingDirectory`: the provider drops such servers.
 - A `command` can start with `~/` to name a program that a desktop app installs
-  in the home folder, as the Paper listing does. OpenBot expands `~` on the
+  in the home folder. OpenBot expands `~` on the
   computer that runs the server, before any provider starts it.
 - Names must pass `mcpConfigErrors` and must not be reserved (`openbot`).
 - OAuth-only vendors install as a plain `http` server with a `link` flow, the
@@ -55,17 +55,19 @@ Rules for a new entry:
 
 ## Paper
 
-Paper Desktop installs its CLI at `~/.paper/bin/paper`. `paper mcp` is a stdio
-relay to the file that is open in Paper Desktop. Paper also has an http address,
-`http://127.0.0.1:29979/mcp`, but its documentation calls that address legacy,
-and a listing must use https. The listing needs no key.
+The listing connects to the remote Paper MCP server, `https://mcp.paper.design`, with
+a Paper sign-in (`link`). It works on a joined server, in the web client and on a
+phone, and it does not need Paper Desktop. Paper calls this server early access
+(<https://paper.design/docs/mcp>). Version 1.0.1 started `~/.paper/bin/paper mcp`,
+the stdio relay that Paper Desktop installs, so it failed on each computer without
+Paper Desktop. A row of that version is now a custom app, and it keeps working.
+`earlierUrls` lists `https://mcp.paper.design/`, so a row that a user saved with
+the trailing slash is also the Paper app.
 
 Troubleshooting:
 
-- "Command not found: ~/.paper/bin/paper": install Paper Desktop from
-  <https://paper.design/downloads> and open it once.
-- The tools see no file, or the wrong file: open the file in Paper Desktop.
-  The server works on the file that is open.
+- "Paper account setup is incomplete": open <https://app.paper.design>, complete
+  the setup, then sign in to Paper again in OpenBot.
 - A long session calls tools that do not exist: start a new thread. Paper
   gives this advice in <https://paper.design/docs/mcp>.
 

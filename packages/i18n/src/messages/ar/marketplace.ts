@@ -299,12 +299,12 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "استخرج أيقونات التسويق بدقة 2x لحزمة التطبيق.",
   "marketplace.plugin.paper.tagline": "لوحة تصميم مبنية على HTML وCSS",
   "marketplace.plugin.paper.description":
-    "يتيح Paper للوكلاء قراءة ملف التصميم المفتوح في Paper Desktop والكتابة فيه: فحص لوحات الرسم والتحديدات والأنماط المحسوبة وJSX والرموز المميزة، وإنشاء الإطارات والنصوص والأنماط أو تغييرها. ثبّت Paper Desktop، وافتحه مرة واحدة، وافتح ملفًا قبل البدء. يشغّل OpenBot واجهة Paper CLI التي يثبّتها Paper Desktop. لا يحتاج Paper إلى مفتاح. تغيّر أدوات الكتابة الملف المفتوح، لذا راجع كل عملية كتابة قبل الموافقة عليها.",
+    "يتيح Paper للوكلاء قراءة ملفات تصميم Paper الخاصة بك والكتابة فيها: فحص لوحات الرسم والتحديدات والأنماط المحسوبة وJSX والرموز المميزة، وإنشاء الإطارات والنصوص والأنماط أو تغييرها. سجّل الدخول بحساب Paper. يتصل OpenBot بخادم Paper MCP البعيد، لذلك لا تحتاج إلى Paper Desktop، حتى عندما يعمل وكلاؤك على خادم. يصف Paper هذا الخادم بأنه وصول مبكر. تغيّر أدوات الكتابة ملفك، لذا راجع كل عملية كتابة قبل الموافقة عليها.",
   "marketplace.plugin.paper.app":
-    "يقرأ ملف Paper Desktop المفتوح ويكتب فيه، عبر خادم MCP المحلي الذي ترحّله Paper CLI. يحتاج إلى Paper Desktop مع ملف مفتوح.",
+    "يقرأ ملفات Paper الخاصة بك ويكتب فيها، عبر خادم Paper MCP البعيد. يسجّل كل مستخدم الدخول بحساب Paper الخاص به.",
   "marketplace.plugin.paper.prompt.implement": "نفّذ إطار Paper المحدد في قاعدة الشيفرة هذه، وفق أعراف الشيفرة لدينا.",
   "marketplace.plugin.paper.prompt.codeToDesign": "استخدم الأنماط في هذا المستودع وصمّم صفحة إعدادات في Paper.",
-  "marketplace.plugin.paper.prompt.tokens": "اعرض رموز التصميم في ملف Paper المفتوح وقارنها بسمتنا.",
+  "marketplace.plugin.paper.prompt.tokens": "اعرض رموز التصميم في ملف Paper الخاص بي وقارنها بسمتنا.",
   "marketplace.plugin.higgsfield.tagline": "صور وفيديو وصوت بالذكاء الاصطناعي",
   "marketplace.plugin.higgsfield.description":
     "يتيح Higgsfield للوكلاء إنشاء الصور والفيديو والشخصيات والصوت بنماذج Higgsfield مثل Seedance وKling وVeo وMiniMax Hailuo، والتحقق من رصيد الأرصدة، وتصفح Asset Library. تُحفظ النتائج في Assets الخاصة بالمستخدم في Higgsfield. يسجّل كل مستخدم الدخول إلى حسابه في Higgsfield عبر المتصفح. كل عملية إنشاء تستهلك أرصدة ذلك الحساب بالسعر القياسي، حتى في الخطة غير المحدودة.",

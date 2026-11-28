@@ -290,12 +290,12 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "חלץ את סמלי השיווק ברזולוציה 2x עבור חבילת האפליקציה.",
   "marketplace.plugin.paper.tagline": "קנבס עיצוב על בסיס HTML ו-CSS",
   "marketplace.plugin.paper.description":
-    "Paper מאפשר לסוכנים לקרוא ולכתוב את קובץ העיצוב הפתוח ב-Paper Desktop: לבדוק לוחות עבודה, בחירות, סגנונות מחושבים, JSX ואסימונים, וליצור או לשנות מסגרות, טקסט וסגנונות. יש להתקין את Paper Desktop, לפתוח אותו פעם אחת ולפתוח קובץ לפני ההתחלה. OpenBot מפעיל את ה-CLI של Paper ש-Paper Desktop מתקין. Paper לא צריך מפתח. כלי כתיבה משנים את הקובץ הפתוח, לכן יש לבדוק כל כתיבה לפני האישור.",
+    "Paper מאפשר לסוכנים לקרוא ולכתוב את קובצי העיצוב שלך ב-Paper: לבדוק לוחות עבודה, בחירות, סגנונות מחושבים, JSX ואסימונים, וליצור או לשנות מסגרות, טקסט וסגנונות. יש להתחבר עם חשבון Paper. OpenBot מתחבר לשרת ה-MCP המרוחק של Paper, כך שאין צורך ב-Paper Desktop, גם כשהסוכנים פועלים על שרת. Paper מגדיר את השרת הזה כגישה מוקדמת. כלי כתיבה משנים את הקובץ שלך, לכן יש לבדוק כל כתיבה לפני האישור.",
   "marketplace.plugin.paper.app":
-    "קורא וכותב את הקובץ הפתוח ב-Paper Desktop, דרך שרת ה-MCP המקומי ש-Paper CLI מעביר. דורש Paper Desktop עם קובץ פתוח.",
+    "קורא וכותב את קובצי ה-Paper שלך, דרך שרת ה-MCP המרוחק של Paper. כל משתמש מתחבר עם חשבון Paper משלו.",
   "marketplace.plugin.paper.prompt.implement": "ממש את מסגרת Paper שנבחרה בבסיס הקוד הזה, לפי מוסכמות הקוד שלנו.",
   "marketplace.plugin.paper.prompt.codeToDesign": "השתמש בסגנונות במאגר הזה ועצב ב-Paper דף הגדרות.",
-  "marketplace.plugin.paper.prompt.tokens": "פרט את אסימוני העיצוב בקובץ Paper הפתוח והשווה אותם לערכת הנושא שלנו.",
+  "marketplace.plugin.paper.prompt.tokens": "פרט את אסימוני העיצוב בקובץ ה-Paper שלי והשווה אותם לערכת הנושא שלנו.",
   "marketplace.plugin.higgsfield.tagline": "תמונות, סרטונים ואודיו מבוססי AI",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield מאפשר לסוכנים ליצור תמונות, סרטונים, דמויות ואודיו עם מודלים של Higgsfield כמו Seedance, Kling, Veo ו-MiniMax Hailuo, לבדוק את יתרת הקרדיטים ולעיין בספריית הנכסים. התוצאות נשמרות בנכסי Higgsfield של המשתמש. כל משתמש מתחבר לחשבון Higgsfield שלו דרך הדפדפן. כל יצירה משתמשת בקרדיטים של החשבון הזה בתעריף רגיל, גם בתוכנית ללא הגבלה.",

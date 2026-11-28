@@ -1,0 +1,37 @@
+{
+  "slug": "paper",
+  "name": "Paper",
+  "tagline": "Design canvas built on HTML and CSS",
+  "description": "Paper lets agents read and write your Paper design files: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Sign in with your Paper account. OpenBot connects to the remote Paper MCP server, so you do not need Paper Desktop, also when your agents run on a server. Paper calls this server early access. Write tools change your file, so review each write before you approve it.",
+  "category": "design",
+  "creatorName": "Paper",
+  "iconUrl": "https://paper.design/apple-touch-icon.png",
+  "version": "2.0.0",
+  "prompts": [
+    {
+      "id": "prompt-implement",
+      "text": "Implement the selected Paper frame in this codebase, with our code conventions."
+    },
+    { "id": "prompt-code-to-design", "text": "Use the styles in this repository and design a settings page in Paper." },
+    { "id": "prompt-tokens", "text": "List the design tokens in my Paper file and compare them with our theme." }
+  ],
+  "apps": [
+    {
+      "id": "app-paper-mcp",
+      "name": "Paper",
+      "description": "Reads and writes your Paper files, over the remote Paper MCP server. Each user signs in to their own Paper account.",
+      "iconUrl": "https://paper.design/apple-touch-icon.png",
+      "server": {
+        "name": "paper",
+        "transport": "http",
+        "url": "https://mcp.paper.design",
+        "earlierUrls": ["https://mcp.paper.design/"],
+        "auth": [{ "id": "paper-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://paper.design",
+  "privacyPolicyUrl": "https://paper.design/legal/privacy",
+  "termsUrl": "https://paper.design/legal/tos",
+  "skills": []
+}

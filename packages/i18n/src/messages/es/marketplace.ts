@@ -290,15 +290,15 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "Extrae los iconos de marketing a 2x para el paquete de la aplicación.",
   "marketplace.plugin.paper.tagline": "Lienzo de diseño basado en HTML y CSS",
   "marketplace.plugin.paper.description":
-    "Paper permite a los agentes leer y escribir el archivo de diseño abierto en Paper Desktop: inspeccionar mesas de trabajo, selecciones, estilos calculados, JSX y tokens, y crear o cambiar marcos, texto y estilos. Instala Paper Desktop, ábrelo una vez y abre un archivo antes de empezar. OpenBot inicia la CLI de Paper que instala Paper Desktop. Paper no necesita clave. Las herramientas de escritura cambian el archivo abierto, así que revisa cada escritura antes de aprobarla.",
+    "Paper permite a los agentes leer y escribir tus archivos de diseño de Paper: inspeccionar mesas de trabajo, selecciones, estilos calculados, JSX y tokens, y crear o cambiar marcos, texto y estilos. Inicia sesión con tu cuenta de Paper. OpenBot se conecta al servidor MCP remoto de Paper, así que no necesitas Paper Desktop, también cuando tus agentes se ejecutan en un servidor. Paper llama a este servidor acceso anticipado. Las herramientas de escritura cambian tu archivo, así que revisa cada escritura antes de aprobarla.",
   "marketplace.plugin.paper.app":
-    "Lee y escribe el archivo abierto de Paper Desktop, mediante el servidor MCP local que retransmite la CLI de Paper. Necesita Paper Desktop con un archivo abierto.",
+    "Lee y escribe tus archivos de Paper, mediante el servidor MCP remoto de Paper. Cada usuario inicia sesión con su propia cuenta de Paper.",
   "marketplace.plugin.paper.prompt.implement":
     "Implementa el marco seleccionado de Paper en este código, con nuestras convenciones de código.",
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Usa los estilos de este repositorio y diseña una página de ajustes en Paper.",
   "marketplace.plugin.paper.prompt.tokens":
-    "Lista los tokens de diseño del archivo abierto de Paper y compáralos con nuestro tema.",
+    "Lista los tokens de diseño de mi archivo de Paper y compáralos con nuestro tema.",
   "marketplace.plugin.higgsfield.tagline": "Imágenes, vídeos y audio con IA",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield permite a los agentes generar imágenes, vídeos, personajes y audio con modelos de Higgsfield como Seedance, Kling, Veo y MiniMax Hailuo, consultar el saldo de créditos y explorar la Asset Library. Los resultados se guardan en los Assets de Higgsfield del usuario. Cada usuario inicia sesión en su propia cuenta de Higgsfield en el navegador. Cada generación usa créditos de esa cuenta a la tarifa estándar, también con un plan ilimitado.",

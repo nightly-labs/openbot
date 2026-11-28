@@ -267,13 +267,13 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "앱 번들에 넣을 마케팅 아이콘을 2x로 추출해 줘.",
   "marketplace.plugin.paper.tagline": "HTML과 CSS 기반 디자인 캔버스",
   "marketplace.plugin.paper.description":
-    "Paper를 사용하면 에이전트가 Paper Desktop에서 열려 있는 디자인 파일을 읽고 쓸 수 있어요. 아트보드, 선택 영역, 계산된 스타일, JSX, 토큰을 살펴보고 프레임, 텍스트, 스타일을 만들거나 바꿀 수 있어요. 시작하기 전에 Paper Desktop을 설치하고, 한 번 실행한 다음 파일을 열어 주세요. OpenBot은 Paper Desktop이 설치하는 Paper CLI를 실행해요. Paper는 키가 필요 없어요. 쓰기 도구는 열려 있는 파일을 변경하므로, 승인하기 전에 각 쓰기 작업을 검토해 주세요.",
+    "Paper를 사용하면 에이전트가 내 Paper 디자인 파일을 읽고 쓸 수 있어요. 아트보드, 선택 영역, 계산된 스타일, JSX, 토큰을 살펴보고 프레임, 텍스트, 스타일을 만들거나 바꿀 수 있어요. Paper 계정으로 로그인해 주세요. OpenBot은 Paper의 원격 MCP 서버에 연결하므로, 에이전트가 서버에서 실행될 때도 Paper Desktop이 필요 없어요. Paper는 이 서버를 얼리 액세스로 제공해요. 쓰기 도구는 파일을 변경하므로, 승인하기 전에 각 쓰기 작업을 검토해 주세요.",
   "marketplace.plugin.paper.app":
-    "Paper CLI가 중계하는 로컬 MCP 서버로 열려 있는 Paper Desktop 파일을 읽고 써요. 파일이 열린 Paper Desktop이 필요해요.",
+    "Paper의 원격 MCP 서버로 내 Paper 파일을 읽고 써요. 각 사용자가 자신의 Paper 계정으로 로그인해요.",
   "marketplace.plugin.paper.prompt.implement":
     "선택한 Paper 프레임을 우리 코드 컨벤션에 맞게 이 코드베이스에 구현해 줘.",
   "marketplace.plugin.paper.prompt.codeToDesign": "이 저장소의 스타일을 사용해서 Paper에서 설정 페이지를 디자인해 줘.",
-  "marketplace.plugin.paper.prompt.tokens": "열려 있는 Paper 파일의 디자인 토큰을 나열하고 우리 테마와 비교해 줘.",
+  "marketplace.plugin.paper.prompt.tokens": "내 Paper 파일의 디자인 토큰을 나열하고 우리 테마와 비교해 줘.",
   "marketplace.plugin.higgsfield.tagline": "AI 이미지, 동영상, 오디오",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield를 사용하면 에이전트가 Seedance, Kling, Veo, MiniMax Hailuo 같은 Higgsfield 모델로 이미지, 동영상, 캐릭터, 오디오를 생성하고, 크레딧 잔액을 확인하고, Asset Library를 둘러볼 수 있습니다. 결과는 사용자의 Higgsfield Assets에 저장됩니다. 각 사용자는 브라우저에서 자신의 Higgsfield 계정에 로그인합니다. 모든 생성은 무제한 요금제에서도 그 계정의 크레딧을 표준 요금으로 사용합니다.",

@@ -17,7 +17,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  catalogSha256: "08afd754a53fa7c0d44f155b4b7ddb8e6d9677c80d44ce07664e3eabeddd51f4",
+  catalogSha256: "0fb6743b92f7cf352983123fbc47307508b25da445934c2dc53483ab06f1726d",
   updatedAt: "2026-11-10T00:00:00.000Z",
   plugins: [
     {
@@ -106,9 +106,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "paper",
-      version: "1.0.1",
+      version: "2.0.0",
       featured: false,
-      detailSha256: "d15a140eec6ab0a0a6e79e354ccaba88d035435112bdb7a044528b2a4c7a1548",
+      detailSha256: "1e7e365ffad156cc5b6094e9d3138913ab940e7629b1b7d9dc3f7d982f5316af",
     },
     {
       slug: "higgsfield",
@@ -2169,27 +2169,33 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Paper",
     tagline: "Design canvas built on HTML and CSS",
     description:
-      "Paper lets agents read and write the design file that is open in Paper Desktop: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Install Paper Desktop, open it once, and open a file before you start. OpenBot starts the Paper CLI that Paper Desktop installs. Paper needs no key. Write tools change the open file, so review each write before you approve it.",
+      "Paper lets agents read and write your Paper design files: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Sign in with your Paper account. OpenBot connects to the remote Paper MCP server, so you do not need Paper Desktop, also when your agents run on a server. Paper calls this server early access. Write tools change your file, so review each write before you approve it.",
     category: "design",
     creatorName: "Paper",
     iconUrl: "https://paper.design/apple-touch-icon.png",
-    version: "1.0.1",
+    version: "2.0.0",
     prompts: [
       {
         id: "prompt-implement",
         text: "Implement the selected Paper frame in this codebase, with our code conventions.",
       },
       { id: "prompt-code-to-design", text: "Use the styles in this repository and design a settings page in Paper." },
-      { id: "prompt-tokens", text: "List the design tokens in the open Paper file and compare them with our theme." },
+      { id: "prompt-tokens", text: "List the design tokens in my Paper file and compare them with our theme." },
     ],
     apps: [
       {
         id: "app-paper-mcp",
         name: "Paper",
         description:
-          "Reads and writes the open Paper Desktop file, over the local MCP server that the Paper CLI relays. Needs Paper Desktop with a file open.",
+          "Reads and writes your Paper files, over the remote Paper MCP server. Each user signs in to their own Paper account.",
         iconUrl: "https://paper.design/apple-touch-icon.png",
-        server: { name: "paper", transport: "stdio", command: "~/.paper/bin/paper", args: ["mcp"] },
+        server: {
+          name: "paper",
+          transport: "http",
+          url: "https://mcp.paper.design",
+          earlierUrls: ["https://mcp.paper.design/"],
+          auth: [{ id: "paper-oauth", kind: "link", label: "Sign in" }],
+        },
       },
     ],
     websiteUrl: "https://paper.design",

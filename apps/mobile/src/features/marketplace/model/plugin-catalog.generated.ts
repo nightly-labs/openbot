@@ -613,17 +613,17 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "Paper",
     tagline: "Design canvas built on HTML and CSS",
     description:
-      "Paper lets agents read and write the design file that is open in Paper Desktop: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Install Paper Desktop, open it once, and open a file before you start. OpenBot starts the Paper CLI that Paper Desktop installs. Paper needs no key. Write tools change the open file, so review each write before you approve it.",
+      "Paper lets agents read and write your Paper design files: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Sign in with your Paper account. OpenBot connects to the remote Paper MCP server, so you do not need Paper Desktop, also when your agents run on a server. Paper calls this server early access. Write tools change your file, so review each write before you approve it.",
     category: "design",
     creatorName: "Paper",
-    version: "1.0.1",
+    version: "2.0.0",
     prompts: [
       {
         id: "prompt-implement",
         text: "Implement the selected Paper frame in this codebase, with our code conventions.",
       },
       { id: "prompt-code-to-design", text: "Use the styles in this repository and design a settings page in Paper." },
-      { id: "prompt-tokens", text: "List the design tokens in the open Paper file and compare them with our theme." },
+      { id: "prompt-tokens", text: "List the design tokens in my Paper file and compare them with our theme." },
     ],
     websiteUrl: "https://paper.design",
     privacyPolicyUrl: "https://paper.design/legal/privacy",
@@ -634,8 +634,14 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
         id: "app-paper-mcp",
         name: "Paper",
         description:
-          "Reads and writes the open Paper Desktop file, over the local MCP server that the Paper CLI relays. Needs Paper Desktop with a file open.",
-        server: { name: "paper", transport: "stdio", command: "~/.paper/bin/paper", args: ["mcp"] },
+          "Reads and writes your Paper files, over the remote Paper MCP server. Each user signs in to their own Paper account.",
+        server: {
+          name: "paper",
+          transport: "http",
+          url: "https://mcp.paper.design",
+          earlierUrls: ["https://mcp.paper.design/"],
+          auth: [{ id: "paper-oauth", kind: "link", label: "Sign in" }],
+        },
       },
     ],
   },

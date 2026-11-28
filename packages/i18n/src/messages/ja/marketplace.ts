@@ -283,15 +283,15 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "アプリバンドル用に、マーケティングアイコンを 2x で書き出してください。",
   "marketplace.plugin.paper.tagline": "HTML と CSS で作られたデザインキャンバス",
   "marketplace.plugin.paper.description":
-    "Paper を使うと、エージェントは Paper Desktop で開いているデザインファイルを読み書きできます。アートボード、選択範囲、計算済みのスタイル、JSX、トークンを調べ、フレーム、テキスト、スタイルを作成・変更できます。Paper Desktop をインストールして一度開き、始める前にファイルを開いてください。OpenBot は Paper Desktop がインストールする Paper CLI を起動します。Paper にキーは不要です。書き込みツールは開いているファイルを変更するので、承認する前に各書き込みを確認してください。",
+    "Paper を使うと、エージェントはあなたの Paper のデザインファイルを読み書きできます。アートボード、選択範囲、計算済みのスタイル、JSX、トークンを調べ、フレーム、テキスト、スタイルを作成・変更できます。Paper のアカウントでサインインしてください。OpenBot は Paper のリモート MCP サーバーに接続するので、エージェントがサーバーで動いていても Paper Desktop は不要です。Paper はこのサーバーを早期アクセスとしています。書き込みツールはファイルを変更するので、承認する前に各書き込みを確認してください。",
   "marketplace.plugin.paper.app":
-    "開いている Paper Desktop のファイルを、Paper CLI が中継するローカルの MCP サーバーで読み書きします。ファイルを開いた Paper Desktop が必要です。",
+    "Paper のリモート MCP サーバーで、あなたの Paper のファイルを読み書きします。各ユーザーが自分の Paper アカウントでサインインします。",
   "marketplace.plugin.paper.prompt.implement":
     "選択した Paper のフレームを、このコードベースのコード規約に沿って実装してください。",
   "marketplace.plugin.paper.prompt.codeToDesign":
     "このリポジトリのスタイルを使って、Paper で設定ページをデザインしてください。",
   "marketplace.plugin.paper.prompt.tokens":
-    "開いている Paper のファイルにあるデザイントークンを一覧にして、私たちのテーマと比較してください。",
+    "私の Paper のファイルにあるデザイントークンを一覧にして、私たちのテーマと比較してください。",
   "marketplace.plugin.higgsfield.tagline": "AI による画像、動画、音声",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield を使うと、エージェントは Seedance、Kling、Veo、MiniMax Hailuo などの Higgsfield モデルで画像、動画、キャラクター、音声を生成し、クレジット残高を確認し、Asset Library を閲覧できます。結果はユーザーの Higgsfield Assets に保存されます。各ユーザーはブラウザで自分の Higgsfield アカウントにサインインします。生成のたびに、そのアカウントのクレジットが標準料金で使われます。無制限プランでも同じです。",

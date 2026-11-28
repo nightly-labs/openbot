@@ -275,15 +275,14 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "Exporteer de marketingiconen op 2x voor de app-bundel.",
   "marketplace.plugin.paper.tagline": "Ontwerpcanvas op basis van HTML en CSS",
   "marketplace.plugin.paper.description":
-    "Met Paper kunnen agents het ontwerpbestand lezen en schrijven dat open is in Paper Desktop: artboards, selecties, berekende stijlen, JSX en tokens inspecteren, en frames, tekst en stijlen maken of wijzigen. Installeer Paper Desktop, open het één keer en open een bestand voordat je begint. OpenBot start de Paper CLI die Paper Desktop installeert. Paper heeft geen sleutel nodig. Schrijftools wijzigen het open bestand, dus controleer elke wijziging voordat je die goedkeurt.",
+    "Met Paper kunnen agents je Paper-ontwerpbestanden lezen en schrijven: artboards, selecties, berekende stijlen, JSX en tokens inspecteren, en frames, tekst en stijlen maken of wijzigen. Log in met je Paper-account. OpenBot maakt verbinding met de externe MCP-server van Paper, dus je hebt geen Paper Desktop nodig, ook niet als je agents op een server draaien. Paper noemt deze server early access. Schrijftools wijzigen je bestand, dus controleer elke wijziging voordat je die goedkeurt.",
   "marketplace.plugin.paper.app":
-    "Leest en schrijft het open Paper Desktop-bestand, via de lokale MCP-server die de Paper CLI doorgeeft. Vereist Paper Desktop met een open bestand.",
+    "Leest en schrijft je Paper-bestanden, via de externe MCP-server van Paper. Elke gebruiker logt in met een eigen Paper-account.",
   "marketplace.plugin.paper.prompt.implement":
     "Bouw het geselecteerde Paper-frame in deze codebase, volgens onze codeconventies.",
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Gebruik de stijlen in deze repository en ontwerp een instellingenpagina in Paper.",
-  "marketplace.plugin.paper.prompt.tokens":
-    "Toon de designtokens in het open Paper-bestand en vergelijk ze met ons thema.",
+  "marketplace.plugin.paper.prompt.tokens": "Toon de designtokens in mijn Paper-bestand en vergelijk ze met ons thema.",
   "marketplace.plugin.higgsfield.tagline": "AI-afbeeldingen, -video's en -audio",
   "marketplace.plugin.higgsfield.description":
     "Met Higgsfield maken agents afbeeldingen, video's, personages en audio met Higgsfield-modellen zoals Seedance, Kling, Veo en MiniMax Hailuo, controleren ze het creditsaldo en bladeren ze door de Asset Library. Resultaten worden opgeslagen in de Higgsfield Assets van de gebruiker. Elke gebruiker meldt zich in de browser aan bij een eigen Higgsfield-account. Elke generatie gebruikt credits van dat account tegen het standaardtarief, ook met een onbeperkt abonnement.",

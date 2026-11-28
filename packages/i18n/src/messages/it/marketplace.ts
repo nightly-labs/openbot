@@ -287,15 +287,15 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "Estrai le icone di marketing a 2x per il bundle dell'app.",
   "marketplace.plugin.paper.tagline": "Tela di design basata su HTML e CSS",
   "marketplace.plugin.paper.description":
-    "Paper permette agli agenti di leggere e scrivere il file di design aperto in Paper Desktop: ispezionare artboard, selezioni, stili calcolati, JSX e token, e creare o modificare frame, testi e stili. Installa Paper Desktop, aprilo una volta e apri un file prima di iniziare. OpenBot avvia la CLI di Paper che Paper Desktop installa. Paper non richiede chiavi. I tool di scrittura modificano il file aperto, quindi controlla ogni scrittura prima di approvarla.",
+    "Paper permette agli agenti di leggere e scrivere i tuoi file di design Paper: ispezionare artboard, selezioni, stili calcolati, JSX e token, e creare o modificare frame, testi e stili. Accedi con il tuo account Paper. OpenBot si collega al server MCP remoto di Paper, quindi non ti serve Paper Desktop, anche quando i tuoi agenti girano su un server. Paper definisce questo server come accesso anticipato. I tool di scrittura modificano il tuo file, quindi controlla ogni scrittura prima di approvarla.",
   "marketplace.plugin.paper.app":
-    "Legge e scrive il file aperto in Paper Desktop, tramite il server MCP locale che la CLI di Paper inoltra. Richiede Paper Desktop con un file aperto.",
+    "Legge e scrive i tuoi file Paper, tramite il server MCP remoto di Paper. Ogni utente accede con il proprio account Paper.",
   "marketplace.plugin.paper.prompt.implement":
     "Implementa il frame Paper selezionato in questo codice, seguendo le nostre convenzioni.",
   "marketplace.plugin.paper.prompt.codeToDesign":
     "Usa gli stili di questo repository e progetta una pagina delle impostazioni in Paper.",
   "marketplace.plugin.paper.prompt.tokens":
-    "Elenca i design token del file Paper aperto e confrontali con il nostro tema.",
+    "Elenca i design token del mio file Paper e confrontali con il nostro tema.",
   "marketplace.plugin.higgsfield.tagline": "Immagini, video e audio con l'IA",
   "marketplace.plugin.higgsfield.description":
     "Higgsfield permette agli agenti di generare immagini, video, personaggi e audio con modelli Higgsfield come Seedance, Kling, Veo e MiniMax Hailuo, controllare il saldo dei crediti e sfogliare la Asset Library. I risultati vengono salvati negli Assets Higgsfield dell'utente. Ogni utente accede al proprio account Higgsfield nel browser. Ogni generazione usa crediti di quell'account alla tariffa standard, anche con un piano illimitato.",
