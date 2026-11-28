@@ -146,15 +146,15 @@ try {
         photos: [],
       },
     );
-    assert.equal(service.showsEvent(SESSION, REPLY, null, null), false);
+    assert.equal(service.showsEvent(SESSION, REPLY, null, Date.now()), false);
     assert.equal(pushes.length, 0);
     return { away: false, pushes: pushes.length };
   });
 
   await step("a failed path sends the host state at once", async () => {
     service.disconnected(SESSION);
-    assert.equal(service.showsEvent(SESSION, REPLY, null, null), false);
-    assert.equal(service.showsEvent(SESSION, { agentId: AGENT, kind: "input" }, null, null), false);
+    assert.equal(service.showsEvent(SESSION, REPLY, null, Date.now()), false);
+    assert.equal(service.showsEvent(SESSION, { agentId: AGENT, kind: "input" }, null, Date.now()), false);
     const mode = shownMode(await pushNumber(1));
     assert.equal(mode, "working");
     return { away: true, mode };
@@ -175,9 +175,9 @@ try {
   });
 
   await step("a path that comes back stops the host pushes and drops a waiting alert", async () => {
-    assert.equal(service.showsEvent(SESSION, REPLY, { sound: "default" }, null), true);
+    assert.equal(service.showsEvent(SESSION, REPLY, { sound: "default" }, Date.now()), true);
     service.reconnected(SESSION);
-    assert.equal(service.showsEvent(SESSION, REPLY, null, null), false);
+    assert.equal(service.showsEvent(SESSION, REPLY, null, Date.now()), false);
     return { away: false };
   });
 

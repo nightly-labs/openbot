@@ -1262,6 +1262,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window}剩余 {percent}%",
   "mobile.server.planLimits.resetsAt": "{time} 重置",
   "mobile.server.planLimits.empty": "还没有服务商报告其额度。",
+  "mobile.server.planLimits.notReported": "无用量数据",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "额度",
   "mobile.server.planLimits.window.weekly": "每周",

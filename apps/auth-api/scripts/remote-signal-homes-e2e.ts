@@ -106,6 +106,10 @@ function storedHome(database: DatabaseSync, hostId: string): string {
   return row?.signal_home === null || row?.signal_home === undefined ? "none" : String(row.signal_home);
 }
 
+function endFailureHold(database: DatabaseSync, hostId: string) {
+  database.prepare("UPDATE remote_hosts SET signal_home_failed_at = 1 WHERE host_id = ?").run(hostId);
+}
+
 const downMachines = new Set<string>();
 const healthRequests: string[] = [];
 async function healthFetch(input: string | URL | Request): Promise<Response> {
@@ -427,6 +431,14 @@ async function hostsGetANearHome() {
     failed.signal === "us" && storedHome(database, "near-2") === "us",
     { failed },
   );
+  healthRequests.length = 0;
+  const held = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney));
+  check(
+    "within an hour of the failure, the host keeps the San Jose home with no health request and no write",
+    held.signal === "us" && storedHome(database, "near-2") === "us" && healthRequests.length === 0,
+    { held, healthRequests: [...healthRequests] },
+  );
+  endFailureHold(database, "near-2");
   downMachines.add("signal-au.test");
   healthRequests.length = 0;
   const stillDown = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney));
@@ -456,6 +468,7 @@ async function hostsGetANearHome() {
     { firstHome, failedAway, healthRequests: [...healthRequests] },
   );
   database.prepare("UPDATE remote_hosts SET signal_home = 'us' WHERE host_id = 'near-1'").run();
+  endFailureHold(database, "near-1");
   const tokyo = await hostTicket(remote, "near-1", asksFrom(PLACES.tokyo));
   check(
     "a host whose stored home is within the margin of the nearest home keeps it (Tokyo: Sydney 7,800 km, San Jose 8,200 km)",
@@ -498,6 +511,14 @@ async function aChosenHomeWinsAndFallsBack() {
     failed.signal !== "au" && storedHome(database, "chosen-1") === failed.signal,
     { failed },
   );
+  healthRequests.length = 0;
+  const held = await hostTicket(remote, "chosen-1", chooses("au"));
+  check(
+    "within an hour of the failure, the host keeps the near home and does not check the chosen home",
+    held.signal === failed.signal && storedHome(database, "chosen-1") === failed.signal && healthRequests.length === 0,
+    { held, healthRequests: [...healthRequests] },
+  );
+  endFailureHold(database, "chosen-1");
   downMachines.add("signal-au.test");
   const stillDown = await hostTicket(remote, "chosen-1", chooses("au"));
   downMachines.delete("signal-au.test");
