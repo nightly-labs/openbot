@@ -483,6 +483,16 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.draft":
     "新しいリリースについての LinkedIn 投稿を下書きしてください。ただし予約はしないでください。",
   "marketplace.plugin.trypost.prompt.analytics": "先月の投稿のうち、エンゲージメントが最も高かったのはどれですか？",
+  "marketplace.plugin.postsyncer.tagline": "ソーシャルメディアの予約投稿",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer を使うと、エージェントはワークスペースと接続済みのアカウントを一覧し、Instagram、TikTok、Facebook、X、LinkedIn、YouTube、Threads、Pinterest、Bluesky、Google Business Profile、Mastodon、Telegram への投稿を下書き、予約、公開できます。メディアのアップロード、コメントと Google のクチコミへの返信、分析の確認もできます。ブラウザで PostSyncer アカウントにサインインするか、PostSyncer の Settings › API にある API キーを貼り付けてください。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.postsyncer.app":
+    "ブラウザでのサインインまたは API キーを使い、PostSyncer の MCP サーバー経由でワークスペース、アカウント、投稿、メディア、コメント、クチコミ、分析を扱います。",
+  "marketplace.plugin.postsyncer.prompt.accounts":
+    "PostSyncer に接続されているソーシャルメディアのアカウントはどれですか？",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "新しいリリースについての Instagram 投稿と LinkedIn 投稿を書いて、両方を下書きとして保存してください。",
+  "marketplace.plugin.postsyncer.prompt.week": "PostSyncer で来週に予約されている投稿を、日ごとに一覧にしてください。",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub など 1,000 以上のアプリ",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など 1,000 以上のアプリに接続します。Composio アカウントでサインインしてください。エージェントがアプリを必要とすると、そのアプリの接続を求めます。",

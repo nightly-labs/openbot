@@ -373,6 +373,18 @@ const PLUGIN_TEXT = {
       "prompt-analytics": "marketplace.plugin.trypost.prompt.analytics",
     },
   },
+  postsyncer: {
+    tagline: "marketplace.plugin.postsyncer.tagline",
+    description: "marketplace.plugin.postsyncer.description",
+    apps: {
+      "app-postsyncer-mcp": "marketplace.plugin.postsyncer.app",
+    },
+    prompts: {
+      "prompt-accounts": "marketplace.plugin.postsyncer.prompt.accounts",
+      "prompt-draft": "marketplace.plugin.postsyncer.prompt.draft",
+      "prompt-week": "marketplace.plugin.postsyncer.prompt.week",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",

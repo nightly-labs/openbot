@@ -279,6 +279,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "872298599d7dedfa1d31e1f83a293a6d992b54a444809546d84e98cea0668765",
     },
     {
+      slug: "postsyncer",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "98fa9e140a7ef34c0355f2553ec64ed4d3400acad9fa0bae987056a539ae0f41",
+    },
+    {
       slug: "composio",
       version: "1.2.0",
       featured: false,
@@ -3303,6 +3309,62 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://trypost.it",
     privacyPolicyUrl: "https://trypost.it/en/privacy",
     termsUrl: "https://trypost.it/en/terms",
+    skills: [],
+  },
+  postsyncer: {
+    slug: "postsyncer",
+    name: "PostSyncer",
+    tagline: "Social media scheduling",
+    description:
+      "PostSyncer lets agents list your workspaces and connected accounts, and draft, schedule and publish posts on Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon and Telegram. Agents can also upload media, reply to comments and Google reviews, and read analytics. Sign in to your PostSyncer account through the browser, or paste an API key from Settings › API in PostSyncer. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "PostSyncer",
+    iconUrl: "https://postsyncer.com/web-app-manifest-512x512.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-accounts", text: "Which social media accounts are connected to PostSyncer?" },
+      {
+        id: "prompt-draft",
+        text: "Write an Instagram post and a LinkedIn post about our new release, and save both as drafts.",
+      },
+      { id: "prompt-week", text: "List the posts scheduled in PostSyncer for next week, by day." },
+    ],
+    apps: [
+      {
+        id: "app-postsyncer-mcp",
+        name: "PostSyncer",
+        description:
+          "Workspaces, accounts, posts, media, comments, reviews and analytics, over PostSyncer's MCP server with browser sign-in or an API key.",
+        iconUrl: "https://postsyncer.com/web-app-manifest-512x512.png",
+        server: {
+          name: "postsyncer",
+          transport: "http",
+          url: "https://postsyncer.com/mcp",
+          auth: [
+            { id: "postsyncer-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "postsyncer-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "PostSyncer Settings › API › New key",
+                },
+              ],
+              docsUrl: "https://docs.postsyncer.com/essentials/authentication",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://postsyncer.com",
+    privacyPolicyUrl: "https://postsyncer.com/privacy-policy",
+    termsUrl: "https://postsyncer.com/terms-of-service",
     skills: [],
   },
   composio: {

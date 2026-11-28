@@ -475,6 +475,16 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.draft":
     "Schrijf een concept voor een LinkedIn-post over onze nieuwe release, maar plan hem niet in.",
   "marketplace.plugin.trypost.prompt.analytics": "Welke van mijn posts van vorige maand hadden de meeste interactie?",
+  "marketplace.plugin.postsyncer.tagline": "Socialemediaplanning",
+  "marketplace.plugin.postsyncer.description":
+    "Met PostSyncer kunnen agents je workspaces en gekoppelde accounts weergeven en posts opstellen, inplannen en publiceren op Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon en Telegram. Agents kunnen ook media uploaden, reacties en Google-reviews beantwoorden en statistieken lezen. Log in de browser in op je PostSyncer-account, of plak een API-sleutel uit Settings › API in PostSyncer. Agents kunnen een post direct publiceren, dus controleer elke post voordat je hem goedkeurt.",
+  "marketplace.plugin.postsyncer.app":
+    "Workspaces, accounts, posts, media, reacties, reviews en statistieken, via de MCP-server van PostSyncer met inloggen in de browser of een API-sleutel.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "Welke socialemedia-accounts zijn gekoppeld aan PostSyncer?",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "Schrijf een Instagram-post en een LinkedIn-post over onze nieuwe release, en sla ze allebei op als concept.",
+  "marketplace.plugin.postsyncer.prompt.week":
+    "Geef per dag de posts die in PostSyncer voor volgende week zijn ingepland.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub en meer dan 1000 andere apps",
   "marketplace.plugin.composio.description":
     "Composio koppelt je agents via één MCP-server met Gmail, Slack, GitHub en meer dan 1000 andere apps. Log in met je Composio-account. Als een agent een app nodig heeft, vraagt hij je die app te koppelen.",

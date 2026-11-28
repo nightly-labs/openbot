@@ -25,6 +25,7 @@ import { PAPER_PLUGIN_GUIDE } from "./paper";
 import type { PluginGuide } from "./plugin-guide";
 import { POSTHOG_PLUGIN_GUIDE } from "./posthog";
 import { POSTIZ_PLUGIN_GUIDE } from "./postiz";
+import { POSTSYNCER_PLUGIN_GUIDE } from "./postsyncer";
 import { PRISMA_PLUGIN_GUIDE } from "./prisma";
 import { RAILWAY_PLUGIN_GUIDE } from "./railway";
 import { RENDER_PLUGIN_GUIDE } from "./render";
@@ -63,6 +64,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   omnisend: OMNISEND_PLUGIN_GUIDE,
   postiz: POSTIZ_PLUGIN_GUIDE,
   trypost: TRYPOST_PLUGIN_GUIDE,
+  postsyncer: POSTSYNCER_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
   gitlab: GITLAB_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,

@@ -476,6 +476,15 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.trypost.prompt.week": "Which posts are scheduled for this week?",
   "marketplace.plugin.trypost.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
   "marketplace.plugin.trypost.prompt.analytics": "Which of my posts from last month had the most engagement?",
+  "marketplace.plugin.postsyncer.tagline": "Social media scheduling",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer lets agents list your workspaces and connected accounts, and draft, schedule and publish posts on Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon and Telegram. Agents can also upload media, reply to comments and Google reviews, and read analytics. Sign in to your PostSyncer account through the browser, or paste an API key from Settings › API in PostSyncer. Agents can publish a post immediately, so review each post before you approve it.",
+  "marketplace.plugin.postsyncer.app":
+    "Workspaces, accounts, posts, media, comments, reviews and analytics, over PostSyncer's MCP server with browser sign-in or an API key.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "Which social media accounts are connected to PostSyncer?",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "Write an Instagram post and a LinkedIn post about our new release, and save both as drafts.",
+  "marketplace.plugin.postsyncer.prompt.week": "List the posts scheduled in PostSyncer for next week, by day.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
     "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",

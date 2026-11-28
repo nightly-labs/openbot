@@ -500,6 +500,16 @@ export const messages = {
     "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
   "marketplace.plugin.trypost.prompt.analytics":
     "Какие из моих постов за прошлый месяц получили больше всего вовлечённости?",
+  "marketplace.plugin.postsyncer.tagline": "Планирование публикаций в соцсетях",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer позволяет агентам просматривать ваши рабочие пространства и подключённые аккаунты, а также готовить, планировать и публиковать посты в Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon и Telegram. Агенты также могут загружать медиафайлы, отвечать на комментарии и отзывы в Google и читать аналитику. Войдите в аккаунт PostSyncer в браузере или вставьте API-ключ из Settings › API в PostSyncer. Агенты могут опубликовать пост сразу, поэтому проверяйте каждый пост перед одобрением.",
+  "marketplace.plugin.postsyncer.app":
+    "Рабочие пространства, аккаунты, посты, медиафайлы, комментарии, отзывы и аналитика через MCP-сервер PostSyncer со входом в браузере или API-ключом.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "Какие аккаунты в соцсетях подключены к PostSyncer?",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "Напиши пост для Instagram и пост для LinkedIn о нашем новом релизе и сохрани оба как черновики.",
+  "marketplace.plugin.postsyncer.prompt.week":
+    "Перечисли посты, запланированные в PostSyncer на следующую неделю, по дням.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub и ещё более 1000 приложений",
   "marketplace.plugin.composio.description":
     "Composio подключает ваших агентов к Gmail, Slack, GitHub и ещё более чем 1000 приложений через один сервер MCP. Войдите с аккаунтом Composio. Когда агенту нужно приложение, он попросит вас подключить его.",

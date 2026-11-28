@@ -442,6 +442,15 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.week": "이번 주에 예약된 게시물은 무엇인가요?",
   "marketplace.plugin.trypost.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성하되, 예약하지는 마세요.",
   "marketplace.plugin.trypost.prompt.analytics": "지난달 내 게시물 중 참여가 가장 많았던 것은 무엇인가요?",
+  "marketplace.plugin.postsyncer.tagline": "소셜 미디어 예약",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer를 사용하면 에이전트가 워크스페이스와 연결된 계정을 확인하고 Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon, Telegram에 게시물을 작성, 예약, 게시할 수 있습니다. 에이전트는 미디어를 업로드하고, 댓글과 Google 리뷰에 답글을 달고, 분석을 읽을 수도 있습니다. 브라우저에서 PostSyncer 계정에 로그인하거나 PostSyncer의 Settings › API에서 API 키를 붙여 넣으세요. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요.",
+  "marketplace.plugin.postsyncer.app":
+    "브라우저 로그인 또는 API 키로 PostSyncer의 MCP 서버를 통해 워크스페이스, 계정, 게시물, 미디어, 댓글, 리뷰, 분석을 다룹니다.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "PostSyncer에 연결된 소셜 미디어 계정은 무엇인가요?",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "새 릴리스에 대한 Instagram 게시물과 LinkedIn 게시물을 작성하고, 둘 다 초안으로 저장하세요.",
+  "marketplace.plugin.postsyncer.prompt.week": "PostSyncer에서 다음 주에 예약된 게시물을 요일별로 나열하세요.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub 외 1,000개 이상의 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 1,000개 이상의 앱에 연결해요. Composio 계정으로 로그인하세요. 에이전트에게 앱이 필요하면 그 앱을 연결해 달라고 요청해요.",

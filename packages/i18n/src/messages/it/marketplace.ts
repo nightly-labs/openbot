@@ -485,6 +485,16 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.draft":
     "Scrivi una bozza di post LinkedIn sulla nostra nuova versione, ma non programmarlo.",
   "marketplace.plugin.trypost.prompt.analytics": "Quali dei miei post del mese scorso hanno avuto più interazioni?",
+  "marketplace.plugin.postsyncer.tagline": "Programmazione dei social media",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer permette agli agenti di elencare i tuoi workspace e gli account collegati, e di scrivere, programmare e pubblicare post su Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon e Telegram. Gli agenti possono anche caricare contenuti multimediali, rispondere ai commenti e alle recensioni Google e leggere le statistiche. Accedi al tuo account PostSyncer dal browser, oppure incolla una chiave API da Settings › API in PostSyncer. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo.",
+  "marketplace.plugin.postsyncer.app":
+    "Workspace, account, post, contenuti multimediali, commenti, recensioni e statistiche, tramite il server MCP di PostSyncer con accesso dal browser o una chiave API.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "Quali account social sono collegati a PostSyncer?",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "Scrivi un post per Instagram e uno per LinkedIn sulla nostra nuova versione, e salvali entrambi come bozze.",
+  "marketplace.plugin.postsyncer.prompt.week":
+    "Elenca i post programmati in PostSyncer per la prossima settimana, giorno per giorno.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub e oltre 1.000 altre app",
   "marketplace.plugin.composio.description":
     "Composio collega i tuoi agenti a Gmail, Slack, GitHub e oltre 1.000 altre app tramite un solo server MCP. Accedi con il tuo account Composio. Quando un agente ha bisogno di un'app, ti chiede di collegarla.",

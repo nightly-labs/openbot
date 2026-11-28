@@ -458,6 +458,15 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.week": "אילו פוסטים מתוזמנים לשבוע הזה?",
   "marketplace.plugin.trypost.prompt.draft": "נסח פוסט ל-LinkedIn על הגרסה החדשה שלנו, אבל אל תתזמן אותו.",
   "marketplace.plugin.trypost.prompt.analytics": "אילו מהפוסטים שלי מהחודש שעבר קיבלו הכי הרבה מעורבות?",
+  "marketplace.plugin.postsyncer.tagline": "תזמון רשתות חברתיות",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer מאפשר לסוכנים להציג את סביבות העבודה והחשבונות המחוברים שלך, ולנסח, לתזמן ולפרסם פוסטים ב-Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon ו-Telegram. הסוכנים יכולים גם להעלות מדיה, להשיב לתגובות ולביקורות ב-Google ולקרוא נתוני ניתוח. התחבר לחשבון PostSyncer שלך בדפדפן, או הדבק מפתח API מ-Settings › API ב-PostSyncer. סוכנים יכולים לפרסם פוסט מיד, לכן בדוק כל פוסט לפני שאתה מאשר אותו.",
+  "marketplace.plugin.postsyncer.app":
+    "סביבות עבודה, חשבונות, פוסטים, מדיה, תגובות, ביקורות וניתוח נתונים, דרך שרת ה-MCP של PostSyncer עם התחברות בדפדפן או מפתח API.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "אילו חשבונות רשתות חברתיות מחוברים ל-PostSyncer?",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "כתוב פוסט ל-Instagram ופוסט ל-LinkedIn על הגרסה החדשה שלנו, ושמור את שניהם כטיוטות.",
+  "marketplace.plugin.postsyncer.prompt.week": "הצג את הפוסטים המתוזמנים ב-PostSyncer לשבוע הבא, לפי יום.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ועוד יותר מ-1,000 אפליקציות",
   "marketplace.plugin.composio.description":
     "Composio מחבר את הסוכנים שלך ל-Gmail, Slack, GitHub ולעוד יותר מ-1,000 אפליקציות אחרות דרך שרת MCP אחד. יש להתחבר עם חשבון Composio שלך. כשסוכן צריך אפליקציה, הוא מבקש ממך לחבר אותה.",

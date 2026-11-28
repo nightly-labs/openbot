@@ -1970,6 +1970,68 @@ const TRYPOST: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/trypost",
 };
 
+const POSTSYNCER: MarketplacePluginDetail = {
+  id: "plugin-postsyncer",
+  slug: "postsyncer",
+  name: "PostSyncer",
+  tagline: "Social media scheduling",
+  description:
+    "PostSyncer lets agents list your workspaces and connected accounts, and draft, schedule and publish posts on Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon and Telegram. Agents can also upload media, reply to comments and Google reviews, and read analytics. Sign in to your PostSyncer account through the browser, or paste an API key from Settings › API in PostSyncer. Agents can publish a post immediately, so review each post before you approve it.",
+  category: "automation",
+  creatorName: "PostSyncer",
+  iconUrl: "https://postsyncer.com/web-app-manifest-512x512.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-accounts", text: "Which social media accounts are connected to PostSyncer?" },
+    {
+      id: "prompt-draft",
+      text: "Write an Instagram post and a LinkedIn post about our new release, and save both as drafts.",
+    },
+    { id: "prompt-week", text: "List the posts scheduled in PostSyncer for next week, by day." },
+  ],
+  apps: [
+    {
+      id: "app-postsyncer-mcp",
+      name: "PostSyncer",
+      description:
+        "Workspaces, accounts, posts, media, comments, reviews and analytics, over PostSyncer's MCP server with browser sign-in or an API key.",
+      iconUrl: "https://postsyncer.com/web-app-manifest-512x512.png",
+      server: {
+        name: "postsyncer",
+        transport: "http",
+        url: "https://postsyncer.com/mcp",
+        auth: [
+          { id: "postsyncer-oauth", kind: "link", label: "Sign in" },
+          {
+            id: "postsyncer-key",
+            kind: "key",
+            label: "API key",
+            fields: [
+              {
+                id: "api-key",
+                label: "API key",
+                header: "Authorization",
+                prefix: "Bearer ",
+                hint: "PostSyncer Settings › API › New key",
+              },
+            ],
+            docsUrl: "https://docs.postsyncer.com/essentials/authentication",
+            docsLabel: "Get a key",
+          },
+        ],
+      },
+    },
+  ],
+  websiteUrl: "https://postsyncer.com",
+  privacyPolicyUrl: "https://postsyncer.com/privacy-policy",
+  termsUrl: "https://postsyncer.com/terms-of-service",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/postsyncer",
+};
+
 const COMPOSIO: MarketplacePluginDetail = {
   id: "plugin-composio",
   slug: "composio",
@@ -10820,6 +10882,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   OMNISEND,
   POSTIZ,
   TRYPOST,
+  POSTSYNCER,
   COMPOSIO,
   CLICKUP,
   COINBASE,
