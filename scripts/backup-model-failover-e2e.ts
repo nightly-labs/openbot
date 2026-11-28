@@ -35,6 +35,10 @@ const claudeExecutable = join(root, "claude");
 const codexExecutable = join(root, "codex");
 const codexLog = join(root, "codex-turns.jsonl");
 const workLog = join(root, "work.jsonl");
+const vibeExecutable = join(root, "vibe-acp");
+const vibeLog = join(root, "vibe-turns.jsonl");
+const VIBE_CHECKPOINT = "Vibe checkpoint saved.";
+const REDACTION_PROBE = "fake-vibe-fixture-bearer";
 const CODEX_MODEL = defaultProviderModel("codex");
 const PRIMARY: AgentModelId = defaultProviderModel("claude");
 const BACKUP: AgentModelId = PRIMARY === "claude-sonnet-5-5" ? "claude-opus-5-5" : "claude-sonnet-5-5";
@@ -52,6 +56,8 @@ process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.CLAUDE_CONFIG_DIR = join(home, ".claude");
 process.env.OPENBOT_CODEX_PATH = codexExecutable;
 process.env.CODEX_HOME = join(home, ".codex");
+process.env.OPENBOT_MISTRAL_PATH = vibeExecutable;
+process.env.VIBE_HOME = join(home, ".vibe");
 mkdirSync(home, { recursive: true });
 
 const { AgentService } = await import("../src/backend/agent-service");
@@ -61,6 +67,7 @@ const { CodexAppServerClient } = await import("../src/backend/app-server-client"
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { NO_PROVIDER_CREDENTIALS, requireProviderDriver } = await import("../src/backend/provider-drivers");
 const { importProviderHistory } = await import("../src/backend/provider-history-import");
 
 const STAND_IN_CLAUDE = `#!/usr/bin/env node
@@ -364,6 +371,67 @@ process.stdin.on("data", (chunk) => {
 process.stdout.on("error", (error) => { if (error.code === "EPIPE") process.exit(0); else throw error; });
 `;
 
+const STAND_IN_VIBE = `#!/usr/bin/env node
+const fs = require("node:fs");
+const NL = String.fromCharCode(10);
+if (process.argv.includes("--version")) {
+  process.stdout.write("vibe-acp 3.1.0" + NL);
+  process.exit(0);
+}
+const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
+const update = (sessionId, value) => write({ method: "session/update", params: { sessionId, update: value } });
+const models = { availableModels: [{ modelId: "devstral", name: "devstral" }], currentModelId: "devstral" };
+const body = (type, code, message) => "API error occurred: Status 402. Body: " + JSON.stringify({ type, code, message });
+const BUDGET = body("billing_vibe_budget_exhausted", "2304", "Vibe budget exhausted");
+const failure = (prompt) =>
+  prompt.includes("vibe-refill")
+    ? { code: -32603, message: body("billing_payment_failure", "2302", "Add funds to continue."),
+        data: { details: "Authorization: Bearer " + ${JSON.stringify(REDACTION_PROBE)} + " Earlier error: " + BUDGET } }
+    : prompt.includes("vibe-budget-data")
+      ? { code: -32603, message: "Internal error", data: { details: BUDGET } }
+      : prompt.includes("vibe-budget")
+        ? { code: -32603, message: BUDGET }
+        : null;
+let sessions = 0;
+function handle(message) {
+  const params = message.params ?? {};
+  if (message.id === undefined) return;
+  if (message.method === "initialize")
+    return write({ id: message.id, result: { protocolVersion: 1, authMethods: [], agentCapabilities: { loadSession: true } } });
+  if (message.method === "session/new")
+    return write({ id: message.id, result: { sessionId: "vibe-" + process.pid + "-" + ++sessions, models } });
+  if (message.method === "session/load") return write({ id: message.id, result: { models } });
+  if (message.method === "session/prompt") {
+    const prompt = params.prompt.map((block) => block.text ?? "").join("");
+    const error = failure(prompt);
+    const worked = error !== null && !prompt.includes("vibe-budget-first");
+    fs.appendFileSync(${JSON.stringify(vibeLog)}, JSON.stringify({ worked, failed: error !== null, input: prompt }) + NL);
+    if (worked) {
+      update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "checkpoint-" + message.id,
+        title: "Save Vibe checkpoint", kind: "edit", status: "completed" });
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: ${JSON.stringify(VIBE_CHECKPOINT)} } });
+    }
+    if (error) return write({ id: message.id, error });
+    update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } });
+    return write({ id: message.id, result: { stopReason: "end_turn" } });
+  }
+  write({ id: message.id, result: {} });
+}
+let buffer = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let index;
+  while ((index = buffer.indexOf(NL)) >= 0) {
+    const line = buffer.slice(0, index);
+    buffer = buffer.slice(index + 1);
+    if (line.trim()) handle(JSON.parse(line));
+  }
+});
+setInterval(() => {}, 1000);
+`;
+
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
@@ -555,12 +623,20 @@ interface CodexTurn {
   limited: boolean;
 }
 
+interface VibeTurn {
+  worked: boolean;
+  failed: boolean;
+  input: string;
+}
+
 await writeFile(claudeExecutable, STAND_IN_CLAUDE, { mode: 0o755 });
 await writeFile(codexExecutable, STAND_IN_CODEX, { mode: 0o755 });
+await writeFile(vibeExecutable, STAND_IN_VIBE, { mode: 0o755 });
 failing([]);
 const database = new OpenBotDatabase(userData);
 const clients: ClaudeStandIn[] = [];
 const events: AgentEvent[] = [];
+let mistralOn = false;
 
 function startService() {
   const store = new AgentStore(userData, home, database);
@@ -570,9 +646,13 @@ function startService() {
     mailbox,
     browser,
     preferredProvider: "claude",
-    offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "claude" && provider !== "codex"),
+    offProviders: AGENT_PROVIDERS.filter(
+      (provider) => provider !== "claude" && provider !== "codex" && !(mistralOn && provider === "mistral"),
+    ),
     clientFactory: (provider, cli) => {
       if (provider === "codex") return new CodexAppServerClient(cli.executable, 30000);
+      if (provider === "mistral")
+        return requireProviderDriver("mistral").createClient(cli, 30000, NO_PROVIDER_CREDENTIALS);
       const client = new ClaudeStandIn(cli);
       clients.push(client);
       return client;
@@ -647,24 +727,32 @@ async function restart() {
   await runCauseEffect(service.initialize());
 }
 
-async function createCodex(name: string, backupModels?: AgentBackupModels) {
+async function createOn(
+  provider: "codex" | "mistral",
+  model: AgentModelId,
+  name: string,
+  backupModels?: AgentBackupModels,
+) {
   const agent = await runCauseEffect(
     service.createAgent({
       name,
       description: "Checks usage-limit continuation.",
       avatarSeed: randomUUID(),
       avatarHue: null,
-      provider: "codex",
-      model: CODEX_MODEL,
+      provider,
+      model,
       initialMessage: "Hello.",
     }),
   );
-  await waitFor("the initial Codex turn to end", () =>
+  await waitFor(`the initial ${provider} turn to end`, () =>
     service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
   );
   if (backupModels) await runCauseEffect(service.updateAgent({ agentId: agent.id, backupModels }));
   return agentOf(agent.id);
 }
+
+const createCodex = (name: string, backupModels?: AgentBackupModels) =>
+  createOn("codex", CODEX_MODEL, name, backupModels);
 
 const automaticBackups: AgentBackupModels = {
   automatic: true,
@@ -1822,6 +1910,98 @@ try {
       .map((turn) => turn.model);
     assert.deepEqual(nextModels, [BACKUP], "The next message does not try the refused sign-in again.");
     return { models, shown, nextModels };
+  });
+
+  mistralOn = true;
+  const askFirst: AgentBackupModels = { automatic: false, order: automaticBackups.order };
+  const runOnMistral = async (name: string, backupModels: AgentBackupModels, text: string) => {
+    await restart();
+    const agent = await createOn("mistral", "devstral", name, backupModels);
+    const since = events.length;
+    const beforeClaude = turns().length;
+    const beforeVibe = readLog<VibeTurn>(vibeLog).length;
+    const outcome = await send(agent.id, text);
+    return {
+      agent: agentOf(agent.id),
+      outcome,
+      shown: errorsFor(agent.id, since),
+      mistral: readLog<VibeTurn>(vibeLog).slice(beforeVibe),
+      backups: turns().slice(beforeClaude),
+      conversation: await runCauseEffect(service.readConversation(agent.id)),
+    };
+  };
+  const continuesOnFirstBackup = async (name: string, backupModels: AgentBackupModels, text: string) => {
+    const run = await runOnMistral(name, backupModels, text);
+    assert.deepEqual(
+      run.mistral.map(({ worked, failed }) => ({ worked, failed })),
+      [{ worked: true, failed: true }],
+      "Mistral works once and reports the budget failure.",
+    );
+    if (run.outcome.status === "failed") {
+      assert.match(JSON.stringify({ error: run.outcome.error, shown: run.shown }), /billing_vibe_budget_exhausted/u);
+      assert.deepEqual(run.backups, [], "No backup ran before the budget failure stopped the delivery.");
+      throw new Error("Mistral stopped after a Vibe budget error without running a backup.");
+    }
+    assert.deepEqual(
+      run.backups.map((turn) => turn.model),
+      [PRIMARY],
+      "Only the first ready backup runs, once.",
+    );
+    const input = run.backups[0]?.input ?? "";
+    const continued = input.includes("Continue the unfinished task");
+    const checkpoint = input.includes(VIBE_CHECKPOINT);
+    assert.ok(continued, "The backup gets a continuation request.");
+    assert.ok(checkpoint, "The Mistral checkpoint reaches the backup.");
+    assert.equal(run.agent.provider, "claude", "The agent is on its backup model.");
+    assert.equal(run.agent.model, PRIMARY);
+    assert.deepEqual(run.shown, [], "A recovered budget error shows no failure.");
+    return {
+      status: run.outcome.status,
+      mistralTurns: run.mistral.length,
+      backups: run.backups.map((turn) => turn.model),
+      continued,
+      checkpoint,
+      returnsTo: run.agent.usageLimitReturn?.provider ?? null,
+    };
+  };
+
+  await check("a Mistral payment refusal after work stops with the credential masked", async () => {
+    const run = await runOnMistral("Vibe refill", automaticBackups, "vibe-refill after work");
+    assert.equal(run.outcome.status, "failed", "A payment refusal after work stops the task.");
+    assert.deepEqual(
+      run.mistral.map((turn) => turn.worked),
+      [true],
+    );
+    assert.deepEqual(run.backups, [], "No backup runs.");
+    assert.equal(run.agent.provider, "mistral", "The agent keeps its model.");
+    assert.ok(run.shown.length > 0, "The error shows.");
+    const shownText = JSON.stringify({ error: run.outcome.error, shown: run.shown });
+    assert.ok(shownText.includes("Add funds to continue.") && shownText.includes("[redacted]"), shownText);
+    assert.ok(
+      !JSON.stringify({ shownText, conversation: run.conversation }).includes(REDACTION_PROBE),
+      "No credential reaches the error, the events or the chat.",
+    );
+    return { status: run.outcome.status, mistralTurns: run.mistral.length };
+  });
+
+  await check("a Mistral budget code in the RPC message continues once on the first ready backup", () =>
+    continuesOnFirstBackup("Vibe budget", automaticBackups, "vibe-budget after work"),
+  );
+
+  await check("a Mistral budget code in the RPC error data continues on the saved ask-first backup", () =>
+    continuesOnFirstBackup("Vibe budget data", askFirst, "vibe-budget-data after work"),
+  );
+
+  await check("a Mistral budget code before work stops with ask-first backups", async () => {
+    const run = await runOnMistral("Vibe budget first", askFirst, "vibe-budget-first before work");
+    assert.equal(run.outcome.status, "failed", "Ask-first backups do not take a task before work starts.");
+    assert.deepEqual(
+      run.mistral.map((turn) => turn.worked),
+      [false],
+    );
+    assert.deepEqual(run.backups, [], "No backup runs.");
+    assert.equal(run.agent.provider, "mistral", "The agent keeps its model.");
+    return { status: run.outcome.status, mistralTurns: run.mistral.length };
   });
 
   report.passed = true;

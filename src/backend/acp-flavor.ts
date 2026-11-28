@@ -512,7 +512,31 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   },
 };
 
+const MISTRAL_PAYMENT_BODY = /^API error occurred: Status 402(?:\.\s*Body:|\s+Body:)?\s*(?=\{)/u;
+
+function mistralPaymentErrorType(data: unknown): string | null {
+  let body = data;
+  if (typeof data === "string") {
+    const prefix = MISTRAL_PAYMENT_BODY.exec(data)?.[0];
+    if (prefix === undefined) return null;
+    try {
+      body = JSON.parse(data.slice(prefix.length));
+    } catch {
+      return null;
+    }
+  }
+  return isRecord(body) && typeof body.type === "string" ? body.type : null;
+}
+
 export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
+  failureCause: (error) => {
+    if (!(error instanceof RequestError) || error.code !== -32603) return null;
+    const type =
+      mistralPaymentErrorType(error.message) ??
+      mistralPaymentErrorType(error.data) ??
+      (isRecord(error.data) ? mistralPaymentErrorType(error.data.details) : null);
+    return type === "billing_vibe_budget_exhausted" ? "usage_limit" : null;
+  },
   sessionNotFound: (error, sessionId) =>
     error.code === -32602 ? isRecord(error.data) && error.data.session_id === sessionId : null,
   workspaceAsAdditionalDirectory: true,
