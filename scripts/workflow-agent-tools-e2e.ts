@@ -262,6 +262,42 @@ try {
     bareError?.includes("openbot.list_workflows") === true,
     bareError,
   );
+  const runsName = "openbot.read_workflow_runs";
+  const nested = resolveDeferredTool(
+    params("tool_call", { name: runsName, arguments: { name: runsName, arguments: { workflowId: "w1", limit: "2" } } }),
+    "antigravity",
+  );
+  check(
+    "tool_call uses the inner arguments of a repeated envelope with the same tool name",
+    nested?.tool === "read_workflow_runs" && JSON.stringify(nested.arguments) === '{"workflowId":"w1","limit":2}',
+    nested,
+  );
+  const nestedText = resolveDeferredTool(
+    params("tool_call", {
+      name: runsName,
+      arguments: JSON.stringify({ tool: "mcp__openbot__read_workflow_runs", arguments: '{"workflowId":"w1"}' }),
+    }),
+    "antigravity",
+  );
+  check(
+    "tool_call decodes a repeated envelope sent as text, also with its arguments as text",
+    JSON.stringify(nestedText?.arguments) === '{"workflowId":"w1"}',
+    nestedText,
+  );
+  const otherInner = { name: "openbot.list_workflows", arguments: { workflowId: "w1" } };
+  const otherName = resolveDeferredTool(params("tool_call", { name: runsName, arguments: otherInner }), "antigravity");
+  check(
+    "tool_call keeps an inner envelope with a different tool name as the arguments",
+    JSON.stringify(otherName?.arguments) === JSON.stringify(otherInner),
+    otherName,
+  );
+  const extraInner = { name: runsName, arguments: { workflowId: "w1" }, limit: 1 };
+  const extraKey = resolveDeferredTool(params("tool_call", { name: runsName, arguments: extraInner }), "antigravity");
+  check(
+    "tool_call keeps an inner object with more keys than name and arguments as the arguments",
+    JSON.stringify(extraKey?.arguments) === JSON.stringify(extraInner),
+    extraKey,
+  );
 
   const built = await call("create", "edit_workflow", {
     title: "Morning news",
