@@ -1,7 +1,7 @@
 import { isAppLanguage } from "@openbot/contracts/app-language";
 import type { TranslatedLocale } from "@openbot/i18n";
 import { createIsomorphicFn } from "@tanstack/solid-start";
-import { getCookie, getRequestHeader } from "@tanstack/solid-start/server";
+import { getRequestHeader } from "@tanstack/solid-start/server";
 import { chosenSiteLocale, SITE_LOCALE_COOKIE } from "./site-paths";
 
 interface LanguageRange {
@@ -39,12 +39,18 @@ function cookieValue(cookies: string, name: string): string | undefined {
   return undefined;
 }
 
+export function serverRequestLocale(
+  cookieHeader: string | null | undefined,
+  acceptLanguage: string | null | undefined,
+): TranslatedLocale {
+  return (
+    chosenSiteLocale(cookieValue(cookieHeader ?? "", SITE_LOCALE_COOKIE)) ??
+    firstTranslated(acceptedLanguages(acceptLanguage ?? undefined))
+  );
+}
+
 export const requestLocale = createIsomorphicFn()
-  .server(
-    (): TranslatedLocale =>
-      chosenSiteLocale(getCookie(SITE_LOCALE_COOKIE)) ??
-      firstTranslated(acceptedLanguages(getRequestHeader("accept-language"))),
-  )
+  .server((): TranslatedLocale => serverRequestLocale(getRequestHeader("cookie"), getRequestHeader("accept-language")))
   .client(
     (): TranslatedLocale =>
       chosenSiteLocale(cookieValue(globalThis.document?.cookie ?? "", SITE_LOCALE_COOKIE)) ??
