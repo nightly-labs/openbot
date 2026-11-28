@@ -1667,7 +1667,14 @@ export class InstanceTransferService {
         .filter((entry) => entry.name.startsWith(`${path}/`))
         .map((entry) => [entry.name.slice(path.length + 1), entry] as const);
     const skills: Array<{ files: Array<readonly [string, Uint8Array]>; slug: string }> = [];
-    for (const skill of source.skills) skills.push(yield* readSkillEffect(archive, under(skill)));
+    for (const skill of source.skills)
+      skills.push(
+        yield* readSkillEffect(archive, under(skill)).pipe(
+          Effect.mapError((error) =>
+            archiveFailure(new Error(named(skill.split("/").at(-1) ?? skill)(message(error.cause)))),
+          ),
+        ),
+      );
     const model = this.options.agents
       .listModels()
       .find((option) => option.provider === source.provider && option.id === source.model);

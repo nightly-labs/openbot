@@ -11,7 +11,12 @@ import { Effect, Exit, Schema } from "effect";
 import { strFromU8, zipSync } from "fflate";
 import { isPathInside } from "../backend/path-containment";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveResult, archiveSync } from "./archive-effects";
-import { inspectArchive, isUnsafeArchivePath, MAX_BYTES as SKILL_MAX_BYTES } from "./skill-package";
+import {
+  inspectArchive,
+  isUnsafeArchivePath,
+  MAX_BYTES as SKILL_MAX_BYTES,
+  MAX_FILES as SKILL_MAX_FILES,
+} from "./skill-package";
 
 export interface ArchiveLimits {
   files: number;
@@ -118,6 +123,8 @@ export const readSkillEffect = Effect.fn("Archive.readSkill")(function* (
 ): Effect.fn.Return<{ files: Array<readonly [string, Uint8Array]>; slug: string }, ArchiveOperationError> {
   if (files.reduce((total, [, entry]) => total + entry.size, 0) > SKILL_MAX_BYTES)
     return yield* archiveFailure(new Error(sourceText("error.skill.expandedTooLarge")));
+  if (files.length > SKILL_MAX_FILES)
+    return yield* archiveFailure(new Error(sourceText("error.skill.tooManyFiles", { limit: SKILL_MAX_FILES })));
   const data = yield* readEntriesEffect(
     archive,
     files.map(([, entry]) => entry.name),
