@@ -73,6 +73,7 @@ interface ChatVisualProps {
   failed?: boolean;
   fill?: boolean;
   onOpenLink: (url: string) => void;
+  onOpenFile?: ((path: string) => void) | undefined;
   onMessage?: ((text: string) => void) | undefined;
   onContext?: ((text: string) => void) | undefined;
   onUse?: (() => void) | undefined;
@@ -204,6 +205,12 @@ function VisualFrame(props: ChatVisualProps) {
         props.onOpenLink(url);
         return;
       }
+      case "open-file":
+        if (!props.onOpenFile || !userActed()) return reply(null);
+        exitFullscreen();
+        frame?.blur();
+        props.onOpenFile(message.path);
+        return reply({});
       case "display-mode":
         if (message.mode === "inline") exitFullscreen();
         else if (userActed()) enterFullscreen();
