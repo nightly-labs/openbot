@@ -14,9 +14,10 @@ import { source as pl } from "./messages/pl/source";
 import { source as pt } from "./messages/pt/source";
 import { source as ru } from "./messages/ru/source";
 import { source as tr } from "./messages/tr/source";
+import { source as uk } from "./messages/uk/source";
 import { source as zh } from "./messages/zh/source";
 
-const catalogs = { en, ar, de, es, fr, he, it, ja, ko, nl, pl, pt, ru, tr, zh } as const;
+const catalogs = { en, ar, de, es, fr, he, it, ja, ko, nl, pl, pt, ru, tr, uk, zh } as const;
 
 export function sourceTranslation(locale: TranslatedLocale): PartialTranslation<typeof en> | undefined {
   return catalogs[locale];
