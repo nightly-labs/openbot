@@ -1,5 +1,5 @@
 import { ProviderLogo } from "@openbot/brand";
-import { agentProviderName, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, agentProviderName, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import {
   AGENT_BACKUP_MODEL_LIMIT,
   type AgentBackupModels,
@@ -71,7 +71,8 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
     (accounts === undefined ? accountId === DEFAULT_PROVIDER_ACCOUNT_ID : account?.state === "connected");
   const workspaceOnlyBlocked =
     source.workspaceOnly === true &&
-    source.modelOptions.some((option) => option.provider === choice.provider && option.workspaceOnlyUnavailable);
+    agentProviderDescriptor(choice.provider).workspaceEnforcement === "confined-process" &&
+    source.modelOptions.some((option) => option.workspaceOnlyUnavailable);
   return {
     key: `${choice.provider}\u0000${accountId}\u0000${choice.model}`,
     choice,
