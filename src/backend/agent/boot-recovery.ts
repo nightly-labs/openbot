@@ -38,6 +38,7 @@ type UnresolvedDelivery = DeliveryContext["delivery"];
 const logger = createOpenBotLogger("provider-history");
 const eventLogger = createOpenBotLogger("thread-event-compaction");
 const THREAD_EVENT_COMPACTION_INTERVAL = Duration.hours(6);
+const THREAD_EVENT_COMPACTION_START_DELAY = Duration.minutes(1);
 
 export interface BootRecoveryHooks {
   executionThreads?(): Array<{ id: string; threadId: string; channelId?: string }>;
@@ -570,9 +571,13 @@ export class BootRecovery {
     return Effect.suspend(() => {
       if (this.#threadEventsCompacted) return Effect.void;
       this.#threadEventsCompacted = true;
-      return this.#compactThreadEventsOnce().pipe(
-        Effect.andThen(Effect.sleep(THREAD_EVENT_COMPACTION_INTERVAL)),
-        Effect.forever,
+      return Effect.sleep(THREAD_EVENT_COMPACTION_START_DELAY).pipe(
+        Effect.andThen(
+          this.#compactThreadEventsOnce().pipe(
+            Effect.andThen(Effect.sleep(THREAD_EVENT_COMPACTION_INTERVAL)),
+            Effect.forever,
+          ),
+        ),
         Effect.ensuring(
           Effect.sync(() => {
             this.#threadEventsCompacted = false;

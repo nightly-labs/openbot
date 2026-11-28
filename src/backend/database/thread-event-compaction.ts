@@ -41,7 +41,9 @@ interface SupersededUpdates {
 const BATCH_EVENTS = 256;
 const REFOLD_MIN_NEW_EVENTS = 1000;
 const BATCH_BYTES = 4 * 1024 * 1024;
+const BATCH_MILLISECONDS = 25;
 const MAX_RESTARTS = 3;
+const RECENTLY_COMPACTED_MILLISECONDS = 5 * 60 * 60 * 1000;
 
 interface ThreadProgress {
   threadId: string;
@@ -96,6 +98,7 @@ export class ThreadEventCompaction {
   }
 
   #startNextThread(db: DatabaseSync): ThreadProgress | null {
+    const now = Date.now();
     const row = databaseRow(
       db
         .prepare(
@@ -104,13 +107,20 @@ export class ThreadEventCompaction {
              AND NOT EXISTS (
                SELECT 1 FROM thread_event_compaction c
                WHERE c.thread_id = t.thread_id AND (
-                 SELECT count(*) FROM orchestration_events e
-                 WHERE e.aggregate_type = 'thread' AND e.aggregate_id = t.thread_id AND e.sequence > c.through_sequence
-               ) < max(?, (SELECT count(*) FROM projection_thread_messages m WHERE m.thread_id = t.thread_id))
+                 c.compacted_at BETWEEN ? AND ? OR (
+                   SELECT count(*) FROM orchestration_events e
+                   WHERE e.aggregate_type = 'thread' AND e.aggregate_id = t.thread_id AND e.sequence > c.through_sequence
+                 ) < max(?, (SELECT count(*) FROM projection_thread_messages m WHERE m.thread_id = t.thread_id))
+               )
              )
            ORDER BY t.thread_id LIMIT 1`,
         )
-        .get(this.#afterThreadId, REFOLD_MIN_NEW_EVENTS),
+        .get(
+          this.#afterThreadId,
+          new Date(now - RECENTLY_COMPACTED_MILLISECONDS).toISOString(),
+          new Date(now).toISOString(),
+          REFOLD_MIN_NEW_EVENTS,
+        ),
     );
     if (!row) return null;
     const threadId = requiredStringColumn(row, "thread_id");
@@ -131,6 +141,7 @@ export class ThreadEventCompaction {
   }
 
   #compactBatch(db: DatabaseSync, progress: ThreadProgress): ThreadEventCompactionBatch {
+    const started = performance.now();
     const batch: ThreadEventCompactionBatch = {
       done: false,
       events: 0,
@@ -178,7 +189,11 @@ export class ThreadEventCompaction {
     let bytes = 0;
     let reachedEnd = true;
     for (const value of select.iterate(progress.threadId, progress.through, progress.cutoff)) {
-      if (batch.events >= BATCH_EVENTS || bytes >= BATCH_BYTES) {
+      if (
+        batch.events >= BATCH_EVENTS ||
+        bytes >= BATCH_BYTES ||
+        (batch.events > 0 && performance.now() - started >= BATCH_MILLISECONDS)
+      ) {
         reachedEnd = false;
         break;
       }
