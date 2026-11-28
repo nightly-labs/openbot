@@ -40,7 +40,10 @@ interface Report {
   mediaTools?: {
     goKeyOnly: (boolean | null)[];
     otherProviderEnvKey: (boolean | null)[];
+    textProviderEnvKey: (boolean | null)[];
     customProviderKey: (boolean | null)[];
+    textCustomProviderKey: (boolean | null)[];
+    envKeyWithoutCatalog: (boolean | null)[];
     userConfigKey: (boolean | null)[];
     otherProviderKey: (boolean | null)[];
   };
@@ -63,6 +66,22 @@ delete process.env.OPENCODE_AUTH_CONTENT;
 delete process.env.OPENCODE_DB;
 for (const name of Object.keys(process.env)) if (name.endsWith("_API_KEY")) delete process.env[name];
 
+function seedOpenCodeCatalog() {
+  const models = (type: string) => ({ m: { type } });
+  const body = {
+    opencode: { env: ["OPENCODE_API_KEY"], models: { ...models("chat"), image: { type: "image" } } },
+    openai: { env: ["OPENAI_API_KEY"], models: { ...models("chat"), image: { type: "image" } } },
+    anthropic: { env: ["ANTHROPIC_API_KEY"], models: models("chat") },
+    deepseek: { env: ["DEEPSEEK_API_KEY"], models: models("chat") },
+  };
+  const catalog = new DatabaseSync(join(openCodeData, "opencode.db"));
+  catalog.exec("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  const insert = catalog.prepare("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)");
+  insert.run("models-dev:v3:catalog", JSON.stringify({ updatedAt: 1, digest: "d1", body: JSON.stringify(body) }));
+  insert.run("models-dev:v3:catalog:meta", JSON.stringify({ updatedAt: 1, digest: "d1" }));
+  catalog.close();
+}
+
 function open(cli: AgentCliInfo): AgentClient {
   const client = requireProviderDriver("opencode").createClient(cli, 10_000, {
     ...NO_PROVIDER_CREDENTIALS,
@@ -79,6 +98,8 @@ try {
   const workspace = join(root, "workspace");
   await mkdir(workspace);
   await installFakeAgent(executable, "opencode-expired-key");
+  await mkdir(openCodeData, { recursive: true });
+  seedOpenCodeCatalog();
   const cli: AgentCliInfo = { executable, version: "1.18.30", source: "managed" };
 
   const first = open(cli);
@@ -134,6 +155,16 @@ try {
     "A provider key in the environment keeps the image and video tools.",
   );
 
+  process.env.DEEPSEEK_API_KEY = "text-provider";
+  const textProviderEnvKey = await mediaToolsOfNewProcess().finally(() => {
+    delete process.env.DEEPSEEK_API_KEY;
+  });
+  assert.deepEqual(
+    textProviderEnvKey,
+    [false, false],
+    "A key for a provider with no image or video models does not keep the tools (#17402).",
+  );
+
   endpoints = [
     {
       id: "openai",
@@ -152,6 +183,39 @@ try {
     [null, null],
     "A custom provider with a key keeps the image and video tools: OpenCode adds its catalog image models.",
   );
+
+  endpoints = [
+    {
+      id: "amin",
+      name: "Amin",
+      baseUrl: "https://llm.example.com/v1",
+      apiKey: "endpoint-key",
+      models: [{ id: "manageit/qwen3.8-27b", name: "Qwen" }],
+      headers: [],
+    },
+  ];
+  const textCustomProviderKey = await mediaToolsOfNewProcess().finally(() => {
+    endpoints = [];
+  });
+  assert.deepEqual(
+    textCustomProviderKey,
+    [false, false],
+    "A custom provider with a key but no catalog image models does not keep the tools (#17402).",
+  );
+
+  const withoutCatalog = new DatabaseSync(join(openCodeData, "opencode.db"));
+  withoutCatalog.exec("DELETE FROM kv");
+  withoutCatalog.close();
+  process.env.OPENAI_API_KEY = "other-provider";
+  const envKeyWithoutCatalog = await mediaToolsOfNewProcess().finally(() => {
+    delete process.env.OPENAI_API_KEY;
+  });
+  assert.deepEqual(
+    envKeyWithoutCatalog,
+    [null, null],
+    "Before OpenCode stores its catalog, a provider key keeps the image and video tools as before.",
+  );
+  seedOpenCodeCatalog();
 
   const userConfig = join(root, "config", "opencode", "opencode.json");
   await mkdir(join(root, "config", "opencode"), { recursive: true });
@@ -282,10 +346,19 @@ try {
   const otherProviderKey = [otherKeySpawn?.imageTool ?? null, otherKeySpawn?.videoTool ?? null];
   assert.deepEqual(
     otherProviderKey,
-    [null, null],
-    "A stored key for another provider keeps the image and video tools.",
+    [false, false],
+    "A stored key for a provider with no image or video models does not keep the tools (#17402).",
   );
-  report.mediaTools = { goKeyOnly, otherProviderEnvKey, customProviderKey, userConfigKey, otherProviderKey };
+  report.mediaTools = {
+    goKeyOnly,
+    otherProviderEnvKey,
+    textProviderEnvKey,
+    customProviderKey,
+    textCustomProviderKey,
+    envKeyWithoutCatalog,
+    userConfigKey,
+    otherProviderKey,
+  };
   await runCauseEffect(eighth.stop());
 
   delete process.env.FAKE_PROVIDER_AUTH;

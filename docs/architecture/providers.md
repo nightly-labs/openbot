@@ -790,16 +790,28 @@ credential" or "Missing API key" (#15281, #6432). OpenCode Go has no image or vi
 Go key does not help. When `hasOpenCodeMediaSignIn` finds no sign-in that can pay for these models,
 `openCodeAgentConfig` sends `experimental.image_generate` and `experimental.video_generate` as
 `false`, which removes both tools. OpenBot's own `generate_image` and `generate_video` (OpenBot
-credits) stay, and their guidance sends an agent to them when it has no media tool of its own. The check counts a non-empty environment variable whose name ends in
-`_API_KEY` (`OPENCODE_API_KEY` after `clearedInheritedOpenCodeKeyEnv`, or a provider key such as
-`OPENAI_API_KEY`: 291 of the 326 key variables in the OpenCode 2.4.2 catalog end so), and an
-`auth.json` entry or an active `credential` row for any provider except `opencode-go`. It also counts
-a custom endpoint with a key or headers (`hasCustomProviderCredentials`), and a user OpenCode config
-(the global config files or `OPENCODE_CONFIG`) that sets a provider `apiKey` or
-`experimental.image_generate`/`video_generate`, or that OpenBot cannot decode. A key for another
-provider keeps the tools, because that provider can have its own image models: a custom endpoint
-with the id `openai` and a key gets the OpenAI image models of the catalog in OpenCode 2.4.2. Checked with the real OpenCode 2.4.0 and 2.4.2 on a free
-model; 2.2.5 and 2.3.2 have the same switch. `test:opencode-expired-key` checks the config.
+credits) stay, and their guidance sends an agent to them when it has no media tool of its own.
+
+A key keeps the tools only when its provider can pay for image or video models.
+`readOpenCodeMediaProviders` reads OpenCode's own catalog from `opencode.db` (kv
+`models-dev:v3:catalog` in 2.4, `models-dev:v2:catalog` in 2.2 and 2.3; the v3 `body` is a JSON
+string) and keeps the providers that have a model of type `image` or `video`, with their `env` key
+names. A provider entry or a model entry that does not decode is skipped. The result is cached
+until the catalog `digest` changes, and only when the catalog row has the same `digest` as its
+`:meta` row. A Zen key (`opencode`, `OPENCODE_API_KEY`) always counts. Before OpenCode stores a
+catalog (its first start, or `OPENCODE_DB=:memory:`), or when the catalog cannot be read, the check
+keeps the earlier rule: any `*_API_KEY` variable, and any key except an `opencode-go` key, keep the
+tools, so a working provider key does not lose them. With a catalog, the check counts a
+non-empty `*_API_KEY` variable that the catalog lists for such a provider, an `auth.json` entry or an
+active `credential` row for such a provider, a custom endpoint with a key or headers whose id is
+such a provider (`hasCustomProviderMediaKey`: the id `openai` gets the OpenAI image models of the
+catalog), and a user OpenCode config (the global config files or `OPENCODE_CONFIG`) that sets an
+`apiKey` for such a provider, sets `experimental.image_generate`/`video_generate`, or that OpenBot
+cannot decode. A key for a provider with no image or video model, such as a custom endpoint for a
+text model or a DeepSeek or Anthropic key, does not keep the tools: OpenCode would offer only the
+Zen image model, and the image job would fail with "Invalid credential" (#17402). Checked with the
+real OpenCode 2.4.2 and the catalogs of 2.4.2 and 2.2.5. `test:opencode-expired-key` checks the
+config with a seeded catalog and with no catalog.
 
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode

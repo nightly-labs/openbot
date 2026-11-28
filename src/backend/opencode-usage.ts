@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -102,8 +102,7 @@ const readAuthFileProviders = Effect.fn("OpenCode.readAuthFileProviders")(functi
 });
 
 const PROVIDER_CREDENTIAL_QUERY = "SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1";
-const OTHER_PROVIDER_CREDENTIAL_QUERY =
-  "SELECT 1 FROM credential WHERE integration_id != ? AND active IS NOT 0 LIMIT 1";
+const ACTIVE_CREDENTIAL_PROVIDERS_QUERY = "SELECT DISTINCT integration_id FROM credential WHERE active IS NOT 0";
 
 const hasStoredCredential = Effect.fn("OpenCode.hasStoredCredential")(function* (
   env: NodeJS.ProcessEnv,
@@ -126,14 +125,100 @@ export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(funct
   return yield* hasStoredCredential(env, PROVIDER_CREDENTIAL_QUERY, provider);
 });
 
-function hasProviderKeyVariable(env: NodeJS.ProcessEnv): boolean {
-  return Object.entries(env).some(([name, value]) => name.toUpperCase().endsWith("_API_KEY") && Boolean(value?.trim()));
+const readStoredCredentialProviders = Effect.fn("OpenCode.readStoredCredentialProviders")(function* (
+  env: NodeJS.ProcessEnv,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (env.OPENCODE_AUTH_CONTENT || !databasePath) return [];
+  return yield* Effect.try({
+    try: () =>
+      readOpenCodeDatabase(databasePath, (database) =>
+        database
+          .prepare(ACTIVE_CREDENTIAL_PROVIDERS_QUERY)
+          .all()
+          .flatMap((row) => (typeof row.integration_id === "string" ? [row.integration_id] : [])),
+      ),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed((): string[] => []));
+});
+
+export interface OpenCodeMediaProviders {
+  readonly paysForMedia: (provider: string) => boolean;
+  readonly paysForMediaKey: (variable: string) => boolean;
 }
 
-export const hasOpenCodeMediaSignIn = Effect.fn("OpenCode.hasMediaSignIn")(function* (env: NodeJS.ProcessEnv) {
-  if (hasProviderKeyVariable(env)) return true;
-  if ((yield* readAuthFileProviders(env)).some((provider) => provider !== OPENCODE_GO_PROVIDER)) return true;
-  return yield* hasStoredCredential(env, OTHER_PROVIDER_CREDENTIAL_QUERY, OPENCODE_GO_PROVIDER);
+const OPENCODE_CATALOG_KEYS = ["models-dev:v3:catalog", "models-dev:v2:catalog"] as const;
+
+const MEDIA_PROVIDERS_WITHOUT_CATALOG: OpenCodeMediaProviders = {
+  paysForMedia: (provider) => provider !== OPENCODE_GO_PROVIDER,
+  paysForMediaKey: () => true,
+};
+
+const CatalogMeta = Schema.fromJsonString(Schema.Struct({ digest: Schema.String }));
+const CatalogBody = Schema.Record(Schema.String, Schema.Unknown);
+const Catalog = Schema.fromJsonString(
+  Schema.Struct({ digest: Schema.String, body: Schema.Union([CatalogBody, Schema.fromJsonString(CatalogBody)]) }),
+);
+const decodeCatalogProvider = Schema.decodeUnknownOption(
+  Schema.Struct({
+    env: Schema.optionalKey(Schema.Array(Schema.String)),
+    models: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  }),
+);
+const isMediaModel = Schema.is(Schema.Struct({ type: Schema.Literals(["image", "video"]) }));
+
+let catalogCache: { readonly source: string; readonly media: OpenCodeMediaProviders } | null = null;
+
+function mediaProvidersOf(body: typeof CatalogBody.Type): OpenCodeMediaProviders {
+  const providers = new Set(["opencode"]);
+  const keys = new Set(["OPENCODE_API_KEY"]);
+  for (const [id, entry] of Object.entries(body)) {
+    const provider = decodeCatalogProvider(entry);
+    if (Option.isNone(provider) || !Object.values(provider.value.models ?? {}).some(isMediaModel)) continue;
+    providers.add(id);
+    for (const name of provider.value.env ?? []) keys.add(name.toUpperCase());
+  }
+  return { paysForMedia: (provider) => providers.has(provider), paysForMediaKey: (variable) => keys.has(variable) };
+}
+
+function readCatalogMediaProviders(database: DatabaseSync, databasePath: string): OpenCodeMediaProviders {
+  const select = database.prepare("SELECT value FROM kv WHERE key = ?");
+  for (const key of OPENCODE_CATALOG_KEYS) {
+    const meta = Schema.decodeUnknownOption(CatalogMeta)(select.get(`${key}:meta`)?.value);
+    if (Option.isNone(meta)) continue;
+    const source = `${databasePath}\n${key}\n${meta.value.digest}`;
+    if (catalogCache?.source === source) return catalogCache.media;
+    const catalog = Schema.decodeUnknownOption(Catalog)(select.get(key)?.value);
+    const media = Option.isSome(catalog) ? mediaProvidersOf(catalog.value.body) : MEDIA_PROVIDERS_WITHOUT_CATALOG;
+    if (Option.isNone(catalog) || catalog.value.digest === meta.value.digest) catalogCache = { source, media };
+    return media;
+  }
+  return MEDIA_PROVIDERS_WITHOUT_CATALOG;
+}
+
+export const readOpenCodeMediaProviders = Effect.fn("OpenCode.readMediaProviders")(function* (env: NodeJS.ProcessEnv) {
+  const databasePath = openCodeDatabasePath(env);
+  if (!databasePath || !existsSync(databasePath)) return MEDIA_PROVIDERS_WITHOUT_CATALOG;
+  return yield* Effect.try({
+    try: () => readOpenCodeDatabase(databasePath, (database) => readCatalogMediaProviders(database, databasePath)),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => MEDIA_PROVIDERS_WITHOUT_CATALOG));
+});
+
+function hasMediaKeyVariable(env: NodeJS.ProcessEnv, media: OpenCodeMediaProviders): boolean {
+  return Object.entries(env).some(([name, value]) => {
+    const variable = name.toUpperCase();
+    return variable.endsWith("_API_KEY") && media.paysForMediaKey(variable) && Boolean(value?.trim());
+  });
+}
+
+export const hasOpenCodeMediaSignIn = Effect.fn("OpenCode.hasMediaSignIn")(function* (
+  env: NodeJS.ProcessEnv,
+  media: OpenCodeMediaProviders,
+) {
+  if (hasMediaKeyVariable(env, media)) return true;
+  if ((yield* readAuthFileProviders(env)).some(media.paysForMedia)) return true;
+  return (yield* readStoredCredentialProviders(env)).some(media.paysForMedia);
 });
 
 const RefusedTurn = Schema.Struct({
