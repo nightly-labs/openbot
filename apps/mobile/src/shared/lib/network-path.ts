@@ -1,6 +1,13 @@
 import * as Network from "expo-network";
 import { AppState } from "react-native";
-import { type NetworkChange, type NetworkPoint, networkChange, strongerChange, usableAddress } from "./network-change";
+import {
+  type NetworkChange,
+  type NetworkPoint,
+  networkChange,
+  rememberedPoint,
+  strongerChange,
+  usableAddress,
+} from "./network-change";
 
 const SETTLE_MS = 1_000;
 
@@ -30,7 +37,7 @@ function record(state: Network.NetworkState): void {
   void point(state).then((next) => {
     if (current !== reading || !next || listeners.size === 0) return;
     const change = previous ? networkChange(previous, next) : null;
-    previous = next.address === null && previous?.type === next.type ? { ...next, address: previous.address } : next;
+    previous = rememberedPoint(previous, next);
     if (!change) return;
     pending = strongerChange(pending, change);
     if (pending === "moved") emit();

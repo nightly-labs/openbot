@@ -54,7 +54,9 @@ is also a move. A change that involves a VPN, such as a VPN or Tailscale that tu
 reports the type as unknown, Android as VPN), keeps the connection: the peer renews its Signal socket
 and restarts ICE, which gathers the candidates of the new interface and keeps the old path until a
 new one answers, and it checks the path with the compatibility read (`networkChanged`,
-`apps/mobile/src/shared/lib/network-change.ts`). A dead path then makes a new connection. Such a
+`apps/mobile/src/shared/lib/network-change.ts`). While a VPN is on, iOS reports the type as unknown on
+Wi-Fi and on mobile data, and `getIpAddressAsync` gives the Wi-Fi address or no address. Thus a new,
+lost or returned address with a VPN type is also such a change. A dead path then makes a new connection. Such a
 change waits 1 s, so that a short series of changes sends one restart; a move goes at once. In other cases, a probe of the path waits up
 to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
 at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
