@@ -104,6 +104,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "Belleklerini güncelliyor…",
   "status.agent.skillUsing": "{name} becerisini kullanıyor…",
   "status.agent.backdropSetting": "Arka plan değiştiriliyor…",
+  "status.agent.backdropRemoved": "Arka plan kaldırıldı",
   "status.agent.skillReading": "Bir beceri okuyor…",
   "status.agent.toolStepFailed":
     "Bir araç adımı başarısız oldu; sonucu inceliyor ve sırada neyi deneyeceğine karar veriyor…",

@@ -544,6 +544,7 @@ export const messages = {
   "chat.menu.backdropSet": "تم تعيين الخلفية.",
   "chat.menu.backdropFailed": "لا يمكن أن يكون هذا الملف خلفية.",
   "chat.backdrop.agentSet": "غيّر وكيل الخلفية: {name}",
+  "chat.backdrop.agentRemoved": "أزال وكيل الخلفية.",
   "chat.backdrop.undo": "تراجع",
   "chat.pins.title": "الرسائل المثبتة",
   "chat.pins.emptyTitle": "لا توجد رسائل مثبتة",

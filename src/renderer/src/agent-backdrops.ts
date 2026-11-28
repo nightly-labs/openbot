@@ -1,4 +1,4 @@
-import { chatBackdropPage, chatBackdropRequesters } from "@openbot/contracts/chat-visual";
+import { chatBackdropChange, chatBackdropRequesters } from "@openbot/contracts/chat-visual";
 import { toast } from "@openbot/ui";
 import { type ChatBackdropChoice, customBackdropChoice } from "@openbot/ui/features/conversation/chat-backdrop";
 import { currentText } from "@openbot/ui/text";
@@ -59,6 +59,23 @@ async function undoAction(slot: string, choice: ChatBackdropChoice): Promise<() 
   };
 }
 
+function removeBackdrop(time: number): void {
+  if (readMark() >= time) return;
+  writeMark(time);
+  const previous = useChatBackdrop()();
+  if (previous === null) return;
+  setChatBackdrop(null);
+  const { t } = currentText();
+  toast(t("chat.backdrop.agentRemoved"), {
+    action: {
+      label: t("chat.backdrop.undo"),
+      onClick: () => {
+        if (useChatBackdrop()() === null) setChatBackdrop(previous);
+      },
+    },
+  });
+}
+
 export function showNewAgentBackdrop<
   Attachment extends { mimeType: string },
   Message extends BackdropMessage<Attachment>,
@@ -72,17 +89,17 @@ export function showNewAgentBackdrop<
   },
 ): void {
   const mark = readMark();
-  let newest: { message: Message; attachment: Attachment; time: number } | undefined;
+  let newest: { message: Message; attachment: Attachment; clear: boolean; time: number } | undefined;
   for (const message of messages) {
-    const attachment = chatBackdropPage<Attachment>(message);
+    const change = chatBackdropChange<Attachment>(message);
     const time = message.createdAt ? Date.parse(message.createdAt) : Number.NaN;
-    if (!attachment || !(time > mark) || (newest && newest.time >= time)) continue;
+    if (!change || !(time > mark) || (newest && newest.time >= time)) continue;
     if (pending.has(message.id) || failed.has(message.id)) continue;
     if (requesters.get(message.id)?.some(page.isReader) === false) continue;
-    newest = { message, attachment, time };
+    newest = { message, ...change, time };
   }
   if (!newest) return;
-  const { message, attachment, time } = newest;
+  const { message, attachment, clear, time } = newest;
   pending.add(message.id);
   queue = queue.then(async () => {
     const { t } = currentText();
@@ -93,6 +110,10 @@ export function showNewAgentBackdrop<
       const askedBy = chatBackdropRequesters(new TextDecoder().decode(bytes));
       requesters.set(message.id, askedBy);
       if (!askedBy.some(page.isReader)) return;
+      if (clear) {
+        removeBackdrop(time);
+        return;
+      }
       const slot = agentSlot(agentId);
       const choice = customBackdropChoice(slot);
       const undo = await undoAction(slot, choice);

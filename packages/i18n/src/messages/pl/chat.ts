@@ -493,6 +493,7 @@ export const messages = {
   "chat.menu.backdropSet": "Tło jest ustawione.",
   "chat.menu.backdropFailed": "Ten plik nie może być tłem.",
   "chat.backdrop.agentSet": "Agent zmienił tło: {name}",
+  "chat.backdrop.agentRemoved": "Agent usunął tło.",
   "chat.backdrop.undo": "Cofnij",
   "chat.pins.title": "Przypięte wiadomości",
   "chat.pins.emptyTitle": "Brak przypiętych wiadomości",

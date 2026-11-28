@@ -384,6 +384,7 @@ export const messages = defineMessages("chat", {
   "chat.menu.backdropSet": "The backdrop is set.",
   "chat.menu.backdropFailed": "This file cannot be a backdrop.",
   "chat.backdrop.agentSet": "An agent changed the backdrop: {name}",
+  "chat.backdrop.agentRemoved": "An agent removed the backdrop.",
   "chat.backdrop.undo": "Undo",
   "chat.pins.title": "Pinned messages",
   "chat.pins.emptyTitle": "No pinned messages",

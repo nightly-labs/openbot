@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import {
+  CHAT_BACKDROP_CLEAR_ITEM_TYPE,
   CHAT_BACKDROP_ITEM_TYPE,
   chatVisualItemType,
   withChatBackdropBubbles,
@@ -2768,12 +2769,15 @@ export class OpenBotToolRouter {
     const parsed = setBackdropToolSchema.safeParse(params.arguments, { reportInput: true });
     if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
     const args = parsed.data;
+    const remove = args.html.trim().toLowerCase() === "none";
+    const status = remove ? "removed" : "set";
     const messageId = backdropMessageId(params.threadId, params.turnId, params.callId);
     if (
       this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
     ) {
-      return openBotToolResult({ status: "set", messageId });
+      return openBotToolResult({ status, messageId });
     }
+    const requesters = this.#turnRequesters(senderAgentId, params.turnId);
     yield* this.#addGeneratedMessage({
       agentId: senderAgentId,
       threadId: executionThreadId,
@@ -2782,22 +2786,24 @@ export class OpenBotToolRouter {
       file: {
         bytes: new TextEncoder().encode(
           withChatBackdropRequesters(
-            withChatBackdropBubbles(args.html, {
-              ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
-              ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
-            }),
-            this.#turnRequesters(senderAgentId, params.turnId),
+            remove
+              ? "<!doctype html>"
+              : withChatBackdropBubbles(args.html, {
+                  ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
+                  ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
+                }),
+            requesters,
           ),
         ),
-        name: `${visualReplyFileName(args.title)}.html`,
+        name: remove ? "backdrop-removed.html" : `${visualReplyFileName(args.title)}.html`,
         mimeType: "text/html",
       },
-      text: args.title,
-      itemType: CHAT_BACKDROP_ITEM_TYPE,
-      eventType: "response.backdrop-set",
+      text: remove ? sourceText("status.agent.backdropRemoved") : args.title,
+      itemType: remove ? CHAT_BACKDROP_CLEAR_ITEM_TYPE : CHAT_BACKDROP_ITEM_TYPE,
+      eventType: remove ? "response.backdrop-cleared" : "response.backdrop-set",
       detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
     });
-    return openBotToolResult({ status: "set", messageId });
+    return openBotToolResult({ status, messageId });
   });
 
   readonly #addGeneratedMessage = Effect.fn("OpenBotToolRouter.addGeneratedMessage")(function* (

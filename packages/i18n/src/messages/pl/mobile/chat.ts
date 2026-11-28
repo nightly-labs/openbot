@@ -207,6 +207,7 @@ export const messages = {
   "mobile.chat.attachment.tooLargeForMobile":
     "Ten plik przekracza limit {limit} na telefonie. Otwórz go na komputerze.",
   "mobile.chat.backdrop.agentSet": "Agent {name} ustawił tło",
+  "mobile.chat.backdrop.agentRemoved": "Agent {name} usunął tło",
   "mobile.chat.backdrop.undo": "Cofnij",
   "mobile.chat.backdrop.dismiss": "Zamknij",
   "mobile.chat.attachment.sharingUnavailable": "Udostępnianie plików jest niedostępne na tym urządzeniu.",

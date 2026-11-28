@@ -150,6 +150,7 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "FILE",
   "mobile.chat.attachment.tooLargeForMobile": "הקובץ הזה חורג ממגבלת {limit} בנייד. יש לפתוח אותו במחשב.",
   "mobile.chat.backdrop.agentSet": "{name} הגדיר את הרקע",
+  "mobile.chat.backdrop.agentRemoved": "{name} הסיר את הרקע",
   "mobile.chat.backdrop.undo": "ביטול",
   "mobile.chat.backdrop.dismiss": "סגירה",
   "mobile.chat.attachment.sharingUnavailable": "שיתוף קבצים אינו זמין במכשיר הזה.",

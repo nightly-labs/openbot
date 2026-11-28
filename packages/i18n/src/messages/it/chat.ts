@@ -399,6 +399,7 @@ export const messages = {
   "chat.menu.backdropSet": "Lo sfondo è impostato.",
   "chat.menu.backdropFailed": "Questo file non può essere uno sfondo.",
   "chat.backdrop.agentSet": "Un agente ha cambiato lo sfondo: {name}",
+  "chat.backdrop.agentRemoved": "Un agente ha rimosso lo sfondo.",
   "chat.backdrop.undo": "Annulla",
   "chat.pins.title": "Messaggi fissati",
   "chat.pins.emptyTitle": "Nessun messaggio fissato",

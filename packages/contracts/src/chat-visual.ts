@@ -67,6 +67,17 @@ export function chatBackdropPage<Attachment extends { mimeType: string }>(messag
   return attachment && isChatVisualMimeType(attachment.mimeType) ? attachment : null;
 }
 
+export const CHAT_BACKDROP_CLEAR_ITEM_TYPE = "window-backdrop-clear";
+
+export function chatBackdropChange<Attachment extends { mimeType: string }>(message: {
+  itemType?: string | null | undefined;
+  attachments?: readonly Attachment[] | null | undefined;
+}): { attachment: Attachment; clear: boolean } | null {
+  const clear = message.itemType === CHAT_BACKDROP_CLEAR_ITEM_TYPE;
+  const attachment = chatBackdropPage({ ...message, itemType: clear ? CHAT_BACKDROP_ITEM_TYPE : message.itemType });
+  return attachment ? { attachment, clear } : null;
+}
+
 export interface ChatBackdropBubbles {
   yours?: AvatarColor;
   agents?: AvatarColor;

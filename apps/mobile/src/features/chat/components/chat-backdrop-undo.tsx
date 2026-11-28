@@ -31,6 +31,7 @@ export function ChatBackdropUndo({
   const { t } = useText();
   const reducedMotion = useReducedMotion();
   const shown = useChatBackdrop((state) => state.undo?.serverId === serverId && state.undo.agentId === agentId);
+  const removed = useChatBackdrop((state) => state.undo?.removed === true);
   useEffect(
     () => () => {
       const { undo } = useChatBackdrop.getState();
@@ -51,7 +52,9 @@ export function ChatBackdropUndo({
       <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fallbackBackground} height={HEIGHT}>
         <View className="h-full flex-row items-center gap-1 ps-4 pe-1">
           <Typography type="body-sm" numberOfLines={1} className="shrink">
-            {t("mobile.chat.backdrop.agentSet", { name: agentName })}
+            {removed
+              ? t("mobile.chat.backdrop.agentRemoved", { name: agentName })
+              : t("mobile.chat.backdrop.agentSet", { name: agentName })}
           </Typography>
           <Button
             size="sm"

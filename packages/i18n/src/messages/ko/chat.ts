@@ -384,6 +384,7 @@ export const messages = {
   "chat.menu.backdropSet": "배경을 설정했습니다.",
   "chat.menu.backdropFailed": "이 파일은 배경으로 사용할 수 없습니다.",
   "chat.backdrop.agentSet": "에이전트가 배경을 변경했습니다: {name}",
+  "chat.backdrop.agentRemoved": "에이전트가 배경을 제거했습니다.",
   "chat.backdrop.undo": "실행 취소",
   "chat.pins.title": "고정된 메시지",
   "chat.pins.emptyTitle": "고정된 메시지 없음",

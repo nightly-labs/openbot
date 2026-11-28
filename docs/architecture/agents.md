@@ -1351,7 +1351,10 @@ title and the file. A channel turn and a linked chat app turn get a tool failure
 come from other people. Each client keeps the newest backdrop message that is newer than its mark
 (`src/renderer/src/agent-backdrops.ts`, per device and browser) in one replaceable slot per agent in
 `custom-backdrops.ts`, selects it, and shows a notice with Undo. The mark moves to that message, so
-the history of a chat never changes the backdrop again. The desktop reads backdrop messages from the
+the history of a chat never changes the backdrop again. `set_backdrop` with the `html` "none" removes the backdrop the same way: a message with the item type
+`window-backdrop-clear` (`CHAT_BACKDROP_CLEAR_ITEM_TYPE`) and an empty page that holds only the
+requesters. Each client that a requester reads selects no backdrop, keeps the saved pages, and
+shows a notice with Undo. An older client shows the message and the file and keeps its backdrop. The desktop reads backdrop messages from the
 chat events of every agent; the web client reads only the open chat. The page plays in the locked
 frame of a custom backdrop and gets no input.
 

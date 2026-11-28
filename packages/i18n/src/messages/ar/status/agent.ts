@@ -109,6 +109,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "جارٍ تحديث ذكرياته…",
   "status.agent.skillUsing": "جارٍ استخدام المهارة {name}…",
   "status.agent.backdropSetting": "جارٍ تغيير الخلفية…",
+  "status.agent.backdropRemoved": "تمت إزالة الخلفية",
   "status.agent.skillReading": "جارٍ قراءة مهارة…",
   "status.agent.toolStepFailed": "فشلت خطوة أداة؛ جارٍ مراجعة النتيجة وتحديد ما يجب تجربته بعد ذلك…",
   "status.agent.toolResultReviewing": "جارٍ مراجعة آخر نتيجة أداة…",

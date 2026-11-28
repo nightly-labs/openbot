@@ -226,6 +226,7 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "ملف",
   "mobile.chat.attachment.tooLargeForMobile": "يتجاوز هذا الملف حد الهاتف البالغ {limit}. افتحه على سطح المكتب.",
   "mobile.chat.backdrop.agentSet": "عيّن {name} الخلفية",
+  "mobile.chat.backdrop.agentRemoved": "أزال {name} الخلفية",
   "mobile.chat.backdrop.undo": "تراجع",
   "mobile.chat.backdrop.dismiss": "إغلاق",
   "mobile.chat.attachment.sharingUnavailable": "مشاركة الملفات غير متاحة على هذا الجهاز.",

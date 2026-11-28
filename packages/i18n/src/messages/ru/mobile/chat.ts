@@ -204,6 +204,7 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "ФАЙЛ",
   "mobile.chat.attachment.tooLargeForMobile": "Файл больше мобильного лимита в {limit}. Откройте его на компьютере.",
   "mobile.chat.backdrop.agentSet": "Агент {name} установил фон",
+  "mobile.chat.backdrop.agentRemoved": "Агент {name} удалил фон",
   "mobile.chat.backdrop.undo": "Отменить",
   "mobile.chat.backdrop.dismiss": "Закрыть",
   "mobile.chat.attachment.sharingUnavailable": "На этом устройстве нельзя делиться файлами.",

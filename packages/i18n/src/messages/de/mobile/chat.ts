@@ -147,6 +147,7 @@ export const messages = {
   "mobile.chat.attachment.tooLargeForMobile":
     "Diese Datei überschreitet das mobile Limit von {limit}. Öffne sie auf dem Desktop.",
   "mobile.chat.backdrop.agentSet": "{name} hat den Hintergrund festgelegt",
+  "mobile.chat.backdrop.agentRemoved": "{name} hat den Hintergrund entfernt",
   "mobile.chat.backdrop.undo": "Rückgängig",
   "mobile.chat.backdrop.dismiss": "Schließen",
   "mobile.chat.attachment.sharingUnavailable": "Dateifreigabe ist auf diesem Gerät nicht verfügbar.",

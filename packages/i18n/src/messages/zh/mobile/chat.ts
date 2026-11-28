@@ -141,6 +141,7 @@ export const messages = {
   "mobile.chat.attachment.typeFile": "文件",
   "mobile.chat.attachment.tooLargeForMobile": "该文件超过手机端 {limit} 上限，请在桌面端打开。",
   "mobile.chat.backdrop.agentSet": "{name} 设置了背景",
+  "mobile.chat.backdrop.agentRemoved": "{name} 移除了背景",
   "mobile.chat.backdrop.undo": "撤销",
   "mobile.chat.backdrop.dismiss": "关闭",
   "mobile.chat.attachment.sharingUnavailable": "这台设备不支持文件分享。",

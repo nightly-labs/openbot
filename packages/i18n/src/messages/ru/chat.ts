@@ -488,6 +488,7 @@ export const messages = {
   "chat.menu.backdropSet": "Фон установлен.",
   "chat.menu.backdropFailed": "Этот файл нельзя сделать фоном.",
   "chat.backdrop.agentSet": "Агент изменил фон: {name}",
+  "chat.backdrop.agentRemoved": "Агент удалил фон.",
   "chat.backdrop.undo": "Отменить",
   "chat.pins.title": "Закреплённые сообщения",
   "chat.pins.emptyTitle": "Нет закреплённых сообщений",

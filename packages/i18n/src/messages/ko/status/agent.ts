@@ -102,6 +102,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "메모리를 업데이트하는 중…",
   "status.agent.skillUsing": "스킬 {name}을(를) 사용하는 중…",
   "status.agent.backdropSetting": "배경을 변경하는 중…",
+  "status.agent.backdropRemoved": "배경을 제거했습니다",
   "status.agent.skillReading": "스킬을 읽는 중…",
   "status.agent.toolStepFailed": "도구 단계가 실패했습니다. 결과를 확인하고 다음에 시도할 작업을 결정하는 중…",
   "status.agent.toolResultReviewing": "최신 도구 결과를 확인하는 중…",

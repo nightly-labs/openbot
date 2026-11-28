@@ -94,6 +94,7 @@ export const messages = {
   "status.agent.memoriesUpdating": "正在更新记忆…",
   "status.agent.skillUsing": "正在使用技能 {name}…",
   "status.agent.backdropSetting": "正在更改背景…",
+  "status.agent.backdropRemoved": "已移除背景",
   "status.agent.skillReading": "正在读取技能…",
   "status.agent.toolStepFailed": "工具步骤失败；正在查看结果并决定下一步…",
   "status.agent.toolResultReviewing": "正在查看最新的工具结果…",
