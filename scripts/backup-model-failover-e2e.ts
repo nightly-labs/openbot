@@ -1248,14 +1248,16 @@ try {
     const moved = agentOf(agent.id);
     assert.equal(moved.provider, "claude", "The agent is on its backup model.");
     assert.equal(moved.usageLimitReturn ?? null, null, "The agent does not go back to a spent balance by itself.");
-    const spent =
+    const spentModel =
       service.listModels().find((option) => option.provider === "codex" && option.id === CODEX_MODEL)?.name ??
       CODEX_MODEL;
+    const spent = `ChatGPT · ${spentModel}`;
+    const backup = `Claude · ${modelName(moved.model)}`;
     const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
     assert.deepEqual(
       notes,
-      [sourceText("status.agent.modelSwitchedForSpentBalance", { previous: spent, model: modelName(moved.model) })],
-      "The note names the spent model, the backup, and what to do.",
+      [sourceText("status.agent.modelSwitchedForSpentBalance", { previous: spent, model: backup })],
+      "The note names the provider and the model on each side of a switch to another provider, and what to do.",
     );
     return { notes };
   });
