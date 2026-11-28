@@ -4,6 +4,7 @@ import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { EmailDeliveryError } from "./email-delivery";
+import type { HostState } from "./host-state-object";
 import { observedD1 } from "./observed-d1";
 import type { SmtpContactMessage, SmtpFailure, SmtpLicenseMessage, SmtpWelcomeMessage } from "./smtp-email-delivery";
 
@@ -69,6 +70,8 @@ export interface WorkerBindings {
   REMOTE_AUTH_WEBHOOK_URL?: string;
   REMOTE_AUTH_WEBHOOK_URLS?: string;
   REMOTE_AUTH_WEBHOOK_SECRET?: string;
+  HOST_STATE?: DurableObjectNamespace<HostState>;
+  HOST_STATE_MODE?: string;
   SIGNAL_ENTRY_ZONE_ID?: string;
   SIGNAL_ENTRY_DNS_TOKEN?: string;
   SLACK_ROUTE_PRIVATE_JWK?: string;

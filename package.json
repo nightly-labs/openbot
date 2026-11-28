@@ -539,6 +539,7 @@
     "test:d1-write-cuts": "bun apps/auth-api/scripts/d1-write-cuts-e2e.ts",
     "test:remote-resume-batch": "bun apps/auth-api/scripts/remote-resume-batch-e2e.ts",
     "test:host-credential-replica": "bun apps/auth-api/scripts/host-credential-replica-e2e.ts",
+    "test:host-state-object": "node apps/auth-api/scripts/host-state-object-e2e.ts",
     "test:worker-isolate-reuse": "bun apps/auth-api/scripts/worker-isolate-reuse-e2e.ts",
     "test:session-ticket-replica": "bun apps/auth-api/scripts/session-ticket-replica-e2e.ts",
     "test:signal-entry-failover": "bun apps/auth-api/scripts/signal-entry-failover-e2e.ts",
