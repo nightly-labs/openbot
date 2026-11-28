@@ -133,7 +133,9 @@ because a frame in another process can keep its active element after the page ta
 The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
 tokens. They keep the installed Chromium major version and host platform, and give the other version
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
-Electron sends. The `Accept-Language` header adds the base language of each regional language
+Electron sends. On Linux the platform is `X11; Linux x86_64` on each CPU, as Chrome does, because
+Electron names the real CPU (`Linux aarch64`) while Chromium gives `navigator.platform` as
+`Linux x86_64`. The architecture hint keeps the real CPU (`arm`), as Chrome does. The `Accept-Language` header adds the base language of each regional language
 (`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
 a page sets on its own request stays: a site can sign that header. The header leaves out a system
 language that is not a valid language tag. On Linux, Electron gives `c` for the `C.UTF-8` locale and
@@ -167,11 +169,14 @@ does, because V8 stops that check at a Proxy and bot checks find a Proxy that wa
 turn on the `Runtime` domain: while it is on, Chromium formats each console argument for DevTools,
 and DataDome and other bot checks see that from the page (`Error.prepareStackTrace` runs). On a
 Linux server with no GPU, WebGL runs on SwiftShader, which bot checks read as headless Chrome. There,
-the WebGL vendor and renderer names in each tab are those of a common Intel laptop GPU; the
-rendering, the limits and the extensions stay those of SwiftShader. The preload does not run in a
+the WebGL vendor and renderer names in each tab are those of a common Intel laptop GPU, or on ARM64
+those of a Raspberry Pi GPU, so that they agree with the architecture hint. The preload gives the
+page function the host CPU (`process.arch`) as its argument. The rendering, the limits and the
+extensions stay those of SwiftShader. The preload does not run in a
 worker, so WebGL on an `OffscreenCanvas` in a worker still names SwiftShader. A computer with a GPU
 keeps its real names. The check is `bun scripts/browser-fingerprint-e2e.ts`; on Linux it uses the server GPU
-switches, so CI checks the SwiftShader case. Its report is
+switches, so CI checks the SwiftShader case. It also builds a copy of the preload with `process.arch`
+set to `arm64` and checks the ARM64 names. Its report is
 `.openbot-build/browser-fingerprint-e2e/report.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
 hook. Native guests retain their opener, request body, and the browser session of the opener. Local tab and
