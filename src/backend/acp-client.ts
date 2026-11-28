@@ -87,6 +87,7 @@ import { type AgentCliInfo, cliPathEnvironment, compareReleases, isVersion, olde
 import { runCauseEffect } from "./effect-boundary";
 import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import { IdleThreadPool } from "./idle-thread-pool";
+import { LeadingThoughtSplitter, splitLeadingThought } from "./leading-thought";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import type { McpToolArguments } from "./mcp-probe";
 import {
@@ -296,6 +297,7 @@ interface AcpTurn {
   unprompted: boolean;
   textMessageId: string | null;
   textMessageStart: number;
+  leadingThought: LeadingThoughtSplitter;
   messageChunks: number;
   lastChunkAt: number | null;
   wake: boolean;
@@ -2482,7 +2484,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turnId: replay.currentTurnId,
       ...(replay.currentTurnStartedAt === undefined ? {} : { startedAt: replay.currentTurnStartedAt }),
       recordsOnly: true,
-      items: [item],
+      items: this.#flavor.leadingTaggedThoughts ? withLeadingThought(item) : [item],
       complete: false,
     });
   }
@@ -2713,6 +2715,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       unprompted,
       textMessageId: null,
       textMessageStart: 0,
+      leadingThought: new LeadingThoughtSplitter(),
       messageChunks: 0,
       lastChunkAt: null,
       wake,
@@ -2845,6 +2848,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         staleWake = this.#backgroundCommands(turn) === running;
         promptedAgain = true;
       }
+      if (this.#flavor.leadingTaggedThoughts) this.#releaseLeadingThought(thread, turn);
       this.#reportPromptUsage(thread, turn, response);
       const emptyAnswerFailure =
         response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional && !turn.stopped
@@ -3323,6 +3327,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.receivedOutput = false;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
+    turn.leadingThought = new LeadingThoughtSplitter();
     turn.messageChunks = 0;
     turn.lastChunkAt = null;
     return true;
@@ -3642,6 +3647,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (HARNESS_ERROR_CHUNK.test(update.content.text)) {
         const error = update.content.text.trim();
         turn.receivedOutput = true;
+        turn.leadingThought = new LeadingThoughtSplitter();
         turn.interruptedAnswer = [turn.text.trim() || turn.interruptedAnswer, error].filter(Boolean).join("\n\n");
         this.#completeThought(thread, turn);
         this.#completeMessage(thread, turn, "commentary");
@@ -3656,6 +3662,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (update.content.text) this.#completeThought(thread, turn);
       const messageId = contentMessageId(update);
       let text = update.content.text;
+      if (this.#flavor.leadingTaggedThoughts) {
+        text = this.#takeLeadingThought(thread, turn, messageId, text);
+        if (!text && update.content.text) return;
+      }
+      const chunk = text;
       if (
         this.#flavor.messagePerId &&
         text &&
@@ -3665,7 +3676,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.text
       ) {
         text = `${turn.text.endsWith("\n\n") ? "" : turn.text.endsWith("\n") ? "\n" : "\n\n"}${text}`;
-        turn.textMessageStart = turn.text.length + text.length - update.content.text.length;
+        turn.textMessageStart = turn.text.length + text.length - chunk.length;
       }
       if (this.#flavor.resendsAnswer && text) {
         turn.messageChunks = turn.text && messageId && messageId === turn.textMessageId ? turn.messageChunks + 1 : 1;
@@ -3700,7 +3711,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.answerPaused = false;
         if (!/\s$/u.test(turn.text) && !/^\s/u.test(text)) text = `\n${text}`;
       }
-      if ((update.content.text.trim() || released.trim()) && !held) {
+      if ((chunk.trim() || released.trim()) && !held) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
         if (turn.stallCancel) turn.stallCancel = "answered";
@@ -3802,6 +3813,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     phase: "commentary" | "final_answer",
     failureReport = false,
   ): void {
+    if (this.#flavor.leadingTaggedThoughts) this.#releaseLeadingThought(thread, turn);
     if (phase === "final_answer") {
       if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
       turn.interruptedAnswer = null;
@@ -3853,9 +3865,35 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.answerPaused = false;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
+    turn.leadingThought = new LeadingThoughtSplitter();
     turn.messageChunks = 0;
     turn.lastChunkAt = null;
     turn.itemId = `${turn.id}:assistant:${turn.messages.length}`;
+  }
+
+  #takeLeadingThought(thread: AcpThread, turn: AcpTurn, messageId: string | null, text: string): string {
+    if (messageId && turn.leadingThought.messageId && messageId !== turn.leadingThought.messageId)
+      this.#releaseLeadingThought(thread, turn);
+    turn.leadingThought.messageId ??= messageId;
+    const { thought, answer } = turn.leadingThought.feed(text);
+    if (thought) {
+      turn.reasoned = true;
+      this.#appendThought(thread, turn, thought);
+      if (answer) this.#completeThought(thread, turn);
+    }
+    return answer;
+  }
+
+  #releaseLeadingThought(thread: AcpThread, turn: AcpTurn): void {
+    const { messageId } = turn.leadingThought;
+    const text = turn.leadingThought.release();
+    if (text)
+      this.#applyTurnUpdate(thread, turn, {
+        sessionUpdate: "agent_message_chunk",
+        ...(messageId ? { messageId } : {}),
+        content: { type: "text", text },
+      });
+    turn.leadingThought = new LeadingThoughtSplitter();
   }
 
   #dropStreamedCopy(turn: AcpTurn): void {
@@ -4251,9 +4289,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     const open = thread.activeTurn?.unprompted ? thread.activeTurn : null;
-    const growing = open?.textMessageId ?? null;
+    const held = open?.leadingThought.hidden ? open.leadingThought.messageId : null;
+    const growing = held ?? open?.textMessageId ?? null;
     const grown = growing ? replayedText(updates, growing) : "";
-    const shown = open ? open.text.slice(open.textMessageStart) : "";
+    const shown = open
+      ? `${held ? open.leadingThought.hidden : ""}${open.textMessageId === growing ? open.text.slice(open.textMessageStart) : ""}`
+      : "";
     const added = open && grown.startsWith(shown) ? grown.slice(shown.length) : "";
     if (fresh.size === 0 && !open?.toolItems.size && !added) return;
     const turn = open ?? this.#beginTurn(thread, randomUUID(), { unprompted: true, answerOptional: true });
@@ -4402,6 +4443,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ) {
     if (thread.activeTurn !== turn || turn.completing) return;
     this.#releaseBeforeWakeEcho(thread, turn);
+    if (this.#flavor.leadingTaggedThoughts) this.#releaseLeadingThought(thread, turn);
     turn.completing = true;
     endAnswerWait(turn);
     if (this.#flavor.childSessionUpdates) yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
@@ -5140,6 +5182,19 @@ class MissingAcpSessionError extends Error {
     super(message, { cause });
     this.name = "MissingAcpSessionError";
   }
+}
+
+function withLeadingThought(item: ThreadItem): ThreadItem[] {
+  if (item.type !== "agentMessage" || item.phase !== "final_answer" || !item.text) return [item];
+  const split = splitLeadingThought(item.text);
+  if (!split) return [item];
+  const thought: ThreadItem = {
+    ...(item.id === undefined ? {} : { id: `${item.id}:thought` }),
+    type: "agentMessage",
+    phase: "commentary",
+    text: split.thought,
+  };
+  return [...(split.thought ? [thought] : []), ...(split.answer ? [{ ...item, text: split.answer }] : [])];
 }
 
 function contentMessageId(update: SessionNotification["update"]): string | null {

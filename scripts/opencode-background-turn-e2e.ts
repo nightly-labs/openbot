@@ -257,6 +257,29 @@ try {
     ["The background task finished: DONE."],
     "The answer after the background subagent shows in the chat.",
   );
+  const fifth = await startThread(client, { cwd: workspace });
+  const five = record(client, fifth);
+  assert.equal((await runTurn(client, fifth, { text: "background shell tagged" })).status, "completed");
+  const tagged = await five.until(
+    "the tagged background turn",
+    (event) => event.method === "turn/started" && event.unprompted,
+  );
+  await writeFile(join(release, fifth), "");
+  const taggedEnded = await five.until(
+    "the tagged background turn end",
+    (event) => event.method === "turn/completed" && event.turnId === tagged.turnId,
+  );
+  assert.equal(taggedEnded.status, "completed");
+  const taggedItems = five.items(tagged.turnId ?? "").filter((item) => item?.type === "agentMessage");
+  assert.deepEqual(
+    taggedItems.filter((item) => item?.phase === "final_answer").map((item) => item?.text),
+    ["The background task finished: DONE."],
+    "A background answer that grows across loads moves its leading thinking block.",
+  );
+  assert.ok(
+    taggedItems.some((item) => item?.phase === "commentary" && item.text === "The task is done."),
+    "The leading thinking block of a background answer is a thought.",
+  );
   report.passed = true;
 } finally {
   await stopClients(clients);

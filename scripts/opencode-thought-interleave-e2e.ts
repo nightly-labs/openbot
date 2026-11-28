@@ -74,6 +74,43 @@ try {
     ["Full answer."],
     "The retried answer replaces the partial answer.",
   );
+  const answers = async (prompt: string) => {
+    const items = await turnItems(client, thread, prompt);
+    report.turns[prompt] = items;
+    return {
+      answers: items.filter((item) => item.phase === "final_answer").map((item) => item.text),
+      thoughts: items.filter((item) => item.phase === "commentary").map((item) => item.text),
+    };
+  };
+  assert.deepEqual(
+    await answers("tagged"),
+    { answers: ["Clean answer."], thoughts: ["Plan the reply."] },
+    "A leading thinking block split across chunks moves into the thoughts.",
+  );
+  assert.deepEqual(
+    await answers("messages"),
+    { answers: ["First part.\n\nSecond part."], thoughts: ["First plan.", "Second plan."] },
+    "Each message moves its own leading thinking block.",
+  );
+  assert.deepEqual(
+    await answers("unclosed"),
+    { answers: ["<think>Never closed."], thoughts: [] },
+    "An unclosed thinking block stays in the answer.",
+  );
+  assert.deepEqual(
+    await answers("mention"),
+    { answers: ["Use the <think> tag like this. <thinker> stays."], thoughts: [] },
+    "A tag inside the answer stays in the answer.",
+  );
+  const toolFirst = await answers("tool first");
+  assert.deepEqual(toolFirst.answers, ["Answer after the tool."], "A thinking block after a tool step moves too.");
+  assert.ok(toolFirst.thoughts.includes("The file is read."), "The thinking after a tool step is a thought.");
+  const broken = await answers("broken");
+  assert.deepEqual(broken.answers, ["Full answer."], "The retried answer has no reasoning in it.");
+  assert.ok(
+    broken.thoughts.every((text) => !text?.includes("<think>")),
+    "A thinking block that a stream error cut off shows no tags.",
+  );
   report.passed = true;
 } finally {
   await stopClients(clients);

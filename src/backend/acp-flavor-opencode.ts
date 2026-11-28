@@ -304,6 +304,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   modelNotOffered: (error) => error.code === -32602 && isRecord(error.data) && typeof error.data.modelId === "string",
   streamAnswerBeforePromptReturns: true,
   thoughtsInsideAnswer: true,
+  leadingTaggedThoughts: true,
   unsentBackgroundTurns: true,
   contextCompaction: "handoff",
   reopenKeepsPrompts: true,
