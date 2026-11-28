@@ -263,7 +263,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "O provedor de modelos do OpenCode reportou uma requisição de upload inválida. Escolha outro modelo e continue. Verifique as rotinas salvas antes de recriá-las.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Este modelo não consegue ler um arquivo ou uma imagem neste chat. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Envie sua mensagem de novo sem o arquivo ou escolha um modelo que leia arquivos. Se você adicionou este modelo a um provedor personalizado, desmarque “Imagens” em “Aceita” nas configurações dele.",
+    "Este modelo não consegue ler um arquivo ou uma imagem neste chat. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Envie sua mensagem de novo sem o arquivo ou escolha um modelo que leia arquivos. Se você adicionou este modelo a um provedor personalizado, desmarque “Imagens” ou “PDF” em “Aceita” nas configurações dele.",
   "error.provider.opencodeOutOfMemory":
     "O servidor do modelo ficou sem memória para esta conversa. Comece uma nova conversa, ou carregue o modelo com um contexto menor e informe a mesma janela nas configurações do provedor no OpenBot.",
   "error.provider.opencodeContextTooSmall":

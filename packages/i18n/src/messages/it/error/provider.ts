@@ -265,7 +265,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Il provider del modello di OpenCode ha segnalato una richiesta di caricamento non valida. Scegli un altro modello e continua. Controlla le routine salvate prima di ricrearle.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Questo modello non può leggere un file o un'immagine in questa chat. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Invia di nuovo il messaggio senza il file, oppure scegli un modello che legge i file. Se hai aggiunto questo modello a un provider personalizzato, deseleziona «Immagini» in «Accetta» nelle sue impostazioni.",
+    "Questo modello non può leggere un file o un'immagine in questa chat. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Invia di nuovo il messaggio senza il file, oppure scegli un modello che legge i file. Se hai aggiunto questo modello a un provider personalizzato, deseleziona «Immagini» o «PDF» in «Accetta» nelle sue impostazioni.",
   "error.provider.opencodeOutOfMemory":
     "Il server del modello ha esaurito la memoria per questa chat. Avvia una nuova chat, oppure carica il modello con un contesto più corto e inserisci la stessa finestra nelle impostazioni del suo provider in OpenBot.",
   "error.provider.opencodeContextTooSmall":
