@@ -92,6 +92,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.backupModels.remove": "Remove {model}",
   "agentSettings.backupModels.limited": "Usage limit reached · skipped",
   "agentSettings.backupModels.unavailable": "Not available now · skipped",
+  "agentSettings.backupModels.workspaceOnly": "Skipped with Workspace only · change Permissions to use it",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

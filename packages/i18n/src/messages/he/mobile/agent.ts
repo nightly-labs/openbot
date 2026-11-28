@@ -372,6 +372,7 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "העברת {model} למטה",
   "mobile.agent.backupModels.remove": "הסרת {model}",
   "mobile.agent.backupModels.unavailable": "לא זמין כעת · מדולג",
+  "mobile.agent.backupModels.workspaceOnly": "מדולג עם „סביבת עבודה בלבד” · שנו את „הרשאות” כדי להשתמש בו",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

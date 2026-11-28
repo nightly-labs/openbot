@@ -388,6 +388,8 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "{model} modelini aşağı taşı",
   "mobile.agent.backupModels.remove": "{model} modelini kaldır",
   "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
+  "mobile.agent.backupModels.workspaceOnly":
+    '"Yalnızca çalışma alanı" ile atlanır · kullanmak için "İzinler"i değiştirin',
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

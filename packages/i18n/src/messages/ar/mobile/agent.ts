@@ -409,6 +409,7 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "نقل {model} لأسفل",
   "mobile.agent.backupModels.remove": "إزالة {model}",
   "mobile.agent.backupModels.unavailable": "غير متاح الآن · مُتخطى",
+  "mobile.agent.backupModels.workspaceOnly": "يتم التخطي مع «مساحة العمل فقط» · غيّر «الأذونات» لاستخدامه",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

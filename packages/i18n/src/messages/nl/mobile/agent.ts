@@ -378,6 +378,8 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "{model} omlaag",
   "mobile.agent.backupModels.remove": "{model} verwijderen",
   "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
+  "mobile.agent.backupModels.workspaceOnly":
+    "Overgeslagen met ‘Alleen werkruimte’ · wijzig ‘Machtigingen’ om hem te gebruiken",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

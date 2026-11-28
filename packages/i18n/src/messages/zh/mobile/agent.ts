@@ -359,6 +359,7 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "下移 {model}",
   "mobile.agent.backupModels.remove": "移除 {model}",
   "mobile.agent.backupModels.unavailable": "当前不可用 · 已跳过",
+  "mobile.agent.backupModels.workspaceOnly": "在“仅工作区”下跳过 · 要使用，请更改“权限”",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

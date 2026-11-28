@@ -406,6 +406,8 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "Переместить {model} вниз",
   "mobile.agent.backupModels.remove": "Убрать {model}",
   "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
+  "mobile.agent.backupModels.workspaceOnly":
+    "Пропускается в режиме «Только рабочее пространство» · измените «Разрешения», чтобы использовать",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

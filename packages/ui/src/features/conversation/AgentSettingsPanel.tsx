@@ -1501,6 +1501,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 source={{
                   modelOptions: props.modelOptions,
                   providers: props.agentStatus.providers,
+                  workspaceOnly: workspaceAccessEnforced(props.agent),
                   limited: props.usageLimited,
                   failed: props.providerFailed,
                 }}

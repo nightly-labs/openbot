@@ -96,6 +96,8 @@ export const messages = {
   "agentSettings.backupModels.remove": "{model} verwijderen",
   "agentSettings.backupModels.limited": "Gebruikslimiet bereikt · overgeslagen",
   "agentSettings.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
+  "agentSettings.backupModels.workspaceOnly":
+    "Overgeslagen met ‘Alleen werkruimte’ · wijzig ‘Machtigingen’ om het te gebruiken",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

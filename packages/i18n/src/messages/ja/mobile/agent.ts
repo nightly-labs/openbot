@@ -379,6 +379,7 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "{model} を下へ移動",
   "mobile.agent.backupModels.remove": "{model} を削除",
   "mobile.agent.backupModels.unavailable": "現在使用できません · スキップ",
+  "mobile.agent.backupModels.workspaceOnly": "「ワークスペースのみ」ではスキップ · 使うには「権限」を変更",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

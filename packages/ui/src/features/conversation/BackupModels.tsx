@@ -1,5 +1,5 @@
 import { ProviderLogo } from "@openbot/brand";
-import { agentProviderName, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, agentProviderName, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import {
   AGENT_BACKUP_MODEL_LIMIT,
   type AgentBackupModels,
@@ -37,7 +37,7 @@ import { currentText, useText } from "../../text";
 import { formatUsageReset } from "./ComposerNotice";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
-export type BackupModelState = "ready" | "limit" | "unavailable";
+export type BackupModelState = "ready" | "limit" | "workspaceOnly" | "unavailable";
 
 export interface BackupModelOption {
   key: string;
@@ -50,6 +50,7 @@ export interface BackupModelOption {
 export interface BackupModelSource {
   modelOptions: readonly ClientAgentModelOption[];
   providers: AgentStatus["providers"];
+  workspaceOnly?: boolean | undefined;
   limited?: ((choice: AgentModelChoice) => boolean) | undefined;
   failed?: ((choice: AgentModelChoice) => boolean) | undefined;
 }
@@ -68,12 +69,22 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
     provider.state === "available" &&
     model !== undefined &&
     (accounts === undefined ? accountId === DEFAULT_PROVIDER_ACCOUNT_ID : account?.state === "connected");
+  const workspaceOnlyBlocked =
+    source.workspaceOnly === true &&
+    agentProviderDescriptor(choice.provider).workspaceEnforcement === "confined-process" &&
+    source.modelOptions.some((option) => option.workspaceOnlyUnavailable);
   return {
     key: `${choice.provider}\u0000${accountId}\u0000${choice.model}`,
     choice,
     model: model?.name ?? choice.model,
     account: accounts && accounts.length > 1 ? providerAccountName(currentText().t, accounts, accountId) : null,
-    state: !usable ? "unavailable" : source.limited?.(choice) ? "limit" : "ready",
+    state: !usable
+      ? "unavailable"
+      : workspaceOnlyBlocked
+        ? "workspaceOnly"
+        : source.limited?.(choice)
+          ? "limit"
+          : "ready",
   };
 }
 
@@ -134,11 +145,15 @@ function OptionLogo(props: { provider: AgentProviderId }) {
 }
 
 function OptionContent(props: { option: BackupModelOption }) {
+  const { t } = useText();
   const label = useOptionLabel();
   return (
     <span class="backup-model-option">
       <OptionLogo provider={props.option.choice.provider} />
       {label(props.option)}
+      <Show when={props.option.state === "workspaceOnly"}>
+        <span class="backup-models-state">{t("agentSettings.backupModels.workspaceOnly")}</span>
+      </Show>
     </span>
   );
 }
@@ -228,7 +243,9 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
                         {t(
                           entry.state === "limit"
                             ? "agentSettings.backupModels.limited"
-                            : "agentSettings.backupModels.unavailable",
+                            : entry.state === "workspaceOnly"
+                              ? "agentSettings.backupModels.workspaceOnly"
+                              : "agentSettings.backupModels.unavailable",
                         )}
                       </span>
                     </Show>

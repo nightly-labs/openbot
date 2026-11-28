@@ -382,6 +382,8 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "Mover {model} para baixo",
   "mobile.agent.backupModels.remove": "Remover {model}",
   "mobile.agent.backupModels.unavailable": "Indisponível agora · ignorado",
+  "mobile.agent.backupModels.workspaceOnly":
+    "Ignorado com “Somente o espaço de trabalho” · altere as “Permissões” para usá-lo",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

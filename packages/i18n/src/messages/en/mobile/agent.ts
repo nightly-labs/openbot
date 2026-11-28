@@ -369,6 +369,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.moveDown": "Move {model} down",
   "mobile.agent.backupModels.remove": "Remove {model}",
   "mobile.agent.backupModels.unavailable": "Not available now · skipped",
+  "mobile.agent.backupModels.workspaceOnly": "Skipped with Workspace only · change Permissions to use it",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

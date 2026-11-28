@@ -372,6 +372,7 @@ export const messages = {
   "mobile.agent.backupModels.moveDown": "{model} 아래로 이동",
   "mobile.agent.backupModels.remove": "{model} 삭제",
   "mobile.agent.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
+  "mobile.agent.backupModels.workspaceOnly": "'워크스페이스만'에서는 건너뜀 · 사용하려면 '권한'을 바꾸세요",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
   "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":

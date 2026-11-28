@@ -525,7 +525,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
             choice: { ...option.choice },
             model: option.model.slice(0, AGENT_DOCK_LIMITS.backupModelLabel),
             account: option.account?.slice(0, AGENT_DOCK_LIMITS.backupModelLabel) ?? null,
-            state: option.state,
+            state: option.state === "workspaceOnly" ? "unavailable" : option.state,
           }),
         ),
       rememberable: ask.rememberable !== false,

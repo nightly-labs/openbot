@@ -375,7 +375,7 @@ import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging
 import type { NearWallet } from "./near-wallet";
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
-import { canConfineProcesses } from "./process-confinement";
+import { workspaceOnlyUnavailable } from "./process-confinement";
 import {
   type AppServerNotification,
   decodeRecordResponse,
@@ -8006,10 +8006,6 @@ function logUnlistedEndpoints(
     provider: harness,
     endpointIds: unlisted,
   });
-}
-
-function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
-  return agentProviderDescriptor(provider).workspaceEnforcement === "confined-process" && !canConfineProcesses();
 }
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {

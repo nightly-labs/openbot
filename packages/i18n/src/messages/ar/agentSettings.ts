@@ -126,6 +126,7 @@ export const messages = {
   "agentSettings.backupModels.remove": "إزالة {model}",
   "agentSettings.backupModels.limited": "بلغ حد الاستخدام · تم التخطي",
   "agentSettings.backupModels.unavailable": "غير متاح الآن · تم التخطي",
+  "agentSettings.backupModels.workspaceOnly": "يتم التخطي مع «مساحة العمل فقط» · غيّر «الأذونات» لاستخدامه",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

@@ -87,6 +87,7 @@ export const messages = {
   "agentSettings.backupModels.remove": "移除 {model}",
   "agentSettings.backupModels.limited": "额度已用完 · 已跳过",
   "agentSettings.backupModels.unavailable": "当前不可用 · 已跳过",
+  "agentSettings.backupModels.workspaceOnly": "在“仅工作区”下跳过 · 要使用，请更改“权限”",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":

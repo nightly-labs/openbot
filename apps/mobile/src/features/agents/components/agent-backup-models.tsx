@@ -8,6 +8,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type HostProviderAccounts,
   sameAgentModelChoice,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { useQuery } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
@@ -20,6 +21,7 @@ import Trash2 from "lucide-react-native/icons/trash";
 import { type ReactNode, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
+import { useAgentAdminSettings } from "@/features/agents/components/agent-access-fields";
 import { type AgentHostFieldsProps, useAgentHostRecord } from "@/features/agents/components/agent-host-fields";
 import { useProviderAccountName, useProviderAccounts } from "@/features/agents/components/agent-runtime-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -42,6 +44,7 @@ interface BackupModelOption {
   choice: AgentModelChoice;
   label: string;
   ready: boolean;
+  workspaceOnly: boolean;
 }
 
 type BackupModelsProps = AgentHostFieldsProps;
@@ -103,7 +106,11 @@ function choiceKey(choice: AgentModelChoice): string {
   return `${choice.provider}\u0000${choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID}\u0000${choice.model}`;
 }
 
-function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, accounts: HostProviderAccounts | null) {
+function useBackupModelOptions(
+  models: readonly AgentModelOption[] | undefined,
+  accounts: HostProviderAccounts | null,
+  workspaceOnly: boolean,
+) {
   const { t } = useText();
   const accountName = useProviderAccountName();
   const option = (choice: AgentModelChoice, namesProvider: boolean): BackupModelOption => {
@@ -134,6 +141,10 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
         (providerAccounts !== undefined
           ? account?.state === "connected"
           : accounts === null || accountId === DEFAULT_PROVIDER_ACCOUNT_ID),
+      workspaceOnly:
+        workspaceOnly &&
+        models?.some((candidate) => candidate.provider === choice.provider && candidate.workspaceOnlyUnavailable) ===
+          true,
     };
   };
   const all = (exclude: readonly AgentModelChoice[]): BackupModelOption[] =>
@@ -165,7 +176,12 @@ function useBackupModelEditor(props: BackupModelsProps) {
     enabled: available && canManage,
     retry: false,
   });
-  const { option, all } = useBackupModelOptions(models.data, accounts);
+  const { settings: adminSettings } = useAgentAdminSettings(agent, props.server, available && canManage);
+  const { option, all } = useBackupModelOptions(
+    models.data,
+    accounts,
+    adminSettings ? workspaceAccessEnforced(adminSettings) : false,
+  );
   if (!canManage || !current) return { canManage, failed, retry, editor: null };
 
   const automatic = current.backupModels?.automatic === true;
@@ -310,12 +326,18 @@ export function AgentBackupModelsPage(props: BackupModelsProps) {
                 <Typography type="body-sm" className="w-5 text-grouped-secondary">
                   {index + 1}
                 </Typography>
-                <View style={{ opacity: entry.ready ? 1 : 0.45 }}>
+                <View style={{ opacity: entry.ready && !entry.workspaceOnly ? 1 : 0.45 }}>
                   <ProviderMark provider={entry.choice.provider} size={20} />
                 </View>
               </View>
             }
-            supportingText={entry.ready ? undefined : t("mobile.agent.backupModels.unavailable")}
+            supportingText={
+              !entry.ready
+                ? t("mobile.agent.backupModels.unavailable")
+                : entry.workspaceOnly
+                  ? t("mobile.agent.backupModels.workspaceOnly")
+                  : undefined
+            }
             trailing={
               <View className="flex-row items-center gap-4">
                 {iconButton(
@@ -339,7 +361,10 @@ export function AgentBackupModelsPage(props: BackupModelsProps) {
               </View>
             }
           >
-            <Typography.Paragraph numberOfLines={2} className={entry.ready ? undefined : "text-grouped-secondary"}>
+            <Typography.Paragraph
+              numberOfLines={2}
+              className={entry.ready && !entry.workspaceOnly ? undefined : "text-grouped-secondary"}
+            >
               {entry.label}
             </Typography.Paragraph>
           </SettingsRow>
@@ -422,6 +447,7 @@ export function AgentBackupModelPicker(props: BackupModelsProps) {
                 disabled={!enabled || full}
                 disclosure={false}
                 leading={<ProviderMark provider={provider} size={20} />}
+                supportingText={candidate.workspaceOnly ? t("mobile.agent.backupModels.workspaceOnly") : undefined}
                 onPress={() => {
                   void save({ automatic, order: [...order, candidate.choice] }).then((saved) => {
                     if (saved && navigation.isFocused()) router.back();
