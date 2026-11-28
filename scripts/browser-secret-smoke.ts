@@ -222,15 +222,27 @@ async function runStuckSubmitScenario(browser: BrowserHost): Promise<void> {
       const released = title() !== "Secure authentication";
       const recoveryMs = Date.now() - started;
       if (ending !== "done") browser.endTakeover(tab.id, true);
-      const snapshotWorks = await settlesWithin(runCauseEffect(browser.snapshot(tab.id)), 15_000);
+      const snapshot = await runCauseEffect(browser.snapshot(tab.id)).then(
+        (read) => read,
+        () => null,
+      );
+      const snapshotWorks = snapshot !== null;
+      const reloadedFixture = snapshot?.url.endsWith("/hangs-on-submit") === true && title() === "Stuck sign in";
       const timedOut = failure.includes("Authentication submission timed out");
       results[ending] = {
         passed:
-          timedOut && protectedAtTakeover && finished && released && snapshotWorks && (ending !== "view" || frames > 0),
+          timedOut &&
+          protectedAtTakeover &&
+          finished &&
+          released &&
+          snapshotWorks &&
+          reloadedFixture &&
+          (ending !== "view" || frames > 0),
         timedOut,
         protectedAtTakeover,
         finished,
         released,
+        reloadedFixture,
         snapshotWorks,
         frames,
         recoveryMs,
