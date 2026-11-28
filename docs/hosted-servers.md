@@ -1519,6 +1519,10 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    - each directory that the customer added in `/opt`, `/usr/local` and `/usr/local/lib`, and each
      npm package for all users. A directory that programs of root read, such as
      `/usr/local/lib/systemd` or `/usr/local/lib/python3.12`, stays out, and the report names it.
+     `/usr/local/lib/openbot-pool`, which `offer` installs on a pool machine, also stays out: it is
+     not of the customer, and each pool machine has its own copy.
+     A pool machine (it has `/etc/openbot-pool/host`) has no boat image, so its export does not
+     report an unknown image.
    - the Hermes CLI of the image when its sign-in file in the home has a sign-in. OpenBot does not
      download Hermes as it downloads the other provider CLIs. An empty file, a file with only `{}`, or
      the `.env` that the image writes for Hermes is not a sign-in.
