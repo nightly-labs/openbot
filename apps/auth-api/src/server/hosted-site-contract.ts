@@ -18,6 +18,7 @@ export const HOSTED_SITE_LIMITS = {
   activationsPerHour: 20,
   activationsPerDay: 100,
   idleUploadMs: 60_000,
+  uploadClaimLeaseMs: 90_000,
   accountSites: HOSTED_SITE_ACCOUNT_LIMIT,
   ...HOSTED_SITE_UPLOAD_LIMITS,
   siteLifetimeMs: 30 * 24 * 60 * 60_000,

@@ -135,6 +135,13 @@ function accountSlotCountSql(userId: string, excludeSiteId: string | null, now: 
   };
 }
 
+export function liveUploadClaimsSql(alias: string, now: number): SqlPart {
+  return {
+    sql: `CASE WHEN ${alias}last_upload_claim_at <= ? THEN 0 ELSE ${alias}in_flight_uploads END`,
+    binds: [now - HOSTED_SITE_LIMITS.uploadClaimLeaseMs],
+  };
+}
+
 export function idleNewSiteUploadsSql(
   bucket: HostedSiteBucket,
   userId: string,
@@ -143,14 +150,15 @@ export function idleNewSiteUploadsSql(
   count: number,
 ): SqlPart {
   const member = bucketMemberSql(bucket, "x", now);
+  const live = liveUploadClaimsSql("d.", now);
   return {
     sql: `SELECT d.id, d.site_id FROM site_deployments d JOIN hosted_sites x ON x.id = d.site_id
-      WHERE d.user_id = ? AND d.status = 'uploading' AND d.base_deployment_id IS NULL AND d.in_flight_uploads = 0
+      WHERE d.user_id = ? AND d.status = 'uploading' AND d.base_deployment_id IS NULL AND (${live.sql}) = 0
         AND d.upload_expires_at > ? AND x.user_id = ? AND x.status = 'uploading' AND ${member.sql}
         AND MAX(d.created_at, COALESCE(
           (SELECT MAX(f.uploaded_at) FROM site_upload_files f WHERE f.deployment_id = d.id), 0)) <= ?
       ORDER BY d.created_at LIMIT ?`,
-    binds: [userId, now, userId, ...member.binds, idleBefore, count],
+    binds: [userId, ...live.binds, now, userId, ...member.binds, idleBefore, count],
   };
 }
 

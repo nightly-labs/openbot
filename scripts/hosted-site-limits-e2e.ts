@@ -19,6 +19,7 @@ const SCENARIOS = [
   "account-cap",
   "replace-retry",
   "idle-new-upload",
+  "leaked-claim",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
 
@@ -197,6 +198,15 @@ class Account {
     );
   }
 
+  leakClaim(uploadId: string, claimedAgoMs: number | null) {
+    const claimedAt = claimedAgoMs === null ? "NULL" : String(Date.now() - claimedAgoMs);
+    d1(
+      `UPDATE site_deployments SET in_flight_uploads = 1, last_upload_claim_at = ${claimedAt}
+       WHERE id = ${quote(uploadId)} AND user_id = ${quote(this.id)}`,
+      z.unknown(),
+    );
+  }
+
   private headers(server: Server | null, extra: Record<string, string> = {}): Record<string, string> {
     const headers: Record<string, string> = { Authorization: `Bearer ${this.token}`, ...extra };
     if (server) {
@@ -248,6 +258,10 @@ class Account {
   async finish(upload: z.infer<typeof uploadSchema>, body: string): Promise<Publish> {
     const put = await this.put(upload, body);
     if (!put.ok) throw new Error(`The file upload failed: ${put.status} ${await put.text()}`);
+    return this.activate(upload);
+  }
+
+  async activate(upload: z.infer<typeof uploadSchema>): Promise<Publish> {
     const activate = await fetch(`${this.api}/v1/sites/uploads/${upload.uploadId}/activate`, {
       method: "POST",
       headers: this.headers(null, { "Idempotency-Key": `e2e-${crypto.randomUUID()}` }),
@@ -269,6 +283,15 @@ class Account {
       if (!result.ok) throw new Error(`Site ${index + 1} of ${count} was refused: ${result.code} ${result.message}`);
     }
   }
+}
+
+function expectUploadInProgress(scenario: Scenario, step: string, result: Publish) {
+  record(
+    scenario,
+    step,
+    !result.ok && result.status === 409 && result.code === "upload_in_progress",
+    result.ok ? "the site went live" : `${result.status} ${result.code}: ${result.message}`,
+  );
 }
 
 function expectRefused(scenario: Scenario, step: string, result: Publish, text: string) {
@@ -514,6 +537,56 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       reason: "shared",
       sites: 1,
     });
+  },
+
+  async "leaked-claim"(account) {
+    const published = await account.publish(null);
+    if (!published.ok) throw new Error(`The site was refused: ${published.code} ${published.message}`);
+    const replace = await account.start(null, published.siteId);
+    if (!replace.ok) throw new Error(`The replace was refused: ${replace.code} ${replace.message}`);
+    const put = await account.put(replace.upload, replace.body);
+    record("leaked-claim", "the replace sends its file", put.ok, String(put.status));
+    account.leakClaim(replace.upload.uploadId, null);
+    expectUploadInProgress(
+      "leaked-claim",
+      "a claim of the old Worker keeps the replace waiting",
+      await account.activate(replace.upload),
+    );
+    account.leakClaim(replace.upload.uploadId, 0);
+    expectUploadInProgress(
+      "leaked-claim",
+      "a recent claim keeps the replace waiting",
+      await account.activate(replace.upload),
+    );
+    account.leakClaim(replace.upload.uploadId, 91_000);
+    expectPublished(
+      "leaked-claim",
+      "a stopped file upload does not block the replace after its lease",
+      await account.activate(replace.upload),
+    );
+
+    const pool = account.addServer("pool");
+    const stopped = await account.start(pool);
+    if (!stopped.ok) throw new Error(`The upload was refused: ${stopped.code} ${stopped.message}`);
+    const sent = await account.put(stopped.upload, stopped.body);
+    record("leaked-claim", "the new site sends its file", sent.ok, String(sent.status));
+    account.backdateUploads(61_000, true);
+    account.leakClaim(stopped.upload.uploadId, 0);
+    expectRefused(
+      "leaked-claim",
+      "a recent claim keeps the slot of the new site",
+      await account.publish(pool),
+      "share 1 active site",
+    );
+    account.leakClaim(stopped.upload.uploadId, 91_000);
+    expectPublished(
+      "leaked-claim",
+      "a new site takes the slot of a stopped upload after its lease",
+      await account.publish(pool),
+    );
+    const late = await account.put(stopped.upload, stopped.body);
+    const code = late.ok ? "accepted" : errorSchema.parse(await late.json()).error.code;
+    record("leaked-claim", "the stopped upload is closed", code === "upload_expired", code);
   },
 };
 

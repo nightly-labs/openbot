@@ -41,6 +41,7 @@ import {
   type HostedSiteSlots,
   hostedSiteSlots,
   idleNewSiteUploadsSql,
+  liveUploadClaimsSql,
   resolveHostedSiteBucket,
   scopeServerId,
 } from "./hosted-site-server";
@@ -372,18 +373,21 @@ export class HostedSiteService {
         if (stored?.size === file.size && stored.httpMetadata?.contentType === file.mimeType) return;
       }
       const claimTime = this.now();
+      const claimLeaseStart = claimTime - HOSTED_SITE_LIMITS.uploadClaimLeaseMs;
+      const accountClaims = liveUploadClaimsSql("candidate.", claimTime);
       const uploadClaim = yield* siteCall(() =>
         database
           .prepare(
             `UPDATE site_deployments
-         SET in_flight_uploads = in_flight_uploads + 1,
+         SET in_flight_uploads = CASE WHEN last_upload_claim_at <= ? THEN 1 ELSE in_flight_uploads + 1 END,
+             last_upload_claim_at = ?,
              upload_claims = upload_claims + 1,
              upload_bytes_claimed = upload_bytes_claimed + ?
          WHERE id = ? AND user_id = ? AND status = 'uploading' AND upload_expires_at > ?
            AND upload_claims < file_count * ?
            AND upload_bytes_claimed + ? <= total_bytes * ?
            AND (
-             SELECT COALESCE(SUM(candidate.in_flight_uploads), 0)
+             SELECT COALESCE(SUM(${accountClaims.sql}), 0)
              FROM site_deployments candidate
              WHERE candidate.user_id = ? AND candidate.status = 'uploading' AND candidate.upload_expires_at > ?
            ) < ?
@@ -407,6 +411,8 @@ export class HostedSiteService {
            )`,
           )
           .bind(
+            claimLeaseStart,
+            claimTime,
             file.size,
             deployment.id,
             userId,
@@ -414,6 +420,7 @@ export class HostedSiteService {
             HOSTED_SITE_LIMITS.uploadAttemptMultiplier,
             file.size,
             HOSTED_SITE_LIMITS.uploadAttemptMultiplier,
+            ...accountClaims.binds,
             userId,
             claimTime,
             HOSTED_SITE_LIMITS.concurrentFileUploads,
@@ -442,8 +449,12 @@ export class HostedSiteService {
           "The upload retry limit for this account was reached.",
         );
       }
+      const claimExpired = () => this.now() - claimTime >= HOSTED_SITE_LIMITS.uploadClaimLeaseMs;
       yield* Effect.gen({ self: this }, function* () {
         const body = yield* readUploadBody(uploadBody, file.size);
+        if (claimExpired()) {
+          return yield* new HostedSiteInputError(409, "upload_expired", "This upload session has expired.");
+        }
         yield* siteCall(() => bucket.put(key, body, { httpMetadata: { contentType: file.mimeType } }));
         const stored = yield* siteCall(() => bucket.head(key));
         if (!stored || stored.size !== file.size) {
@@ -452,7 +463,9 @@ export class HostedSiteService {
         }
         const storedDeployment = yield* this.requireDeploymentEffect(userId, deployment.id);
         if (storedDeployment.status !== "uploading" || storedDeployment.upload_expires_at <= this.now()) {
-          yield* siteCall(() => bucket.delete(key));
+          if (storedDeployment.status !== "activating" && storedDeployment.status !== "active") {
+            yield* siteCall(() => bucket.delete(key));
+          }
           return yield* new HostedSiteInputError(409, "upload_expired", "This upload session has expired.");
         }
         yield* siteCall(() =>
@@ -469,6 +482,7 @@ export class HostedSiteService {
       }).pipe(
         Effect.ensuring(
           Effect.gen({ self: this }, function* () {
+            if (claimExpired()) return;
             yield* siteCall(() =>
               database
                 .prepare(
@@ -1227,6 +1241,7 @@ export class HostedSiteService {
     ): Effect.fn.Return<DeploymentRow, HostedSiteFailure, HostedSiteStorage> {
       const { database } = yield* HostedSiteStorage;
 
+      const live = liveUploadClaimsSql("", now);
       if (deployment.activation_authorized_at !== null) {
         if (deployment.status === "activating") return deployment;
         const retryClaim = yield* siteCall(() =>
@@ -1234,9 +1249,9 @@ export class HostedSiteService {
             .prepare(
               `UPDATE site_deployments SET status = 'activating'
            WHERE id = ? AND user_id = ? AND status = 'uploading' AND activation_authorized_at IS NOT NULL
-             AND in_flight_uploads = 0`,
+             AND (${live.sql}) = 0`,
             )
-            .bind(deployment.id, userId)
+            .bind(deployment.id, userId, ...live.binds)
             .run(),
         );
         if (retryClaim.meta.changes === 1) return { ...deployment, status: "activating" };
@@ -1249,7 +1264,7 @@ export class HostedSiteService {
             `UPDATE site_deployments SET status = 'activating', activation_authorized_at = ?
          WHERE id = ? AND user_id = ? AND status IN ('uploading', 'activating')
            AND activation_authorized_at IS NULL
-           AND in_flight_uploads = 0
+           AND (${live.sql}) = 0
            AND (
              SELECT COUNT(*) FROM site_deployments
              WHERE user_id = ? AND activation_authorized_at >= ?
@@ -1263,6 +1278,7 @@ export class HostedSiteService {
             now,
             deployment.id,
             userId,
+            ...live.binds,
             userId,
             hour,
             HOSTED_SITE_LIMITS.activationsPerHour,
@@ -1277,7 +1293,7 @@ export class HostedSiteService {
       }
       const current = yield* this.requireDeploymentEffect(userId, deployment.id);
       if (current.status === "activating" && current.activation_authorized_at !== null) return current;
-      if (current.in_flight_uploads > 0) {
+      if (hasLiveUploadClaims(current, now)) {
         return yield* new HostedSiteInputError(409, "upload_in_progress", "Wait for the file upload to finish.");
       }
       yield* siteCall(() =>
@@ -1691,15 +1707,16 @@ export class HostedSiteService {
     ): Effect.fn.Return<number, HostedSiteFailure, HostedSiteStorage> {
       const { database } = yield* HostedSiteStorage;
 
+      const live = liveUploadClaimsSql("", now);
       const idle = yield* siteCall(() =>
         database
           .prepare(
             `SELECT id FROM site_deployments
-         WHERE user_id = ? AND site_id = ? AND status = 'uploading' AND upload_expires_at > ? AND in_flight_uploads = 0
+         WHERE user_id = ? AND site_id = ? AND status = 'uploading' AND upload_expires_at > ? AND (${live.sql}) = 0
            AND base_deployment_id IS NOT NULL
          ORDER BY created_at LIMIT ?`,
           )
-          .bind(userId, siteId, now, count)
+          .bind(userId, siteId, now, ...live.binds, count)
           .all<{ id: string }>(),
       );
       let freed = 0;
@@ -1708,9 +1725,9 @@ export class HostedSiteService {
           database
             .prepare(
               `UPDATE site_deployments SET status = 'abandoned'
-           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0`,
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND (${live.sql}) = 0`,
             )
-            .bind(upload.id, userId)
+            .bind(upload.id, userId, ...live.binds)
             .run(),
         );
         if (claim.meta.changes !== 1) continue;
@@ -1732,6 +1749,7 @@ export class HostedSiteService {
 
       const idleBefore = now - HOSTED_SITE_LIMITS.idleUploadMs;
       const idle = idleNewSiteUploadsSql(siteBucket, userId, now, idleBefore, 1);
+      const live = liveUploadClaimsSql("", now);
       const uploads = yield* siteCall(() =>
         database
           .prepare(idle.sql)
@@ -1743,12 +1761,12 @@ export class HostedSiteService {
           database
             .prepare(
               `UPDATE site_deployments SET status = 'abandoned'
-           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND (${live.sql}) = 0
              AND NOT EXISTS (
                SELECT 1 FROM site_upload_files f WHERE f.deployment_id = site_deployments.id AND f.uploaded_at > ?
              )`,
             )
-            .bind(upload.id, userId, idleBefore)
+            .bind(upload.id, userId, ...live.binds, idleBefore)
             .run(),
         );
         if (claim.meta.changes === 1) yield* this.deleteDeploymentEffect(upload.site_id, upload.id);
@@ -1856,6 +1874,12 @@ export class HostedSiteService {
       return yield* Effect.fail(siteFailure(error));
     },
   );
+}
+
+function hasLiveUploadClaims(deployment: DeploymentRow, now: number): boolean {
+  if (deployment.in_flight_uploads <= 0) return false;
+  const lastClaim = deployment.last_upload_claim_at;
+  return lastClaim === null || lastClaim > now - HOSTED_SITE_LIMITS.uploadClaimLeaseMs;
 }
 
 function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
