@@ -691,7 +691,7 @@ export function agentIpcHandlers({
           runCauseEffect(
             syncedOrRequest(
               input.beforeSequence === undefined
-                ? remoteServers.sync.channelPages.latest(serverId, input.channelId)
+                ? remoteServers.sync.latestChannelPage(serverId, input.channelId)
                 : null,
               () =>
                 remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, {
@@ -706,11 +706,13 @@ export function agentIpcHandlers({
           if (input.type === "read") closeChatNotifications(LOCAL_SERVER_ID, { channelId: input.channelId });
           return runCauseEffect(service.channels.command(input, host.channelActor()));
         },
-        remote: (input, serverId) => {
+        remote: async (input, serverId) => {
           if (input.type === "read") closeChatNotifications(serverId, { channelId: input.channelId });
-          return runCauseEffect(
+          const channel = await runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
           );
+          remoteServers.sync.noteChannelRevision(serverId, channel.id, channel.revision);
+          return channel;
         },
       }),
       deleteChannel: scopedHandler(parseChannelId, {
