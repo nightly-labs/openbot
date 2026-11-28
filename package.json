@@ -536,6 +536,7 @@
     "test:remote-signal-homes": "bun apps/auth-api/scripts/remote-signal-homes-e2e.ts",
     "test:remote-resume-batch": "bun apps/auth-api/scripts/remote-resume-batch-e2e.ts",
     "test:host-credential-replica": "bun apps/auth-api/scripts/host-credential-replica-e2e.ts",
+    "test:host-state-object": "node apps/auth-api/scripts/host-state-object-e2e.ts",
     "test:signal-entry-failover": "bun apps/auth-api/scripts/signal-entry-failover-e2e.ts",
     "test:invite-acceptance": "bun apps/auth-api/scripts/invite-acceptance-e2e.ts",
     "test:host-key-handover": "bun apps/auth-api/scripts/host-key-handover-e2e.ts",

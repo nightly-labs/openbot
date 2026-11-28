@@ -85,6 +85,8 @@ import {
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
+import { type HostStateStore, hostCredentialFresh, hostStateStore } from "./host-state";
+import type { HostStateCredential } from "./host-state-object";
 import { primaryD1, replicaD1 } from "./observed-d1";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import { CHECKOUT_LIFETIME_SECONDS } from "./stripe-client";
@@ -328,16 +330,7 @@ function keyHandoversFromRows(rows: readonly RemoteHostKeyHandoverRow[]): Map<st
   return handovers;
 }
 
-interface RemoteHostRow {
-  host_id: string;
-  owner_user_id: string;
-  name: string;
-  logo_key: string | null;
-  auth_epoch: number;
-  machine_token_hash: string | null;
-  device_public_key: string | null;
-  signal_home: string | null;
-}
+type RemoteHostRow = HostStateCredential;
 
 interface RemoteHostKeyHandoverRow {
   host_id: string;
@@ -711,6 +704,7 @@ class RemoteDependencies extends Context.Service<
     signal: RemoteSignalPlan | null;
     webhookUrls: readonly string[];
     webhookSecret: string | null;
+    hostState: HostStateStore | null;
   }
 >()("auth-api/RemoteControlPlane/Dependencies") {}
 
@@ -740,6 +734,8 @@ export class RemoteControlPlane {
       | "DISCORD_ROUTE_KEY_ID"
       | "TELEGRAM_BOT_ID"
       | "TELEGRAM_BOT_USERNAME"
+      | "HOST_STATE"
+      | "HOST_STATE_MODE"
     >,
     options: {
       fetch?: RemoteFetch;
@@ -795,6 +791,7 @@ export class RemoteControlPlane {
       signal: remoteSignalPlan(bindings),
       webhookUrls,
       webhookSecret,
+      hostState: hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE),
     });
   }
 
@@ -875,6 +872,7 @@ export class RemoteControlPlane {
               .bind(ownerMembershipId, user.id, now, now, hostId, user.id),
           ]),
         );
+        yield* this.#hostChanged(hostId);
         if (metadata.some((result) => (result.meta.changes ?? 0) !== 1)) {
           return yield* new RemoteControlPlaneError(
             403,
@@ -937,6 +935,7 @@ export class RemoteControlPlane {
             : [this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now)]),
         ]),
       );
+      yield* this.#hostChanged(hostId);
       if (registration.some((result) => (result.meta.changes ?? 0) !== 1)) {
         return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
       }
@@ -981,6 +980,7 @@ export class RemoteControlPlane {
           this.#authEpochEventStatement(hostId, now, user.id, { sql: "machine_token_hash IS NULL", binds: [] }),
         ]),
       );
+      yield* this.#hostChanged(hostId);
       yield* this.#flushAuthEvents();
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1069,6 +1069,7 @@ export class RemoteControlPlane {
             .bind(hostId, hostId, HOST_KEY_HANDOVER_LIMIT),
         ]),
       );
+      yield* this.#hostChanged(hostId);
       if (inserted?.meta.changes !== 1 || updated?.meta.changes !== 1) {
         const current = yield* this.#host(hostId);
         if (current?.device_public_key === handover.publicKey && (yield* this.#handoverStored(handover))) {
@@ -1395,6 +1396,7 @@ export class RemoteControlPlane {
           .bind(logoKey, dependencies.now(), hostId)
           .run(),
       );
+      yield* this.#hostChanged(hostId);
       return host.logo_key;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1870,6 +1872,7 @@ export class RemoteControlPlane {
           this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now, applied),
         ]),
       );
+      if (revokingAccess) yield* this.#hostChanged(input.hostId);
       yield* this.#flushAuthEvents();
       if ((changed[0]?.meta.changes ?? 0) === 1) return;
       const current = yield* remoteCall(() =>
@@ -2137,6 +2140,7 @@ export class RemoteControlPlane {
           this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now, applied),
         ]),
       );
+      yield* this.#hostChanged(hostId);
       if ((accepted?.meta.changes ?? 0) !== 1) return yield* ownerTransferInvalid();
       yield* this.#flushAuthEvents();
       return { hostId, hostName: transfer.host_name };
@@ -2818,6 +2822,7 @@ export class RemoteControlPlane {
               ]),
         ]),
       );
+      yield* this.#hostChanged(hostId);
       yield* this.#flushAuthEvents();
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -2849,7 +2854,7 @@ export class RemoteControlPlane {
             .prepare("UPDATE remote_hosts SET signal_home = NULL WHERE host_id = ?")
             .bind(hostId)
             .run(),
-        );
+        ).pipe(Effect.andThen(this.#hostChanged(hostId)));
       const home = placement.signalHome
         ? yield* this.#placeHost(host, signal, placement.failedSignalUrl, {
             location: placement.location ?? null,
@@ -3524,7 +3529,8 @@ export class RemoteControlPlane {
       const provided = yield* sha256(machineToken).pipe(
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
-      const host = yield* this.#host(hostId);
+      const stored = yield* this.#storedHost(hostId, provided);
+      const host = stored ? stored.host : yield* this.#host(hostId);
       if (!host || !machineTokenMatches(host, provided)) {
         return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
       }
@@ -3542,9 +3548,11 @@ export class RemoteControlPlane {
       const provided = yield* sha256(machineToken).pipe(
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
-      const replica = yield* this.#host(hostId, "replica");
+      const stored = yield* this.#storedHost(hostId, provided);
+      if (stored?.host && machineTokenMatches(stored.host, provided)) return;
+      const replica = stored ? null : yield* this.#host(hostId, "replica");
       if (replica && machineTokenMatches(replica, provided)) return;
-      const host = yield* this.#host(hostId, "primary");
+      const host = stored ? stored.host : yield* this.#host(hostId, "primary");
       if (!host || !machineTokenMatches(host, provided)) {
         return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
       }
@@ -3783,6 +3791,32 @@ export class RemoteControlPlane {
     );
   });
 
+  readonly #storedHost = Effect.fn("RemoteControlPlane.storedHost")(function* (
+    this: RemoteControlPlane,
+    hostId: string,
+    providedHash: string,
+  ): Effect.fn.Return<{ host: RemoteHostRow | null } | null, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const hostState = dependencies.hostState;
+    if (hostState?.mode !== "read") return null;
+    const entry = yield* hostState.read(hostId);
+    if (!entry) return null;
+    const checkedAt = dependencies.now();
+    if (hostCredentialFresh(entry, checkedAt) && machineTokenMatches(entry.credential, providedHash))
+      return { host: entry.credential };
+    const host = yield* this.#host(hostId, "primary");
+    if (host) yield* hostState.fill(hostId, host, checkedAt, entry.generation);
+    return { host };
+  });
+
+  readonly #hostChanged = Effect.fn("RemoteControlPlane.hostChanged")(function* (
+    this: RemoteControlPlane,
+    hostId: string,
+  ): Effect.fn.Return<void, never, RemoteDependencies> {
+    const hostState = (yield* RemoteDependencies).hostState;
+    if (hostState) yield* hostState.invalidate(hostId);
+  });
+
   readonly #placeHost = Effect.fn("RemoteControlPlane.placeHost")(function* (
     this: RemoteControlPlane,
     host: RemoteHostRow,
@@ -3824,6 +3858,7 @@ export class RemoteControlPlane {
         .bind(chosen.id, host.host_id, host.signal_home)
         .run(),
     );
+    yield* this.#hostChanged(host.host_id);
     if ((stored.meta.changes ?? 0) === 1) return chosen;
     const raced = yield* remoteCall(() =>
       dependencies.database
