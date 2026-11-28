@@ -449,7 +449,7 @@ export class CreditMediaWorkflows {
     return yield* this.#again(gateway.submit(job, uploads), patient).pipe(
       Effect.catchIf(
         (failure) => failure.code === CREDIT_JOB_CONFLICT,
-        () => gateway.job(job.jobId),
+        () => this.#again(gateway.job(job.jobId), patient),
       ),
       Effect.mapError(failedOf),
     );
@@ -517,7 +517,7 @@ export class CreditMediaWorkflows {
     this: CreditMediaWorkflows,
     jobId: string,
   ) {
-    const found = yield* this.#existing(jobId).pipe(Effect.orElseSucceed(() => null));
+    const found = yield* this.#existing(jobId, true).pipe(Effect.orElseSucceed(() => null));
     return found !== null && found.status !== "failed" && found.status !== "canceled";
   }).bind(this);
 

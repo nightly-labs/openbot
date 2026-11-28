@@ -504,10 +504,10 @@ interface UnfinishedJob {
   at: number;
 }
 
-type Delivery = Pick<UnfinishedJob, "jobId" | "planned" | "roles"> & { files: readonly Uint8Array[] };
+type Delivery = Pick<UnfinishedJob, "jobId" | "planned" | "roles"> & { files: readonly Uint8Array[]; key: string };
 
-function requestKey(call: CreditMediaToolCall): string {
-  return JSON.stringify([call.agentId, call.tool, call.arguments ?? null]);
+function requestKey(call: CreditMediaToolCall, args: JobArguments, inputs: Inputs): string {
+  return JSON.stringify([call.agentId, call.tool, args, inputs]);
 }
 
 function inputsDigest(files: readonly Uint8Array[]): string {
@@ -665,7 +665,8 @@ export class CreditMediaTools {
     const roles = inputRoles(inputs);
     run.facts.references = roles.length;
     run.facts.modelSource = args.model === undefined ? "default" : "agent";
-    const resumed = yield* this.#resume(media, call, run);
+    const key = requestKey(call, args, inputs);
+    const resumed = yield* this.#resume(media, call, run, key);
     if (resumed) return resumed;
     const models = yield* media.models();
     const defaultModels = this.#options.defaultModels(kind);
@@ -725,7 +726,7 @@ export class CreditMediaTools {
         planned = chosen;
       }
     }
-    return yield* this.#delivered(media, call, run, { jobId: randomUUID(), planned, roles, files });
+    return yield* this.#delivered(media, call, run, { jobId: randomUUID(), planned, roles, files, key });
   });
 
   #resume = Effect.fn("CreditMediaTools.resume")(function* (
@@ -733,17 +734,17 @@ export class CreditMediaTools {
     media: CreditMediaWorkflows,
     call: CreditMediaToolCall,
     run: CreditMediaRun,
+    key: string,
   ) {
-    const key = requestKey(call);
     const earlier = this.#unfinished.get(key);
-    if (!earlier) return null;
+    if (!earlier || !this.#options.agentsAllowed()) return null;
     this.#unfinished.delete(key);
     if (Date.now() - earlier.at > UNFINISHED_JOB_MS || !(yield* media.unfinished(earlier.jobId))) return null;
     const read = yield* Effect.result(call.readInputs(earlier.roles.map(({ path }) => path)));
     if (read._tag === "Failure" || inputsDigest(read.success) !== earlier.digest) return null;
     run.facts.agentModel = earlier.planned.model.id;
     notePlan(run, earlier.planned);
-    return yield* this.#delivered(media, call, run, { ...earlier, files: read.success });
+    return yield* this.#delivered(media, call, run, { ...earlier, files: read.success, key });
   });
 
   #delivered(media: CreditMediaWorkflows, call: CreditMediaToolCall, run: CreditMediaRun, delivery: Delivery) {
@@ -766,12 +767,12 @@ export class CreditMediaTools {
     );
   }
 
-  #remember(call: CreditMediaToolCall, job: Delivery) {
+  #remember(job: Delivery) {
     const now = Date.now();
     for (const [key, earlier] of this.#unfinished)
       if (now - earlier.at > UNFINISHED_JOB_MS) this.#unfinished.delete(key);
-    const { files, ...kept } = job;
-    this.#unfinished.set(requestKey(call), { ...kept, digest: inputsDigest(files), at: now });
+    const { files, key, jobId, planned, roles } = job;
+    this.#unfinished.set(key, { jobId, planned, roles, digest: inputsDigest(files), at: now });
   }
 
   #deliver = Effect.fn("CreditMediaTools.deliver")(function* (
@@ -794,7 +795,7 @@ export class CreditMediaTools {
     );
     if (made._tag === "Failure") {
       run.facts.outcome = "failed";
-      this.#remember(call, delivery);
+      this.#remember(delivery);
       return failure(made.failure.message);
     }
     const { bytes, mimeType, credits } = made.success;
@@ -831,6 +832,7 @@ export class CreditMediaTools {
     );
     if (shown._tag === "Failure") {
       run.facts.outcome = "not_saved";
+      this.#remember(delivery);
       return failure(sourceText("error.agent.creditMediaNotSaved"));
     }
     run.facts.outcome = "generated";

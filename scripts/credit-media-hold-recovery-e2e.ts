@@ -285,10 +285,10 @@ async function toolChecks() {
     state.pollsDown = false;
     const afterFailure = available(state);
     state.doneAt = state.now;
-    const retried = await callTool(VIDEO_ARGS);
+    const retried = await callTool(Object.fromEntries(Object.entries(VIDEO_ARGS).reverse()));
     const afterRetry = { holds: holdStates(state), shown: [...shown], available: available(state) };
     check(
-      "when the account service stays down, the agent call fails, and the same call again gets the first video with one charge, also when the hold leaves too few credits for a new job",
+      "when the account service stays down, the agent call fails, and the same call again (in any key order) gets the first video with one charge, also when the hold leaves too few credits for a new job",
       failing(first) &&
         afterFailure < PRICE &&
         succeeded(retried) &&
