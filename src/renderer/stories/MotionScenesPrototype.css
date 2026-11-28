@@ -1,0 +1,1082 @@
+/* Plush motion scenes prototype. Each rule is under `.ms-root` or a scene class. The felt colours of
+   the yarn come from the plush art, which has no token. */
+
+.ms-root {
+  position: relative;
+  min-height: 100vh;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+.ms-root .ms-controls {
+  position: fixed;
+  z-index: var(--openbot-layer-tooltip);
+  right: var(--openbot-space-4);
+  bottom: var(--openbot-space-4);
+  display: flex;
+  gap: var(--openbot-space-2);
+}
+
+/* The lilac plush: a gaze that follows a point, and closed eyes. */
+.ms-scene .ms-mascot {
+  position: relative;
+  display: inline-block;
+  transform-origin: 50% 100%;
+}
+
+.ms-scene .ms-mascot[data-gaze="follow"] .ui-plush-eyes {
+  animation: none;
+  translate: var(--ms-gaze-x) var(--ms-gaze-y);
+  transition: translate 140ms var(--openbot-ease-out);
+}
+
+.ms-scene .ms-mascot[data-eyes="closed"] .ui-plush-mascot .ui-plush-eye {
+  animation: none;
+  scale: 1 0.12;
+}
+
+/* 1. Startup felting ------------------------------------------------------ */
+
+.ms-startup {
+  overflow: hidden;
+  height: 100vh;
+}
+
+.ms-startup .ms-splash {
+  position: absolute;
+  z-index: var(--openbot-layer-dialog);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--openbot-bg-canvas);
+}
+
+.ms-splash .ms-splash-stage {
+  position: relative;
+  width: 240px;
+  height: 240px;
+}
+
+.ms-splash .ms-splash-video,
+.ms-splash .ms-splash-still,
+.ms-splash .ms-splash-body,
+.ms-splash .ms-splash-eye {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* The body stands on y = 381 of the 480 px frame. Each eye turns about its own centre. */
+.ms-splash .ms-splash-still {
+  transform-origin: 50% 79.4%;
+}
+
+.ms-splash .ms-splash-eye[data-side="left"] {
+  transform-origin: 40.9% 46.7%;
+}
+
+.ms-splash .ms-splash-eye[data-side="right"] {
+  transform-origin: 59.4% 46.7%;
+}
+
+/* The splash opens through a hole the shape of the plush, where the plush was. */
+.ms-startup .ms-splash[data-phase="reveal"] {
+  mask-image: linear-gradient(#000 0 0), url("./assets/motion-scenes/splash-body.webp");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size:
+    100% 100%,
+    240px 240px;
+  mask-composite: exclude;
+}
+
+.ms-splash[data-phase="reveal"] .ms-splash-stage {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ms-splash .ms-splash-still {
+    animation: ui-plush-breathe 3.2s ease-in-out 400ms infinite;
+  }
+
+  .ms-splash .ms-splash-eye {
+    animation: ui-plush-blink 4.6s ease-in-out 900ms infinite;
+  }
+
+  .ms-splash .ms-splash-still[data-face="happy"] {
+    animation: ms-happy-squash 320ms var(--openbot-ease-out) both;
+  }
+
+  .ms-splash .ms-splash-still[data-face="happy"] .ms-splash-eye {
+    animation: ui-plush-squint 200ms var(--openbot-ease-out) forwards;
+  }
+
+  .ms-startup .ms-splash[data-phase="reveal"] {
+    animation: ms-splash-reveal 620ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-startup .ms-splash[data-phase="reveal"] {
+    mask-image: none;
+    animation: ms-fade-out 200ms linear forwards;
+  }
+}
+
+@keyframes ms-happy-squash {
+  40% {
+    scale: 1.08 0.9;
+  }
+  75% {
+    scale: 0.97 1.04;
+  }
+}
+
+@keyframes ms-splash-reveal {
+  to {
+    mask-size:
+      100% 100%,
+      640vmax 640vmax;
+  }
+}
+
+@keyframes ms-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 2. Search: nothing found ------------------------------------------------ */
+
+.global-search-empty:has(.ms-search-scene) {
+  flex-direction: column;
+  min-height: 148px;
+  padding-block: var(--openbot-space-3);
+}
+
+.global-search-empty .ms-search-scene {
+  order: -1;
+  display: block;
+  height: 56px;
+}
+
+/* 3. Offline / reconnecting ----------------------------------------------- */
+
+.ms-offline .server-connection-notice:has(.ms-yarn) {
+  justify-content: flex-start;
+}
+
+.ms-offline .server-connection-notice:has(.ms-yarn) .server-connection-actions {
+  margin-left: auto;
+}
+
+.ms-offline .ms-yarn {
+  position: relative;
+  flex: 0 0 auto;
+  order: -1;
+  display: block;
+  width: 120px;
+  height: 44px;
+}
+
+.ms-yarn .ms-yarn-you,
+.ms-yarn .ms-yarn-server {
+  position: absolute;
+  bottom: 2px;
+  display: block;
+  width: 36px;
+  height: 36px;
+  transform-origin: 50% 100%;
+}
+
+.ms-yarn .ms-yarn-you {
+  left: 0;
+}
+
+.ms-yarn .ms-yarn-server {
+  right: 0;
+}
+
+.ms-yarn .ms-yarn-line {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ms-yarn .ms-yarn-strand,
+.ms-yarn .ms-yarn-ply {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.ms-yarn .ms-yarn-strand {
+  stroke: #b46aaa;
+  stroke-width: 3;
+}
+
+.ms-yarn .ms-yarn-ply {
+  stroke: #e2b6da;
+  stroke-dasharray: 1.5 2.5;
+  stroke-width: 1.1;
+}
+
+.ms-yarn .ms-yarn-ball {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  offset-path: path("M34 22 L86 22");
+  offset-rotate: 0deg;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ms-yarn .ms-yarn-strand,
+  .ms-yarn .ms-yarn-ply {
+    transition: d 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .ms-yarn[data-phase="online"] .ms-yarn-ball {
+    animation: ms-yarn-travel 820ms var(--openbot-ease-in-out) 260ms both;
+  }
+
+  .ms-yarn[data-phase="online"] .ms-yarn-you,
+  .ms-yarn[data-phase="online"] .ms-yarn-server {
+    animation: ms-hop 480ms var(--openbot-ease-out) 1.06s both;
+  }
+
+  .ms-yarn[data-phase="online"] .ms-yarn-server {
+    animation-delay: 1.14s;
+  }
+}
+
+@keyframes ms-yarn-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  12%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes ms-hop {
+  20% {
+    scale: 1.12 0.86;
+  }
+  55% {
+    translate: 0 -10px;
+    scale: 0.94 1.08;
+  }
+  80% {
+    translate: 0 0;
+    scale: 1.06 0.94;
+  }
+}
+
+/* 4. Crash / oops --------------------------------------------------------- */
+
+.ms-crash {
+  display: grid;
+  place-items: center;
+}
+
+.ms-crash .ms-crash-panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-8);
+  text-align: center;
+}
+
+.ms-crash .ms-crash-panel > p {
+  margin: 0;
+}
+
+.ms-crash .ms-crash-panel > .ui-button {
+  margin-top: var(--openbot-space-3);
+}
+
+.ms-crash .ms-crash-stage {
+  position: relative;
+  display: grid;
+  width: 300px;
+  height: 150px;
+  margin-bottom: var(--openbot-space-3);
+  place-items: end center;
+}
+
+/* The plush tips over its right bottom corner. */
+.ms-crash-stage .ms-crash-plush {
+  transform-origin: 82% 96%;
+}
+
+.ms-crash-stage .ms-crash-ball {
+  position: absolute;
+  bottom: 36px;
+  left: calc(50% - 13px);
+  width: 26px;
+  opacity: 0;
+}
+
+.ms-crash-stage[data-reduced="true"] .ms-crash-ball {
+  display: none;
+}
+
+/* 5. Files empty ---------------------------------------------------------- */
+
+.ms-files {
+  padding: var(--openbot-space-8);
+}
+
+.ms-files .ms-files-page {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.ms-files .ms-peek {
+  order: -1;
+  display: block;
+}
+
+.ms-peek .ms-peek-window {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  width: 96px;
+  height: 64px;
+  border-bottom: 2px solid var(--openbot-border-strong);
+}
+
+.ms-peek .ms-peek-plush {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  translate: 0 24%;
+  transition: translate 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ms-peek[data-awake="true"] .ms-peek-plush {
+  translate: 0 2%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ms-peek:not([data-awake]) .ms-peek-plush {
+    animation: ms-peek 5.2s ease-in-out 400ms infinite;
+  }
+
+  .ms-peek:not([data-awake]) .ui-plush-eyes {
+    animation: ms-peek-look 5.2s ease-in-out 400ms infinite;
+  }
+}
+
+@keyframes ms-peek {
+  0%,
+  86%,
+  100% {
+    translate: 0 104%;
+  }
+  12%,
+  72% {
+    translate: 0 24%;
+  }
+  16% {
+    translate: 0 20%;
+  }
+}
+
+@keyframes ms-peek-look {
+  0%,
+  22%,
+  66%,
+  100% {
+    translate: 0 0;
+  }
+  28%,
+  40% {
+    translate: -4px 0;
+  }
+  48%,
+  60% {
+    translate: 4px 0;
+  }
+}
+
+/* 6. No agents / connecting ----------------------------------------------- */
+
+.ms-sidebar {
+  display: flex;
+}
+
+.ms-root .ms-sidebar-frame {
+  width: 280px;
+  height: 100vh;
+}
+
+.ms-sidebar .empty-search:has(.ms-crew) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.ms-sidebar .ms-crew {
+  order: -1;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--openbot-space-1);
+}
+
+.ms-crew .ms-crew-member {
+  display: block;
+  width: 34px;
+  height: 34px;
+  transition: translate 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ms-crew .ms-crew-member[data-awake="true"] {
+  translate: 0 -6px;
+}
+
+/* 7. Marketplace no match ------------------------------------------------- */
+
+.ms-market .marketplace-empty:has(.ms-tumble) {
+  overflow: hidden;
+}
+
+.ms-market .ms-tumble {
+  order: -1;
+  display: block;
+  height: 72px;
+}
+
+/* 8. Typing balls ---------------------------------------------------------
+   Each look changes only the working badge of the sidebar. No look has a drop shadow: the shipped
+   badge has one, and it makes a halo on the dark sidebar. */
+
+.ms-typing-app:not([data-look="now"]) .agent-row-agent-status-working {
+  box-shadow: none;
+}
+
+.ms-typing-app:not([data-look="now"]) .agent-row-thinking-dots i {
+  border-radius: var(--openbot-radius-pill);
+  background: url("./assets/motion-scenes/ball-lilac.webp") center / contain no-repeat;
+  transform-origin: 50% 100%;
+  animation: none;
+}
+
+.ms-typing-app:not([data-look="now"]) .agent-row-thinking-dots i:nth-child(2) {
+  background-image: url("./assets/motion-scenes/ball-mint.webp");
+}
+
+.ms-typing-app:not([data-look="now"]) .agent-row-thinking-dots i:nth-child(3) {
+  background-image: url("./assets/motion-scenes/ball-pink.webp");
+}
+
+/* A. Pill: the shipped pill height, a little wider, with felt balls the size of the first felt look.
+   The width leaves about 2px at each end, so a ball does not touch the border when it lands. */
+.ms-typing-app[data-look="pill"] .agent-row-agent-status-working {
+  width: 30px;
+}
+
+.ms-typing-app[data-look="pill"] .agent-row-thinking-dots {
+  align-items: flex-end;
+  gap: 1px;
+  height: 7px;
+}
+
+.ms-typing-app[data-look="pill"] .agent-row-thinking-dots i {
+  width: 7px;
+  height: 7px;
+}
+
+/* B. On the avatar: no pill. Each ball has a ring of the sidebar colour, so it stands out from
+   the avatar under it. */
+.ms-typing-app[data-look="perch"] .agent-row-agent-status-working {
+  inset-inline-end: -6px;
+  bottom: -2px;
+  width: auto;
+  height: 16px;
+  border: 0;
+  background: none;
+}
+
+.ms-typing-app[data-look="perch"] .agent-row-thinking-dots {
+  align-items: flex-end;
+  gap: 0;
+  height: 16px;
+}
+
+.ms-typing-app[data-look="perch"] .agent-row-thinking-dots i {
+  width: 11px;
+  height: 11px;
+  margin-inline-start: -2px;
+  box-shadow: 0 0 0 1px var(--openbot-bg-sidebar);
+}
+
+/* C. Orbit: a round badge the size of the routine and wait badges. The balls roll around its centre. */
+.ms-typing-app[data-look="orbit"] .agent-row-agent-status-working {
+  width: 22px;
+  height: 22px;
+}
+
+.ms-typing-app[data-look="orbit"] .agent-row-thinking-dots {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.ms-typing-app[data-look="orbit"] .agent-row-thinking-dots i {
+  position: absolute;
+  inset-inline-start: 5px;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  transform: rotate(var(--ms-orbit-start, 0deg)) translateX(5px);
+  transform-origin: 50% 50%;
+}
+
+.ms-typing-app[data-look="orbit"] .agent-row-thinking-dots i:nth-child(2) {
+  --ms-orbit-start: 120deg;
+}
+
+.ms-typing-app[data-look="orbit"] .agent-row-thinking-dots i:nth-child(3) {
+  --ms-orbit-start: 240deg;
+}
+
+/* B. On the selected row, the ring has the colour of the row. */
+.ms-typing-app[data-look="perch"] .agent-row-active .agent-row-thinking-dots i {
+  box-shadow: 0 0 0 1px var(--openbot-bg-control);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ms-typing-app:is([data-look="pill"], [data-look="perch"]) .agent-row-thinking-dots i {
+    animation: ms-ball-hop 960ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  }
+
+  .ms-typing-app:is([data-look="pill"], [data-look="perch"]) .agent-row-thinking-dots i:nth-child(2) {
+    animation-delay: 130ms;
+  }
+
+  .ms-typing-app:is([data-look="pill"], [data-look="perch"]) .agent-row-thinking-dots i:nth-child(3) {
+    animation-delay: 260ms;
+  }
+
+  .ms-typing-app[data-look="pill"] .agent-row-thinking-dots i {
+    animation-name: ms-ball-hop-soft;
+  }
+
+  .ms-typing-app[data-look="orbit"] .agent-row-thinking-dots i {
+    animation: ms-ball-orbit 1400ms linear infinite;
+  }
+}
+
+@keyframes ms-ball-orbit {
+  from {
+    transform: rotate(var(--ms-orbit-start, 0deg)) translateX(5px) rotate(calc(0deg - var(--ms-orbit-start, 0deg)));
+  }
+  to {
+    transform: rotate(calc(var(--ms-orbit-start, 0deg) + 360deg)) translateX(5px)
+      rotate(calc(-360deg - var(--ms-orbit-start, 0deg)));
+  }
+}
+
+@keyframes ms-ball-hop {
+  0%,
+  62%,
+  100% {
+    translate: 0 0;
+    scale: 1 1;
+  }
+  8% {
+    scale: 1.22 0.78;
+  }
+  26% {
+    translate: 0 -4px;
+    scale: 0.88 1.12;
+  }
+  44% {
+    translate: 0 0;
+    scale: 1.18 0.82;
+  }
+  54% {
+    scale: 0.96 1.04;
+  }
+}
+
+/* A. A lower hop with less squash, so a 7px ball bounces softly and stays inside the pill. */
+@keyframes ms-ball-hop-soft {
+  0%,
+  62%,
+  100% {
+    translate: 0 0;
+    scale: 1 1;
+  }
+  8% {
+    scale: 1.1 0.9;
+  }
+  26% {
+    translate: 0 -2px;
+    scale: 0.94 1.06;
+  }
+  44% {
+    translate: 0 0;
+    scale: 1.08 0.92;
+  }
+  54% {
+    scale: 0.98 1.02;
+  }
+}
+
+/* 9. Felt counts -----------------------------------------------------------
+   Each look changes only the unread count, the failed routine mark and the "+N" member count of a
+   channel. The pills and balls are the shipped plush textures. The plush digits are CSS only (see
+   below). No look has a drop shadow. */
+
+.ms-counts {
+  --ms-ring-width: 2px;
+  --ms-ring-border: 2px;
+  --ms-felt-pill: url("./assets/motion-scenes/felt-pill-lilac.webp");
+  --ms-felt-x-ball: url("./assets/motion-scenes/felt-x-ball.webp");
+}
+
+.ms-counts:not([data-look="now"]) :is(.agent-row-agent-status-unread, .agent-row-agent-status-routine-failed) {
+  --ms-ring: var(--openbot-bg-sidebar);
+  --ms-felt-box: 16px;
+
+  /* All felt badges share one anchor and one height, so a one-digit count is the same round ball as
+     the failed mark, and a longer count grows to the left from the same right end. The badge keeps
+     the shipped place and 2px border ring, and is 4px larger than the shipped 16px: 20px, with 16px
+     of felt in the ring. The badge
+     fills its padding box with the felt colour, as the shipped badge fills it with black. That fill
+     snaps to the device pixels with the ring, so the ring is the same width on all four sides. The
+     felt texture is a separate box at a fractional offset, so it lands up to one device pixel off; it
+     stays 0.25px inside the fill and never covers the ring. */
+  /* The shipped badge sits 3px past the avatar, plus its 2px ring. A wider ring grows outwards, so
+     the felt stays in place and keeps its size. Chrome rounds a border width down to whole pixels,
+     so the border takes the whole pixels of the ring and a ring shadow adds the half pixel. */
+  inset-inline-end: calc(-3px - var(--ms-ring-border));
+  bottom: calc(-1px - var(--ms-ring-border));
+  min-width: calc(var(--ms-felt-box) + 2 * var(--ms-ring-border));
+  height: calc(var(--ms-felt-box) + 2 * var(--ms-ring-border));
+  isolation: isolate;
+  border-width: var(--ms-ring-border);
+  border-color: var(--ms-ring);
+  background: var(--ms-felt-under) padding-box;
+  box-shadow: 0 0 0 calc(var(--ms-ring-width) - var(--ms-ring-border)) var(--ms-ring);
+  font-size: var(--openbot-text-lg);
+  line-height: 16px;
+}
+
+.ms-counts:not([data-look="now"])
+  .agent-row-active
+  :is(.agent-row-agent-status-unread, .agent-row-agent-status-routine-failed) {
+  --ms-ring: var(--openbot-bg-control);
+}
+
+/* The "+N" member count of a channel cluster gets the same felt pill, digits and ring. It keeps its
+   shipped place, size and outline: the outline is the ring of the faces, 2px in the sidebar colour,
+   the same as the border ring of the unread count. The text is a bare text node, so the count takes
+   the digit styles itself. */
+.ms-counts:is([data-look="puffy"], [data-look="yarn"]) .channel-avatar-count {
+  --ms-felt-box: calc(var(--channel-avatar-size) * 0.46);
+
+  isolation: isolate;
+  /* The count sits 1.5px lower than the shipped cell centre, so its ring meets the faces above it at
+     the same gap as the ring between the faces. */
+  translate: 0 1.5px;
+  padding-inline: 4px;
+  background: var(--ms-felt-under);
+  font-weight: 800;
+  letter-spacing: 0;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 0.7px var(--ms-digit-stroke);
+}
+
+/* The faces of a channel cluster get the ring of the "+N" count. The shipped ring copies the soft
+   fur edge, so it shows as a faint, uneven gap. The prototype filter (`#ms-plush-ring`) is on the
+   avatar box, so its units are CSS pixels at every avatar size. It cuts each face to a smooth
+   outline of its fur, then paints the face on that outline grown by the outline width in the
+   sidebar colour: a solid, smooth ring, as the outline of the count. */
+.ms-counts:is([data-look="puffy"], [data-look="yarn"])
+  .channel-avatar-cluster
+  .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: url("#ms-plush-ring");
+}
+
+.ms-counts:is([data-look="puffy"], [data-look="yarn"]) .channel-avatar-cluster .bloub-avatar-svg:has(image) {
+  filter: none;
+}
+
+/* The ring width options. The "+N" count and the faces take the same width as the badges. */
+.ms-counts[data-ring="2.5"] {
+  --ms-ring-width: 2.5px;
+}
+
+.ms-counts[data-ring="3"] {
+  --ms-ring-width: 3px;
+  --ms-ring-border: 3px;
+}
+
+.ms-counts[data-ring="3.5"] {
+  --ms-ring-width: 3.5px;
+  --ms-ring-border: 3px;
+}
+
+/* The outline of the count takes the whole pixels of the ring, and a ring shadow adds the half pixel,
+   as on the badges. */
+.ms-counts:is([data-look="puffy"], [data-look="yarn"]) .channel-avatar-cluster {
+  --agent-avatar-outline-width: var(--ms-ring-border);
+}
+
+.ms-counts:is([data-look="puffy"], [data-look="yarn"]) .channel-avatar-count {
+  box-shadow: 0 0 0 var(--ms-ring-width) var(--agent-avatar-outline, transparent);
+}
+
+.ms-counts[data-ring="2.5"] .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: url("#ms-plush-ring-2-5");
+}
+
+.ms-counts[data-ring="3"] .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: url("#ms-plush-ring-3");
+}
+
+.ms-counts[data-ring="3.5"] .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
+  filter: url("#ms-plush-ring-3-5");
+}
+
+/* The felt pill: a 9-slice of the round lilac ball, so its ends stay round at any width. The art is
+   the left half of the shipped ball and its mirror image, so both ends are the same. The felt is
+   opaque from 0.19 of the slice on all four sides. It goes out by that much past the felt box, and
+   the clip cuts it 0.25px inside the box, on the felt fill. The slice is half of the felt height, so
+   the ends stay round: 2 × slice = box + 2 × 0.19 × slice, thus slice = box / 1.62. */
+.ms-counts:is([data-look="puffy"], [data-look="yarn"])
+:is(.agent-row-agent-status-unread, .channel-avatar-count)::before {
+  --ms-slice: calc(var(--ms-felt-box) / 1.62);
+  --ms-edge: calc(var(--ms-slice) * 0.19);
+
+  position: absolute;
+  z-index: -1;
+  inset: calc(-1 * var(--ms-edge));
+  border: var(--ms-slice) solid transparent;
+  border-image: var(--ms-felt-pill) 49% fill / var(--ms-slice) stretch;
+  clip-path: inset(calc(var(--ms-edge) + 0.25px) round calc(var(--ms-felt-box) / 2 - 0.25px));
+  content: "";
+}
+
+/* The failed mark: a raspberry felt ball with two cream felt pills crossed on it, generated in
+   Higgsfield. All looks use the same ball. The ball is opaque to a radius of 58 of the 128px art
+   (0.45), so a 17.5px ball is opaque past the clip 0.25px inside the felt box, on a raspberry fill,
+   as on the pill. The mark sits 2px further in than the count, closer to the face. */
+.ms-counts:not([data-look="now"]) .agent-row-agent-status-routine-failed {
+  --ms-felt-under: linear-gradient(rgb(245 32 112), rgb(180 6 65));
+
+  inset-inline-end: calc(-1px - var(--ms-ring-border));
+  bottom: calc(1px - var(--ms-ring-border));
+  width: calc(var(--ms-felt-box) + 2 * var(--ms-ring-border));
+  border-radius: 50%;
+}
+
+.ms-counts:not([data-look="now"]) .agent-row-agent-status-routine-failed::before {
+  position: absolute;
+  z-index: -1;
+  inset: -0.75px;
+  background: var(--ms-felt-x-ball) center / 100% 100% no-repeat;
+  clip-path: circle(calc(50% - 1px));
+  content: "";
+}
+
+.ms-counts:not([data-look="now"]) .agent-row-agent-status-routine-failed svg {
+  display: none;
+}
+
+.ms-counts:not([data-look="now"]) .agent-row-agent-status-unread span {
+  position: relative;
+  font-weight: 800;
+}
+
+/* The letter spacing also adds space after the last digit. The negative end margin removes it, so
+   the digits are on the centre of the pill. The plush look is CSS only, so Chrome and Firefox draw
+   the same digits. An SVG filter is not safe at this size: Firefox rounds a 0.35px dilate up to 1px
+   and the digits fuse. The stroke makes the digits fat. */
+.ms-counts:is([data-look="puffy"], [data-look="yarn"]) .agent-row-agent-status-unread span {
+  margin-inline-end: -0.06em;
+  letter-spacing: 0.06em;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 0.7px var(--ms-digit-stroke);
+}
+
+/* The felt fills are the colours of the felt art at its edge: light at the top, dark at the bottom. */
+.ms-counts[data-look="puffy"] :is(.agent-row-agent-status-unread, .channel-avatar-count) {
+  --ms-felt-under: linear-gradient(rgb(220 184 240), rgb(150 106 174));
+}
+
+.ms-counts[data-look="yarn"] :is(.agent-row-agent-status-unread, .channel-avatar-count) {
+  --ms-felt-under: linear-gradient(rgb(112 80 131), rgb(74 40 92));
+}
+
+/* D. Puffy felt: fat plum digits on the lilac felt pill. Two hairline drop shadows light the top and
+   shade the bottom of the digits like a pillow. */
+.ms-counts[data-look="puffy"] :is(.agent-row-agent-status-unread span, .channel-avatar-count) {
+  --ms-digit-stroke: #3a1d5e;
+  color: #3a1d5e;
+}
+
+.ms-counts[data-look="puffy"] .agent-row-agent-status-unread span {
+  filter: drop-shadow(0 -0.4px 0 rgb(255 255 255 / 0.45)) drop-shadow(0 0.6px 0 rgb(30 10 50 / 0.35));
+}
+
+/* E. Yarn: solid cream digits on a deep plum felt pill. The unread count and the "+N" are the same:
+   the "+N" paints its own background under the pill, so a twist cannot be clipped to its text. */
+.ms-counts[data-look="yarn"] :is(.agent-row-agent-status-unread span, .channel-avatar-count) {
+  --ms-digit-stroke: #efe4d2;
+  color: #f6efe2;
+}
+
+.ms-counts[data-look="yarn"] :is(.agent-row-agent-status-unread, .channel-avatar-count)::before {
+  filter: brightness(0.52) saturate(1.35) contrast(1.1);
+}
+
+/* A felt badge lands soft: it squashes, then settles. */
+@media (prefers-reduced-motion: no-preference) {
+  .ms-counts:not([data-look="now"]) .agent-row-agent-status-entering {
+    animation: ms-felt-plop 520ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+  }
+}
+
+@keyframes ms-felt-plop {
+  0% {
+    opacity: 0;
+    scale: 0.4;
+  }
+  45% {
+    opacity: 1;
+    scale: 1.14 0.86;
+  }
+  70% {
+    scale: 0.94 1.06;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+/* The close-up: every look on the sidebar colour. */
+.ms-counts-sheet {
+  display: grid;
+  min-height: 100vh;
+  align-content: center;
+  justify-items: center;
+  gap: 24px;
+  background: var(--openbot-bg-sidebar);
+}
+
+.ms-counts-sheet-grid {
+  --agent-row-avatar-size: 46px;
+  --agent-avatar-outline: var(--openbot-bg-sidebar);
+
+  display: grid;
+  gap: 20px;
+}
+
+.ms-counts-sheet-row {
+  display: grid;
+  grid-template-columns: 120px repeat(8, 60px);
+  align-items: center;
+  gap: 28px;
+}
+
+/* 9T. Felt count transitions: the buttons change every look at once. */
+.ms-counts-sheet-row.ms-counts-transition-row {
+  grid-template-columns: 120px repeat(2, 60px);
+}
+
+.ms-counts-transition-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* The badge squashes on the avatar, so it scales from its bottom edge. */
+.ms-counts .agent-row-agent-status:is(.ms-badge-in, .ms-badge-bump, .ms-badge-bump-b, .ms-badge-out) {
+  transform-origin: 50% 100%;
+}
+
+/* The old count lies on top of the new one while it rolls away. */
+.ms-counts .agent-row-agent-status-unread span:is(.ms-roll-out, .ms-roll-out-b, .ms-roll-gone) {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  margin: 0;
+  place-items: center;
+}
+
+.ms-counts .agent-row-agent-status-unread span.ms-roll-gone {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ms-counts .ms-badge-in {
+    animation: ms-felt-plop 520ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+  }
+
+  .ms-counts .agent-row-agent-status-routine-failed.ms-badge-in {
+    animation: ms-felt-x-in 680ms ease-out both;
+  }
+
+  .ms-counts .ms-badge-bump {
+    animation: ms-felt-bump 360ms ease-out;
+  }
+
+  .ms-counts .ms-badge-bump-b {
+    animation: ms-felt-bump-b 360ms ease-out;
+  }
+
+  .ms-counts .ms-badge-out {
+    animation: ms-felt-out 240ms cubic-bezier(0.5, 0, 0.75, 0) both;
+  }
+
+  .ms-counts .agent-row-agent-status-unread span.ms-roll-in {
+    animation: ms-roll-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .ms-counts .agent-row-agent-status-unread span.ms-roll-in-b {
+    animation: ms-roll-in-b 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .ms-counts .agent-row-agent-status-unread span.ms-roll-out {
+    animation: ms-roll-out 200ms ease-in both;
+  }
+
+  .ms-counts .agent-row-agent-status-unread span.ms-roll-out-b {
+    animation: ms-roll-out-b 200ms ease-in both;
+  }
+}
+
+/* Reduced motion: a short fade only. The animations stay, so their end events still fire. */
+@media (prefers-reduced-motion: reduce) {
+  .ms-counts :is(.ms-badge-in, .ms-badge-bump, .ms-badge-bump-b) {
+    animation: ms-fade-in 120ms linear both;
+  }
+
+  .ms-counts .ms-badge-out {
+    animation: ms-fade-out 120ms linear both;
+  }
+
+  .ms-counts .agent-row-agent-status-unread span:is(.ms-roll-out, .ms-roll-out-b) {
+    animation: ms-fade-out 1ms linear both;
+  }
+}
+
+/* The X lands like the pill, then shakes "no" once. */
+@keyframes ms-felt-x-in {
+  0% {
+    opacity: 0;
+    scale: 0.3;
+  }
+  35% {
+    opacity: 1;
+    scale: 1.14 0.86;
+  }
+  55% {
+    translate: 0;
+    scale: 0.95 1.05;
+  }
+  68% {
+    translate: -1.4px 0;
+    scale: 1;
+  }
+  80% {
+    translate: 1.2px 0;
+  }
+  90% {
+    translate: -0.6px 0;
+  }
+  100% {
+    translate: 0;
+    scale: 1;
+  }
+}
+
+@keyframes ms-felt-bump {
+  35% {
+    scale: 1.12 0.88;
+  }
+  65% {
+    scale: 0.97 1.04;
+  }
+}
+
+@keyframes ms-felt-bump-b {
+  35% {
+    scale: 1.12 0.88;
+  }
+  65% {
+    scale: 0.97 1.04;
+  }
+}
+
+@keyframes ms-felt-out {
+  30% {
+    scale: 1.1 0.9;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.2;
+  }
+}
+
+@keyframes ms-roll-in {
+  from {
+    opacity: 0;
+    translate: 0 65%;
+  }
+}
+
+@keyframes ms-roll-in-b {
+  from {
+    opacity: 0;
+    translate: 0 65%;
+  }
+}
+
+@keyframes ms-roll-out {
+  to {
+    opacity: 0;
+    translate: 0 -65%;
+  }
+}
+
+@keyframes ms-roll-out-b {
+  to {
+    opacity: 0;
+    translate: 0 -65%;
+  }
+}
+
+@keyframes ms-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The filter definitions take no space. */
+.ms-plush-ring-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}

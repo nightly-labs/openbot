@@ -1,0 +1,664 @@
+/* Wild plush motion scenes prototype, round 2. Each rule is under `.ms-root` or a scene class. The
+   felt colours of the hat and the sleeping bag come from the plush art, which has no token. */
+
+/* Shared: a part of the physics world, and a loose eye. ------------------ */
+
+.ms-scene .wild-part {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  max-width: none;
+  visibility: hidden;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+  pointer-events: auto;
+  will-change: transform;
+  -webkit-user-drag: none;
+}
+
+.ms-scene .wild-part:active {
+  cursor: grabbing;
+}
+
+.ms-scene .wild-part-fluff {
+  pointer-events: none;
+}
+
+/* The eye layer is the full 512 px body frame. The left eye is at 120-246 x 161-347 of it. */
+.ms-scene .wild-eye {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-repeat: no-repeat;
+  background-size: 290% auto;
+}
+
+.ms-scene .wild-eye[data-side="left"] {
+  background-position: 29.6% 37.4%;
+}
+
+.ms-scene .wild-eye[data-side="right"] {
+  background-position: 70.6% 37.4%;
+}
+
+/* Crash W1. Exploding plush ---------------------------------------------- */
+
+.ms-root.wild-crash {
+  display: grid;
+  overflow: hidden;
+  height: 100vh;
+  place-items: center;
+}
+
+.wild-crash .wild-crash-panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-8);
+  text-align: center;
+}
+
+.wild-crash .wild-crash-panel > p {
+  margin: 0;
+}
+
+/* Above the flying parts, so that a part on the button does not stop the click. */
+.wild-crash .wild-crash-panel > .ui-button {
+  position: relative;
+  z-index: 3;
+  margin-top: var(--openbot-space-3);
+}
+
+.wild-crash .wild-world {
+  position: fixed;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wild-crash .wild-crash-slot {
+  display: grid;
+  width: 160px;
+  height: 140px;
+  margin-bottom: var(--openbot-space-3);
+  place-items: end center;
+}
+
+.wild-crash-slot .wild-crash-plush {
+  transform-origin: 50% 60%;
+}
+
+.wild-crash-slot:is([data-phase="exploded"], [data-phase="gathering"]) .wild-crash-plush {
+  opacity: 0;
+}
+
+/* Reduced motion: no burst. The plush lies on its side, eyes shut. */
+.wild-crash-slot[data-reduced="true"] .wild-crash-plush {
+  opacity: 1;
+  rotate: 90deg;
+  transform-origin: 82% 96%;
+}
+
+/* Startup W2. Popcorn crew ------------------------------------------------ */
+
+.ms-root.wild-popcorn {
+  overflow: hidden;
+  height: 100vh;
+}
+
+.wild-popcorn .wild-popcorn-splash {
+  position: absolute;
+  z-index: var(--openbot-layer-dialog);
+  inset: 0;
+  display: grid;
+  background: var(--openbot-bg-canvas);
+  place-items: center;
+}
+
+.wild-popcorn-splash[data-phase="exit"] {
+  animation: wild-fade-out 520ms var(--openbot-ease-out) 200ms both;
+}
+
+.wild-popcorn-splash .wild-popcorn-stage {
+  position: relative;
+  height: 320px;
+}
+
+.wild-popcorn-stage .wild-popcorn-member > * {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+}
+
+.wild-popcorn-stage .wild-popcorn-lead {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  display: block;
+  pointer-events: none;
+  transition:
+    scale 640ms var(--openbot-ease-out),
+    opacity 640ms var(--openbot-ease-out);
+}
+
+.wild-popcorn-stage .wild-popcorn-lead[data-leaving="true"] {
+  opacity: 0;
+  scale: 3.2;
+}
+
+@keyframes wild-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Search W1. Ball-pit dive ------------------------------------------------ */
+
+.global-search-empty:has(.wild-pit) {
+  flex-direction: column;
+  padding-block: var(--openbot-space-3);
+}
+
+.global-search-empty .wild-pit {
+  position: relative;
+  order: -1;
+  display: block;
+  clip-path: inset(-400px -400px 0 -400px);
+}
+
+.wild-pit .wild-pit-diver {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* The two walls of the pit, and the floor under the pit and beside it, as felt lines. */
+.wild-pit .wild-pit-rim {
+  position: absolute;
+  bottom: 0;
+  border: 3px solid var(--openbot-border-strong);
+  border-block: 0;
+  border-radius: var(--openbot-radius-sm) var(--openbot-radius-sm) 0 0;
+  pointer-events: none;
+}
+
+.global-search-empty .wild-pit::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-bottom: 3px solid var(--openbot-border-strong);
+  content: "";
+}
+
+/* No agents W1. Magic hat ------------------------------------------------- */
+
+.ms-sidebar .empty-search:has(.wild-hat-scene) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.empty-search .wild-hat-scene {
+  position: relative;
+  display: block;
+  width: 196px;
+  height: 150px;
+}
+
+.wild-hat-scene .wild-hat-lead {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: block;
+}
+
+.wild-hat-scene .wild-hat {
+  position: absolute;
+  z-index: 5;
+  bottom: -4px;
+  left: 50px;
+  width: 84px;
+  height: 74px;
+  overflow: visible;
+  transform-origin: 50% 100%;
+}
+
+.wild-hat .wild-hat-crown {
+  fill: #2c2a33;
+}
+
+.wild-hat .wild-hat-band {
+  fill: #b9a3e3;
+}
+
+.wild-hat .wild-hat-brim {
+  fill: #3a3742;
+}
+
+.wild-hat-scene .wild-hat-member {
+  position: absolute;
+  bottom: 14px;
+  left: 70px;
+  display: block;
+  opacity: 0;
+  transform-origin: 50% 60%;
+}
+
+.wild-hat-scene[data-reduced="true"] .wild-hat-member {
+  opacity: 1;
+}
+
+.wild-hat-scene[data-reduced="true"] .wild-hat-member:nth-of-type(2) {
+  translate: 76px 0;
+}
+
+.wild-hat-scene[data-reduced="true"] .wild-hat-member:nth-of-type(3) {
+  translate: 76px -24px;
+}
+
+.wild-hat-scene[data-reduced="true"] .wild-hat-member:nth-of-type(4) {
+  translate: 76px -48px;
+}
+
+/* Task done W1. Felt fireworks -------------------------------------------- */
+
+.ms-root.wild-celebrate {
+  overflow: hidden;
+  height: 100vh;
+}
+
+.wild-celebrate .wild-fireworks {
+  position: fixed;
+  z-index: var(--openbot-layer-toast);
+  inset: 0;
+  pointer-events: none;
+}
+
+.wild-fireworks .wild-fireworks-sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.wild-fireworks .wild-conga {
+  position: absolute;
+  right: 0;
+  bottom: 18px;
+  left: 0;
+  height: 64px;
+}
+
+.wild-conga .wild-conga-member {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+.wild-fireworks[data-reduced="true"] .wild-conga {
+  display: flex;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+}
+
+.wild-fireworks[data-reduced="true"] .wild-conga-member {
+  position: static;
+}
+
+/* Waiting W1. Snoring plush ------------------------------------------------ */
+
+.ms-root.wild-wait {
+  display: grid;
+  height: 100vh;
+  padding: var(--openbot-space-6);
+  align-items: end;
+  justify-items: center;
+}
+
+.wild-wait .wild-wait-column {
+  display: grid;
+  width: min(100%, 720px);
+  gap: var(--openbot-space-2);
+}
+
+.wild-wait .wild-sleep {
+  position: relative;
+  width: 240px;
+  height: 190px;
+  justify-self: center;
+}
+
+.wild-sleep .wild-sleeper {
+  position: absolute;
+  bottom: 30px;
+  left: 81px;
+  display: block;
+  cursor: pointer;
+  transform-origin: 50% 80%;
+}
+
+.wild-sleep .wild-bag {
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  left: 20px;
+  display: block;
+  width: 200px;
+  height: 80px;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+
+.wild-bag svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.wild-bag .wild-bag-body {
+  fill: #9ed8c4;
+}
+
+.wild-bag .wild-bag-fold {
+  fill: #c3ead9;
+}
+
+.wild-bag .wild-bag-zip {
+  fill: none;
+  stroke: #6fb39c;
+  stroke-dasharray: 2 3;
+  stroke-linecap: round;
+  stroke-width: 2.5;
+}
+
+.wild-sleep .wild-snore {
+  position: absolute;
+  z-index: 2;
+  bottom: 96px;
+  left: 112px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+  pointer-events: none;
+  place-items: center;
+}
+
+.wild-snore[data-big="true"] {
+  width: 34px;
+  height: 34px;
+}
+
+.wild-snore img,
+.wild-snore .wild-snore-letter {
+  grid-area: 1 / 1;
+}
+
+.wild-snore img {
+  width: 100%;
+  height: 100%;
+}
+
+.wild-snore .wild-snore-letter {
+  color: var(--openbot-paper-text);
+  font-family: var(--openbot-font-sans);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 1;
+}
+
+.wild-snore[data-big="true"] .wild-snore-letter {
+  font-size: var(--openbot-text-lg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wild-sleep .wild-sleeper,
+  .wild-sleep .wild-bag {
+    animation: wild-breathe 2600ms var(--openbot-ease-in-out) infinite;
+  }
+
+  .wild-sleep .wild-snore {
+    animation: wild-snore-float 2800ms var(--openbot-ease-out) both;
+  }
+}
+
+@keyframes wild-breathe {
+  0%,
+  100% {
+    scale: 1 1;
+  }
+
+  45% {
+    scale: 1.03 1.07;
+  }
+}
+
+@keyframes wild-snore-float {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  40% {
+    transform: translate(calc(var(--wild-drift) * 0.4 + 18px), -40px) scale(0.8) rotate(-12deg);
+  }
+
+  75% {
+    opacity: 1;
+    transform: translate(calc(var(--wild-drift) + 34px), -86px) scale(1.1) rotate(10deg);
+  }
+
+  88% {
+    opacity: 1;
+    transform: translate(calc(var(--wild-drift) + 40px), -100px) scale(1.4) rotate(4deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--wild-drift) + 42px), -104px) scale(1.9);
+  }
+}
+
+/* Crash W2. Dizzy plush --------------------------------------------------- */
+
+.wild-crash .wild-dizzy {
+  position: relative;
+  margin-bottom: var(--openbot-space-3);
+}
+
+.wild-dizzy .wild-dizzy-plush {
+  position: absolute;
+  z-index: 2;
+  bottom: 0;
+  left: 84px;
+  transform-origin: 92% 96%;
+}
+
+.wild-dizzy[data-phase="down"] .wild-dizzy-plush {
+  rotate: 90deg;
+  translate: -56px 0;
+}
+
+.wild-dizzy .wild-dizzy-star {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Search W3. Tumbleweed ---------------------------------------------------- */
+
+.global-search-empty:has(.wild-prairie) {
+  flex-direction: column;
+  padding-block: var(--openbot-space-3);
+}
+
+.global-search-empty .wild-prairie {
+  position: relative;
+  order: -1;
+  display: block;
+  border-bottom: 1px dashed var(--openbot-border-strong);
+}
+
+.wild-prairie .wild-prairie-watcher {
+  position: absolute;
+  bottom: 0;
+  left: 24px;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+.wild-prairie .wild-weed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.wild-weed svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The felt browns of a dry tumbleweed; no token has them. */
+.wild-weed .wild-weed-strand,
+.wild-weed .wild-weed-ply {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.wild-weed .wild-weed-strand {
+  stroke: #a8814f;
+  stroke-width: 3;
+}
+
+.wild-weed .wild-weed-ply {
+  stroke: #d8b98a;
+  stroke-dasharray: 2 3;
+  stroke-width: 2;
+}
+
+/* Offline W1. Space tether ------------------------------------------------- */
+
+.ms-root.wild-offline {
+  overflow: hidden;
+  height: 100vh;
+}
+
+.wild-offline .server-connection-notice:has(.wild-tether) {
+  position: relative;
+  z-index: 1;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+.wild-offline .server-connection-notice:has(.wild-tether) .server-connection-actions {
+  margin-left: auto;
+}
+
+.wild-offline .wild-tether {
+  position: relative;
+  flex: 0 0 auto;
+  order: -1;
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.wild-tether .wild-tether-pin {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wild-tether .wild-tether-origin {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+}
+
+.wild-tether .wild-tether-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.wild-tether .wild-tether-strand,
+.wild-tether .wild-tether-ply {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.wild-tether .wild-tether-strand {
+  stroke: #b46aaa;
+  stroke-width: 3;
+}
+
+.wild-tether .wild-tether-ply {
+  stroke: #e2b6da;
+  stroke-dasharray: 1.5 2.5;
+  stroke-width: 1.1;
+}
+
+.wild-tether .wild-tether-floater {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  touch-action: none;
+  cursor: grab;
+  place-items: center;
+  will-change: transform;
+}
+
+.wild-tether .wild-tether-floater:active {
+  cursor: grabbing;
+}
+
+.wild-tether .wild-tether-floater > * {
+  grid-area: 1 / 1;
+}
+
+/* The bubble helmet: a thin border and one highlight, no shadow. */
+.wild-tether-floater .wild-helmet {
+  width: 64px;
+  height: 64px;
+  border: 1.5px solid color-mix(in srgb, var(--openbot-text-primary) 38%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 26%,
+    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 0 8%,
+    transparent 10%
+  );
+  pointer-events: none;
+}
