@@ -448,7 +448,11 @@ class WhatsAppAdapter implements MessagingAdapter {
         const oldest = this.#sentAt.keys().next().value;
         if (oldest !== undefined) this.#sentAt.delete(oldest);
       }
-      this.#handle.store.putPost(id, { chatJid: target.platformChannelId, threadKey: this.#threadKey(target, id) });
+      this.#handle.store.putPost(id, {
+        chatJid: target.platformChannelId,
+        threadKey: this.#threadKey(target, id),
+        own: true,
+      });
       this.#handle.chats.rememberKey(id, { fromMe: true, participant: null, text: "" });
       return id;
     });
@@ -576,7 +580,12 @@ export function whatsAppDriver(options: WhatsAppDriverOptions): MessagingDriver 
             session: handle.session,
           }),
         );
-      return new WhatsAppTransport({ runtime, handle, identity: me, workspaceId: identity.workspaceId });
+      return new WhatsAppTransport({
+        runtime,
+        handle,
+        identity: () => ({ ...me, lid: whatsAppIdentity(handle)?.lid ?? me.lid }),
+        workspaceId: identity.workspaceId,
+      });
     },
   };
 }

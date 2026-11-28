@@ -38,6 +38,7 @@ export interface InboxEntry {
 export interface PostRecord {
   chatJid: string;
   threadKey: string;
+  own?: true;
 }
 
 export interface WhatsAppAuthStoreOptions {
@@ -331,6 +332,6 @@ function isBusy(cause: unknown): boolean {
 function parsePostRecord(text: string): PostRecord | undefined {
   const value = JSON.parse(text);
   return typeof value?.chatJid === "string" && typeof value.threadKey === "string"
-    ? { chatJid: value.chatJid, threadKey: value.threadKey }
+    ? { chatJid: value.chatJid, threadKey: value.threadKey, ...(value.own === true ? { own: true } : {}) }
     : undefined;
 }

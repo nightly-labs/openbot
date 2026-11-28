@@ -45,14 +45,14 @@ interface Pending {
 export interface WhatsAppTransportOptions {
   runtime: WhatsAppRuntime;
   handle: WhatsAppConnectionHandle;
-  identity: WhatsAppIdentity;
+  identity: () => WhatsAppIdentity;
   workspaceId: string;
 }
 
 export class WhatsAppTransport implements MessagingTransport {
   readonly #runtime: WhatsAppRuntime;
   readonly #handle: WhatsAppConnectionHandle;
-  readonly #identity: WhatsAppIdentity;
+  readonly #identity: () => WhatsAppIdentity;
   readonly #workspaceId: string;
   readonly #seen = new Set<string>();
   readonly #pending = new Map<string, Pending>();
@@ -135,7 +135,7 @@ export class WhatsAppTransport implements MessagingTransport {
     let event: WhatsAppEvent | null;
     try {
       event = await whatsAppInbound(message, {
-        me: this.#identity,
+        me: this.#identity(),
         openedAt: session.openedAt,
         now: Date.now(),
         rules: this.#runtime.policy.rules(this.#workspaceId),
@@ -164,7 +164,7 @@ export class WhatsAppTransport implements MessagingTransport {
       this.#sink.action(event.action);
       return;
     }
-    if (live && event.chatJid === userJid(this.#identity.number)) {
+    if (live && event.chatJid === userJid(this.#identity().number)) {
       const limit = this.#selfChatLimit.check(sentAt(message) || Date.now(), event.message.text);
       if (limit === "pause") {
         logger.warn("The owner's own WhatsApp chat got too many requests; it gets no answers for a while.");
