@@ -52,7 +52,7 @@ import {
   type WebhookDeliveryStatus,
 } from "./protocol";
 import { runTelegramCall, type SignalTelegram, type TelegramAnswer, telegramFailure } from "./telegram";
-import { RemoteTokenError, type RemoteTokenUnavailableError, type TelegramChatLink } from "./tokens";
+import { RemoteTokenError, RemoteTokenUnavailableError, type TelegramChatLink } from "./tokens";
 
 interface SlackRoute {
   teams: SlackRouteTeam[];
@@ -151,10 +151,32 @@ interface ActiveConnection {
 export const WEBHOOK_ANSWER_STATUSES = [200, 202, 400, 401, 404, 413, 415, 429, 503] as const;
 export type WebhookAnswerStatus = (typeof WEBHOOK_ANSWER_STATUSES)[number];
 const SLOW_WEBHOOK_WAIT_MILLISECONDS = 5_000;
+export const AUTHENTICATION_FAILURE_REASONS = [
+  "expired",
+  "inactive",
+  "invalid",
+  "role",
+  "route",
+  "revoked",
+  "replayed",
+] as const;
+type AuthenticationFailureReason = (typeof AUTHENTICATION_FAILURE_REASONS)[number];
+type AuthenticationStep = "ticket" | "role" | "route" | "revoked" | "replayed";
+
+function authenticationFailureReason(
+  step: AuthenticationStep,
+  failure: unknown,
+  initialTicketReason: AuthenticationFailureReason | undefined,
+): AuthenticationFailureReason {
+  if (step !== "ticket") return step;
+  if (failure instanceof RemoteTokenUnavailableError) return "revoked";
+  return (failure instanceof RemoteTokenError ? failure.reason : undefined) ?? initialTicketReason ?? "invalid";
+}
 
 export interface SignalMetrics {
   acceptedConnections: number;
   authenticationFailures: number;
+  authenticationFailureReasons: Record<AuthenticationFailureReason, number>;
   authenticationUnavailable: number;
   protocolFailures: number;
   relayedMessages: number;
@@ -391,6 +413,15 @@ export class SignalService {
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
     authenticationFailures: 0,
+    authenticationFailureReasons: {
+      expired: 0,
+      inactive: 0,
+      invalid: 0,
+      role: 0,
+      route: 0,
+      revoked: 0,
+      replayed: 0,
+    },
     authenticationUnavailable: 0,
     protocolFailures: 0,
     relayedMessages: 0,
@@ -1393,6 +1424,7 @@ export class SignalService {
     this.#pruneReplayCache();
     return {
       ...this.#metrics,
+      authenticationFailureReasons: { ...this.#metrics.authenticationFailureReasons },
       webhookAnswers: { ...this.#metrics.webhookAnswers },
       activeSockets: this.#sockets.size,
       activePeerConnections: this.#connections.size,
@@ -1408,11 +1440,13 @@ export class SignalService {
         }
         const tokens = yield* SignalTokens;
         let usedInitialTicket = true;
+        let step: AuthenticationStep = "ticket";
+        let initialTicketReason: AuthenticationFailureReason | undefined;
         const authentication = yield* Effect.gen({ self: this }, function* () {
           const initial = yield* Effect.gen({ self: this }, function* () {
             const claims = yield* tokens.verifyTicket(message.token);
             if (this.#issuedBeforeStart(claims.iat) && !(yield* tokens.validateClaims(claims))) {
-              return yield* new RemoteTokenError({ message: "The remote session is not active." });
+              return yield* new RemoteTokenError({ message: "The remote session is not active.", reason: "inactive" });
             }
             return claims;
           }).pipe(Effect.result);
@@ -1420,9 +1454,11 @@ export class SignalService {
           if (Result.isFailure(initial)) {
             if (initial.failure._tag === "RemoteTokenUnavailableError") return yield* initial.failure;
             usedInitialTicket = false;
+            initialTicketReason = initial.failure.reason;
             claims = yield* tokens.verifyResumeToken(message.token);
           } else claims = initial.success;
           if (!claims.signal && !this.#isEntry()) return yield* new NotEntryError();
+          step = "role";
           if (message.peer !== "client" && claims.role !== "host")
             return yield* new RemoteTokenError({ message: "Host role required." });
           if (message.peer === "client" && claims.role === "host")
@@ -1432,6 +1468,7 @@ export class SignalService {
           let discordRoute: DiscordRoute = { guilds: [] };
           let webhookRoute: WebhookRouteTicket = { routes: [] };
           let githubRoute: GitHubRoute = { repositories: [] };
+          step = "route";
           if (message.peer === "ingress") {
             if (
               !message.slackRoute &&
@@ -1499,9 +1536,12 @@ export class SignalService {
               }
             }
           }
+          step = "ticket";
           const resumeToken = yield* tokens.issueResumeToken(claims);
+          step = "revoked";
           if (this.#isRevoked(claims))
             return yield* new RemoteTokenError({ message: "Revoked ticket or ended session." });
+          step = "replayed";
           this.#pruneReplayCache();
           if (usedInitialTicket && this.#usedTicketIds.has(claims.jti))
             return yield* new RemoteTokenError({ message: "Ticket was already used." });
@@ -1519,6 +1559,8 @@ export class SignalService {
             return;
           }
           this.#metrics.authenticationFailures += 1;
+          this.#metrics.authenticationFailureReasons[authenticationFailureReason(step, failure, initialTicketReason)] +=
+            1;
           this.#fail(socket, "authentication_required", "Remote ticket is invalid or expired.", 1008);
           return;
         }

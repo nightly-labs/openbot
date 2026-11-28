@@ -191,6 +191,7 @@ const report = Effect.fn("CapacityReport.report")(function* (
   base.webhook = counters;
   if (previous) Object.assign(properties, webhookInterval(signal, previous, counters));
   Object.assign(properties, networkInterval(base.network, network));
+  if (network) base.network = network;
   for (const type of ALLOCATION_TYPES.values()) properties[`turn_allocations_${type}`] = 0;
   for (const sample of samples(turn, "turn_total_allocations")) {
     const type = ALLOCATION_TYPES.get(sample.type);
@@ -205,7 +206,6 @@ const report = Effect.fn("CapacityReport.report")(function* (
     },
     body: JSON.stringify({ type: "track", payload: { name: "signal_capacity", properties } }),
   });
-  if (network) base.network = network;
 });
 
 const main = Effect.gen(function* () {

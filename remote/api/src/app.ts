@@ -61,6 +61,7 @@ import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./
 import type { SignalEntry } from "./entry";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
 import {
+  AUTHENTICATION_FAILURE_REASONS,
   type SignalService,
   type SignalSocket,
   type SignalTokens,
@@ -839,6 +840,11 @@ export function prometheusMetrics(signal: SignalService, turnRelays: TurnRelays,
     `openbot_remote_signal_messages_total ${metrics.relayedMessages}`,
     "# TYPE openbot_remote_auth_failures_total counter",
     `openbot_remote_auth_failures_total ${metrics.authenticationFailures}`,
+    "# TYPE openbot_remote_auth_failure_reasons_total counter",
+    ...AUTHENTICATION_FAILURE_REASONS.map(
+      (reason) =>
+        `openbot_remote_auth_failure_reasons_total{reason="${reason}"} ${metrics.authenticationFailureReasons[reason]}`,
+    ),
     "# TYPE openbot_remote_auth_unavailable_total counter",
     `openbot_remote_auth_unavailable_total ${metrics.authenticationUnavailable}`,
     "# TYPE openbot_remote_protocol_failures_total counter",
