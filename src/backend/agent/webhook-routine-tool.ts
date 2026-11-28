@@ -15,6 +15,8 @@ import type { RoutineOperationFailed } from "./routine-scheduler";
 
 export const CREATE_WEBHOOK_ROUTINE_TOOL = "create_webhook_routine";
 
+export type WebhookRoutineRequester = "person" | "member" | "agent_thread" | "outside_chat" | "not_person";
+
 export const CREATE_WEBHOOK_ROUTINE_ARGUMENTS = [
   "agentId",
   "name",

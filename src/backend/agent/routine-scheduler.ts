@@ -73,6 +73,7 @@ import {
   CREATE_WEBHOOK_ROUTINE_TOOL,
   UPDATE_WEBHOOK_ROUTINE_ARGUMENTS,
   UPDATE_WEBHOOK_ROUTINE_TOOL,
+  type WebhookRoutineRequester,
   type WebhookRoutineWriter,
   webhookRoutineSummary,
   webhookRoutineToolResult,
@@ -111,6 +112,16 @@ const logger = createOpenBotLogger("routine-scheduler");
 
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
 const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was closed at the scheduled time.";
+const WEBHOOK_REQUEST_REFUSALS: Record<Exclude<WebhookRoutineRequester, "person">, string> = {
+  member:
+    "A server member who is not an owner or admin sent this request. Only an owner or admin can create, change or delete a webhook routine. Do not retry: tell the user to ask an owner or admin of the server.",
+  agent_thread:
+    "You started this thread, so a message in it cannot create, change or delete a webhook routine. Do not retry here: tell the user to send the request in your main chat.",
+  outside_chat:
+    "A message in a channel or a chat app cannot create, change or delete a webhook routine. Do not retry here: tell the user to send the request in your own OpenBot chat.",
+  not_person:
+    "Only a person's message, in your OpenBot chat or a thread they opened, can create, change or delete a webhook routine. This turn did not start from a person's message alone. Do not retry in this turn: tell the user to send the request as a new message.",
+};
 const QUEUED_RUN_REASONS: Record<string, string> = {
   "active-turn": "Waiting: another turn still runs in the same chat. This run starts when that turn ends.",
   "provider-start": "Waiting: the provider did not start a new chat in time. OpenBot tries again later.",
@@ -609,9 +620,9 @@ export class RoutineScheduler implements RoutineDueSource {
   handleTool(
     params: DynamicToolCallParams,
     senderAgentId: string,
-    requestedByPerson: () => boolean,
+    webhookRequester: () => WebhookRoutineRequester,
   ): Effect.Effect<OpenBotToolResponse | null, RoutineOperationFailed> {
-    return this.#handleTool(params, senderAgentId, requestedByPerson).pipe(
+    return this.#handleTool(params, senderAgentId, webhookRequester).pipe(
       Effect.catchDefect((cause) => Effect.fail(new RoutineOperationFailed({ cause }))),
       Effect.catch((failure) =>
         failure.cause instanceof RoutineInputError
@@ -643,7 +654,7 @@ export class RoutineScheduler implements RoutineDueSource {
     this: RoutineScheduler,
     params: DynamicToolCallParams,
     senderAgentId: string,
-    requestedByPerson: () => boolean,
+    webhookRequester: () => WebhookRoutineRequester,
   ) {
     if (params.tool === "list_routines") {
       const args = routineToolArguments(params.arguments, ["agentId", "routineId"]);
@@ -733,7 +744,7 @@ export class RoutineScheduler implements RoutineDueSource {
     if (params.tool === CREATE_WEBHOOK_ROUTINE_TOOL) {
       const args = routineToolArguments(params.arguments, CREATE_WEBHOOK_ROUTINE_ARGUMENTS);
       const agentId = this.#toolAgentId(args, senderAgentId);
-      const webhooks = this.#webhookTool(requestedByPerson);
+      const webhooks = this.#webhookTool(webhookRequester);
       const active = args.active === undefined ? true : args.active;
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
       const timezone = this.turnSenderTimezone(senderAgentId, params.turnId) ?? this.#timezone();
@@ -763,7 +774,7 @@ export class RoutineScheduler implements RoutineDueSource {
     if (params.tool === UPDATE_WEBHOOK_ROUTINE_TOOL) {
       const args = routineToolArguments(params.arguments, UPDATE_WEBHOOK_ROUTINE_ARGUMENTS);
       const agentId = this.#toolAgentId(args, senderAgentId);
-      const webhooks = this.#webhookTool(requestedByPerson);
+      const webhooks = this.#webhookTool(webhookRequester);
       const routineId = routineToolString(
         args.routineId,
         "routineId",
@@ -866,7 +877,7 @@ export class RoutineScheduler implements RoutineDueSource {
         "routineId is required.",
       );
       if (this.#requireToolRoutine(agentId, routineId).trigger.kind === "webhook") {
-        yield* this.#webhookTool(requestedByPerson).delete({ agentId, routineId });
+        yield* this.#webhookTool(webhookRequester).delete({ agentId, routineId });
       } else {
         yield* this.delete({ agentId, routineId }, agentId === senderAgentId ? { turnId: params.turnId } : {});
       }
@@ -1379,14 +1390,11 @@ export class RoutineScheduler implements RoutineDueSource {
     );
   }
 
-  #webhookTool(requestedByPerson: () => boolean): WebhookRoutineWriter {
+  #webhookTool(webhookRequester: () => WebhookRoutineRequester): WebhookRoutineWriter {
     const webhooks = this.#webhookRoutines?.();
     if (!webhooks) throw new RoutineInputError("This server cannot create webhook routines.");
-    if (!requestedByPerson()) {
-      throw new RoutineInputError(
-        "Only a person's message, in your OpenBot chat or a thread they opened, can create, change or delete a webhook routine. Ask the user to request it there.",
-      );
-    }
+    const requester = webhookRequester();
+    if (requester !== "person") throw new RoutineInputError(WEBHOOK_REQUEST_REFUSALS[requester]);
     return webhooks;
   }
 

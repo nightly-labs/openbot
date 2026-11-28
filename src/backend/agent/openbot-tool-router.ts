@@ -280,6 +280,7 @@ import { unknownAgentMessage } from "./unknown-agent";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
 import { READ_VIDEO_DEFAULT_FRAMES, readVideoToolSchema, type VideoReaderHost } from "./video-reader";
 import { visualPageText } from "./visual-page-text";
+import type { WebhookRoutineRequester } from "./webhook-routine-tool";
 
 const logger = createOpenBotLogger("openbot-tool-router");
 
@@ -2358,7 +2359,7 @@ export class OpenBotToolRouter {
           : "This run ended with nothing to report. Nothing to report is not a stop condition, so this routine stays on. This is not a failure: do not report one. End your turn now.",
       );
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
-      this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
+      this.#webhookRoutineRequester(senderAgentId, params.turnId, executionThreadId),
     );
     const pausedRoutine =
       runPause !== null && routineResult?.success
@@ -3299,6 +3300,25 @@ export class OpenBotToolRouter {
           !this.#messaging.store.linkForThread(executionThreadId) &&
           !this.#channels.store.channelForThread(executionThreadId)))
     );
+  }
+
+  #webhookRoutineRequester(agentId: string, turnId: string, threadId: string): WebhookRoutineRequester {
+    const executionThreadId = this.#conversation.publicThreadId(agentId, threadId);
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    if (deliveries.length === 0 || !deliveries.every(({ delivery }) => delivery.sender.kind === "user"))
+      return "not_person";
+    const fromMember = deliveries.some(({ delivery }) => {
+      const member = this.#mailbox.senderMember(delivery.messageId);
+      return member !== undefined && this.#remoteMember(delivery.messageId) && !this.#personCanAdminister(member.id);
+    });
+    if (fromMember) return "member";
+    if (!this.#conversation.isExecutionThread(executionThreadId)) return "person";
+    if (
+      this.#messaging.store.linkForThread(executionThreadId) ||
+      this.#channels.store.channelForThread(executionThreadId)
+    )
+      return "outside_chat";
+    return this.#tasks.isPersonThread(agentId, executionThreadId) ? "person" : "agent_thread";
   }
 
   #withBrowserPrimer(threadId: string, result: DynamicToolResult): DynamicToolResult {
