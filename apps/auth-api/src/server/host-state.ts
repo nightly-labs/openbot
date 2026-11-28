@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import type { HostState, HostStateCredential, HostStateEntry } from "./host-state-object";
 
-export type HostStateMode = "off" | "write" | "read";
+type HostStateMode = "off" | "write" | "read";
 
-export const HOST_STATE_RECHECK_MS = 60_000;
+const HOST_STATE_RECHECK_MS = 60_000;
 const HOST_STATE_CALL_LIMIT = "1 second";
 
 type HostStateOperation = "read" | "fill" | "invalidate";
@@ -15,7 +15,7 @@ export interface HostStateStore {
   invalidate(hostId: string): Effect.Effect<void>;
 }
 
-export function hostStateMode(value: string | undefined): HostStateMode {
+function hostStateMode(value: string | undefined): HostStateMode {
   const mode = value?.trim();
   return mode === "read" || mode === "write" ? mode : "off";
 }
