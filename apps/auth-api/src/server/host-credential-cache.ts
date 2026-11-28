@@ -1,4 +1,4 @@
-export const HOST_CREDENTIAL_CACHE_MS = 30_000;
+const HOST_CREDENTIAL_CACHE_MS = 30_000;
 const HOST_CREDENTIAL_CACHE_LIMIT = 10_000;
 
 interface AcceptedCredential {
