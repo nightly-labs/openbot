@@ -63,7 +63,7 @@ export interface HostStateFill {
   listing?: HostStateCopy<HostStateListing>;
 }
 
-export const HOST_STATE_SESSION_COPY_LIMIT = 256;
+const HOST_STATE_SESSION_COPY_LIMIT = 256;
 
 const CREDENTIAL_KEY = "v1:credential";
 const LISTING_KEY = "v1:listing";

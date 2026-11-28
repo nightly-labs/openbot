@@ -5121,45 +5121,47 @@ const decodeHostStateRetry = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ type: Schema.Literal("host-state-invalidate"), hostId: Schema.String })),
 );
 
-export const retryHostStateInvalidations = Effect.fn("RemoteControlPlane.retryHostStateInvalidations")(
-  function* (input: { database: D1Database; hostState: HostStateStore | null; now: number }) {
-    const { database, hostState, now } = input;
-    if (!hostState) return;
-    const claimed = yield* remoteCall(() =>
-      database
-        .prepare(
-          `UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ?
+const retryHostStateInvalidations = Effect.fn("RemoteControlPlane.retryHostStateInvalidations")(function* (input: {
+  database: D1Database;
+  hostState: HostStateStore | null;
+  now: number;
+}) {
+  const { database, hostState, now } = input;
+  if (!hostState) return;
+  const claimed = yield* remoteCall(() =>
+    database
+      .prepare(
+        `UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ?
            WHERE event_id IN (
              SELECT event_id FROM remote_auth_events
               WHERE next_attempt_at <= ? AND pending_targets = ? ORDER BY created_at LIMIT 50
            )
            RETURNING event_id, payload, created_at`,
-        )
-        .bind(now + HOST_STATE_RETRY_MS, now, HOST_STATE_RETRY_TARGETS)
-        .all<{ event_id: string; payload: string; created_at: number }>(),
-    );
-    const byHost = new Map<string, string[]>();
-    const done: string[] = [];
-    for (const event of claimed.results ?? []) {
-      const retry = Option.getOrUndefined(decodeHostStateRetry(event.payload));
-      if (!retry || event.created_at <= now - HOST_STATE_RECHECK_MS) done.push(event.event_id);
-      else byHost.set(retry.hostId, [...(byHost.get(retry.hostId) ?? []), event.event_id]);
-    }
-    const applied = yield* Effect.forEach(
-      [...byHost],
-      ([hostId, events]) => hostState.invalidate(hostId).pipe(Effect.map((ok) => (ok ? events : []))),
-      { concurrency: AUTH_EVENT_SEND_CONCURRENCY },
-    );
-    const deleted = [...done, ...applied.flat()];
-    if (deleted.length === 0) return;
-    yield* remoteCall(() =>
-      database
-        .prepare("DELETE FROM remote_auth_events WHERE event_id IN (SELECT value FROM json_each(?))")
-        .bind(JSON.stringify(deleted))
-        .run(),
-    );
-  },
-);
+      )
+      .bind(now + HOST_STATE_RETRY_MS, now, HOST_STATE_RETRY_TARGETS)
+      .all<{ event_id: string; payload: string; created_at: number }>(),
+  );
+  const byHost = new Map<string, string[]>();
+  const done: string[] = [];
+  for (const event of claimed.results ?? []) {
+    const retry = Option.getOrUndefined(decodeHostStateRetry(event.payload));
+    if (!retry || event.created_at <= now - HOST_STATE_RECHECK_MS) done.push(event.event_id);
+    else byHost.set(retry.hostId, [...(byHost.get(retry.hostId) ?? []), event.event_id]);
+  }
+  const applied = yield* Effect.forEach(
+    [...byHost],
+    ([hostId, events]) => hostState.invalidate(hostId).pipe(Effect.map((ok) => (ok ? events : []))),
+    { concurrency: AUTH_EVENT_SEND_CONCURRENCY },
+  );
+  const deleted = [...done, ...applied.flat()];
+  if (deleted.length === 0) return;
+  yield* remoteCall(() =>
+    database
+      .prepare("DELETE FROM remote_auth_events WHERE event_id IN (SELECT value FROM json_each(?))")
+      .bind(JSON.stringify(deleted))
+      .run(),
+  );
+});
 
 const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents")(function* (input: {
   database: D1Database;
