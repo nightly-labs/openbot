@@ -554,6 +554,7 @@ export interface AttentionRegistryOptions {
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   workspaceSandboxed?(agentId: string): boolean;
   confinedWritesAllowed?(agentId: string, paths: readonly string[]): boolean;
+  beforeFileChangeAccepted?(agentId: string, paths: readonly string[]): Effect.Effect<void>;
   messagingThread?(threadId: string): boolean;
   messagingRequestTurn?(agentId: string, turnId: string): boolean;
   approvalChatThread?(agentId: string, threadId: string): string;
@@ -602,6 +603,7 @@ export class AttentionRegistry {
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #workspaceSandboxed: (agentId: string) => boolean;
   readonly #confinedWritesAllowed: (agentId: string, paths: readonly string[]) => boolean;
+  readonly #beforeFileChangeAccepted: (agentId: string, paths: readonly string[]) => Effect.Effect<void>;
   readonly #messagingThread: (threadId: string) => boolean;
   readonly #messagingRequestTurn: (agentId: string, turnId: string) => boolean;
   readonly #approvalChatThread: (agentId: string, threadId: string) => string;
@@ -632,6 +634,7 @@ export class AttentionRegistry {
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#workspaceSandboxed = options.workspaceSandboxed ?? (() => false);
     this.#confinedWritesAllowed = options.confinedWritesAllowed ?? (() => false);
+    this.#beforeFileChangeAccepted = options.beforeFileChangeAccepted ?? (() => Effect.void);
     this.#messagingThread = options.messagingThread ?? (() => false);
     this.#messagingRequestTurn = options.messagingRequestTurn ?? (() => false);
     this.#approvalChatThread = options.approvalChatThread ?? ((_agentId, threadId) => threadId);
@@ -1155,6 +1158,10 @@ export class AttentionRegistry {
         )
         .pipe(toAttentionOperationFailed);
     } else {
+      if (input.decision === "accept") {
+        this.#approvals.delete(input.requestId);
+        yield* this.#beforeAccept(pending.approval, pending.params);
+      }
       pending.client.respond(
         pending.id,
         approvalReply(pending.method, pending.params, input.decision, "The user declined this action."),
@@ -1262,8 +1269,21 @@ export class AttentionRegistry {
 
   #answerWithoutAsking(client: AgentClient, request: AppServerRequest, approval: AgentApproval): boolean {
     if (!this.#answersForAgent(approval.agentId) && !this.#confinedWrite(request, approval)) return false;
-    client.respond(request.id, approvalReply(request.method, request.params, "accept", ""));
+    const answer = () => client.respond(request.id, approvalReply(request.method, request.params, "accept", ""));
+    if (approval.kind !== "file-change") answer();
+    else Effect.runFork(this.#beforeAccept(approval, request.params).pipe(Effect.ensuring(Effect.sync(answer))));
     return true;
+  }
+
+  #beforeAccept(approval: AgentApproval, params: unknown): Effect.Effect<void> {
+    if (approval.kind !== "file-change") return Effect.void;
+    const paths = [
+      getString(params, "grantRoot"),
+      ...getArray(params, "confinedWritePaths"),
+      ...getArray(params, "filePaths"),
+    ].filter(isString);
+    if (paths.length === 0) return Effect.void;
+    return this.#beforeFileChangeAccepted(approval.agentId, paths).pipe(Effect.catchCause(() => Effect.void));
   }
 
   #confinedWrite(request: AppServerRequest, approval: AgentApproval): boolean {

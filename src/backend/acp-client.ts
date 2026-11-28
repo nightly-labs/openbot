@@ -3764,7 +3764,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         params: {
           threadId: thread.id,
           turnId: turn.id,
-          filePaths: update.locations?.map((location) => location.path),
+          filePaths: (update.locations?.length ? update.locations : turn.toolLocations.get(update.toolCallId))?.map(
+            (location) => location.path,
+          ),
           item: shown,
         },
       });
@@ -4732,6 +4734,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
     const filePaths = kind === "file-change" ? permissionFilePaths(toolCall, thread?.cwd) : [];
+    if (turn && filePaths.length > 0 && !turn.toolLocations.has(toolCallId))
+      turn.toolLocations.set(
+        toolCallId,
+        filePaths.map((path) => ({ path })),
+      );
     const result = yield* this.#waitForUser(
       turn,
       this.#serverRequests.call(
@@ -4743,6 +4750,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           reason: toolCall.title ?? null,
           permissions: requestedPermissions,
           grantRoot: filePaths.length === 1 ? filePaths[0] : null,
+          ...(filePaths.length > 0 ? { filePaths } : {}),
           ...(this.options.confine && toolKind !== "move" ? { confinedWritePaths: filePaths } : {}),
         },
         turn?.stop.signal,

@@ -1,17 +1,22 @@
+import { realpath } from "node:fs/promises";
+import { basename, join, resolve } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  AGENT_INSTRUCTION_FILE_NAMES,
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   type AgentInstructionsChange,
   type ConversationMessage,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { readAgentInstructionsFile } from "./workspace-instructions";
+import { agentInstructionsRevealPath, readAgentInstructionsFile } from "./workspace-instructions";
 
 interface Baseline {
   text: string | null;
   turns: Set<string>;
   saves: number;
+  beforeWrites: string[];
+  agentTexts: Set<string>;
 }
 
 const currentText = (workspace: string) =>
@@ -19,6 +24,54 @@ const currentText = (workspace: string) =>
     Effect.map((file) => file.text),
     Effect.orElseSucceed(() => null),
   );
+
+const comparablePath = (path: string) => (process.platform === "win32" ? resolve(path).toLowerCase() : resolve(path));
+
+const realPath = (path: string) =>
+  Effect.tryPromise(() => realpath(path)).pipe(
+    Effect.map(comparablePath),
+    Effect.orElseSucceed(() => comparablePath(path)),
+  );
+
+const namesInstructionFile = (path: string) =>
+  AGENT_INSTRUCTION_FILE_NAMES.some((name) => name.toLowerCase() === basename(path).toLowerCase());
+
+const COMMAND_PARTS = /&&|\|\||[;|\n]/u;
+const REDIRECT_TARGET = />{1,2}\s*([^\s;&|]+)/gu;
+const IN_PLACE_EDIT =
+  /(?:^|\s)(?:sed|perl)\s(?:.*\s)?-(?:[A-Za-z]*i|-in-place)|(?:^|\s)(?:tee|Set-Content|Add-Content|Out-File)\s/iu;
+const MOVE_OR_COPY = /(?:^|\s)(?:mv|cp|Move-Item|Copy-Item)\s/iu;
+
+const unquote = (word: string) => word.replace(/^["']|["']$/gu, "");
+
+const instructionPathTest = (workspace: string) => {
+  const files = new Set(AGENT_INSTRUCTION_FILE_NAMES.map((name) => comparablePath(join(workspace, name))));
+  return (word: string) => word.length > 0 && files.has(comparablePath(resolve(workspace, unquote(word))));
+};
+
+export const writesInstructionFile = (line: string, workspace: string) => {
+  const isInstructionFile = instructionPathTest(workspace);
+  return line.split(COMMAND_PARTS).some((part) => {
+    if ([...part.matchAll(REDIRECT_TARGET)].some((target) => isInstructionFile(target[1] ?? ""))) return true;
+    const words = (part.split(">", 1)[0] ?? "").trim().split(/\s+/u);
+    const command = words.join(" ");
+    if (IN_PLACE_EDIT.test(command)) return words.some(isInstructionFile);
+    return MOVE_OR_COPY.test(command) && isInstructionFile(words.at(-1) ?? "");
+  });
+};
+
+const targetsInstructionFile = Effect.fn("InstructionsChanges.targetsFile")(function* (
+  workspace: string,
+  paths: readonly string[],
+) {
+  const candidates = paths.filter(namesInstructionFile);
+  if (candidates.length === 0) return false;
+  const file = yield* agentInstructionsRevealPath(workspace).pipe(Effect.orElseSucceed(() => workspace));
+  if (file === workspace) return false;
+  const target = yield* realPath(file);
+  for (const candidate of candidates) if ((yield* realPath(candidate)) === target) return true;
+  return false;
+});
 
 export class InstructionsChanges {
   readonly #agents = new Map<string, Baseline>();
@@ -35,10 +88,51 @@ export class InstructionsChanges {
       known.turns.add(turnId);
       return;
     }
-    const baseline: Baseline = { text: null, turns: new Set([turnId]), saves: 0 };
+    const baseline: Baseline = {
+      text: null,
+      turns: new Set([turnId]),
+      saves: 0,
+      beforeWrites: [],
+      agentTexts: new Set(),
+    };
     this.#agents.set(agentId, baseline);
     const text = yield* currentText(workspace);
     baseline.text ??= text;
+  });
+
+  readonly beforeAgentWrite = Effect.fn("InstructionsChanges.beforeAgentWrite")(function* (
+    this: InstructionsChanges,
+    agentId: string,
+    workspace: string,
+    paths: readonly string[],
+  ) {
+    const baseline = this.#agents.get(agentId);
+    if (!baseline || !(yield* targetsInstructionFile(workspace, paths))) return;
+    const text = yield* currentText(workspace);
+    if (text !== null) baseline.beforeWrites.push(text);
+  });
+
+  readonly agentWrote = Effect.fn("InstructionsChanges.agentWrote")(function* (
+    this: InstructionsChanges,
+    agentId: string,
+    workspace: string,
+    paths: readonly string[],
+  ) {
+    const baseline = this.#agents.get(agentId);
+    if (!baseline || !(yield* targetsInstructionFile(workspace, paths))) return;
+    const text = yield* currentText(workspace);
+    if (text !== null) baseline.agentTexts.add(text);
+  });
+
+  readonly agentRanCommand = Effect.fn("InstructionsChanges.agentRanCommand")(function* (
+    this: InstructionsChanges,
+    agentId: string,
+    workspace: string,
+  ) {
+    const baseline = this.#agents.get(agentId);
+    if (!baseline) return;
+    const text = yield* currentText(workspace);
+    if (text !== null) baseline.agentTexts.add(text);
   });
 
   readonly finishTurn = Effect.fn("InstructionsChanges.finishTurn")(function* (
@@ -57,12 +151,15 @@ export class InstructionsChanges {
     const after = yield* currentText(workspace);
     baseline.turns.delete(turnId);
     if (baseline.turns.size === 0) this.#agents.delete(agentId);
+    const outsideEdit = baseline.beforeWrites.findLast((text) => !baseline.agentTexts.has(text));
+    baseline.beforeWrites = [];
+    baseline.agentTexts.clear();
     if (baseline.saves !== saves) return null;
     if (after !== null && after === this.#saving.get(agentId)) {
       baseline.text = after;
       return null;
     }
-    const before = baseline.text;
+    const before = outsideEdit ?? baseline.text;
     if (after !== null) baseline.text = after;
     return before === null || after === null || before === after
       ? null
@@ -82,6 +179,7 @@ export class InstructionsChanges {
       const baseline = this.#agents.get(agentId);
       if (!written || !baseline) return;
       baseline.text = text;
+      baseline.beforeWrites = [];
       baseline.saves += 1;
     };
   }

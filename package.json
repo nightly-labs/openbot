@@ -270,7 +270,7 @@
     "test:acp-turn-stall": "bun scripts/acp-turn-stall-e2e.ts",
     "test:agent-database-host-start": "bun scripts/agent-database-host-start-e2e.ts",
     "test:versioned-json-stores": "bun scripts/versioned-json-stores-e2e.ts",
-    "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts",
+    "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts && bun scripts/opencode-instructions-undo-e2e.ts",
     "test:acp-audio-input": "bun scripts/acp-audio-input-e2e.ts",
     "test:antigravity-steer": "bun scripts/antigravity-steer-e2e.ts",
     "test:devin-steer": "bun scripts/devin-steer-e2e.ts",
