@@ -185,19 +185,20 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   const stopReplyStart = onDictatedReplyStart((agent) => {
     if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
-    if (held || step === "waiting") followingReplies += 1;
-    else if (step === "listening" && !turn?.spoke && sending === 0) {
-      setStep("waiting");
-      setState((draft) => {
-        draft.heard = sentHeard;
-        draft.levels = quietLevels();
-      });
+    if (held || step !== "listening" || turn?.spoke || sending > 0) {
+      followingReplies += 1;
+      return;
     }
+    setStep("waiting");
+    setState((draft) => {
+      draft.heard = sentHeard;
+      draft.levels = quietLevels();
+    });
   });
 
   const stopReplyEnd = onDictatedReplyEnd((agent) => {
     if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
-    if (followingReplies > 0 && (held || step === "waiting")) followingReplies -= 1;
+    if (followingReplies > 0) followingReplies -= 1;
     else if (held) heldReplyEnded = true;
     else if (step === "waiting") resumeListening();
   });
