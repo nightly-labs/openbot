@@ -1964,6 +1964,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
+      turn: (deliveryId) => this.#mailbox.getDelivery(deliveryId)?.delivery.turnId ?? null,
       busy: (agentId) => this.#drain.ownChatHold(agentId) !== null,
       answer: (agentId, threadId, turnId) =>
         this.#store.get(agentId)?.threadId === threadId ? this.#turnAnswer(agentId, turnId) : null,
