@@ -418,16 +418,30 @@ export class ChannelStore {
 
   message(channelId: string, messageId: string): ChannelMessage | null {
     const row = databaseRow(
-      this.database.connection
-        .prepare(
-          `SELECT message_json FROM projection_channel_messages WHERE channel_id = ? AND message_id = ? AND ${SHOWN_MESSAGE_SQL}`,
-        )
-        .get(channelId, messageId),
+      cachedStatement(
+        this.database.connection,
+        `SELECT message_json FROM projection_channel_messages WHERE channel_id = ? AND message_id = ? AND ${SHOWN_MESSAGE_SQL}`,
+      ).get(channelId, messageId),
     );
     if (!row) return null;
     const value = JSON.parse(requiredStringColumn(row, "message_json"));
     if (!isChannelMessage(value)) throw new Error("Invalid stored channel message.");
     return value;
+  }
+
+  messagesById(channelId: string, messageIds: readonly string[]): ChannelMessage[] {
+    if (!messageIds.length) return [];
+    return databaseRows(
+      cachedStatement(
+        this.database.connection,
+        `SELECT message_json FROM projection_channel_messages
+          WHERE channel_id = ? AND message_id IN (SELECT value FROM json_each(?)) AND ${SHOWN_MESSAGE_SQL}`,
+      ).all(channelId, JSON.stringify(messageIds)),
+    ).map((row) => {
+      const value = JSON.parse(requiredStringColumn(row, "message_json"));
+      if (!isChannelMessage(value)) throw new Error("Invalid stored channel message.");
+      return value;
+    });
   }
 
   task(channelId: string, taskId: string): ChannelTask | null {
@@ -455,6 +469,22 @@ export class ChannelStore {
     });
   }
 
+  tasksInStates(channelId: string, states: readonly ChannelTask["state"][]): ChannelTask[] {
+    if (!states.length) return [];
+    return databaseRows(
+      cachedStatement(
+        this.database.connection,
+        `SELECT task_json FROM projection_channel_tasks
+          WHERE channel_id = ? AND json_extract(task_json, '$.state') IN (${states.map(() => "?").join(", ")})
+          ORDER BY rowid`,
+      ).all(channelId, ...states),
+    ).map((row) => {
+      const value = JSON.parse(requiredStringColumn(row, "task_json"));
+      if (!isChannelTask(value)) throw new Error("Invalid stored channel task.");
+      return value;
+    });
+  }
+
   assignments(channelId: string): ChannelAssignment[] {
     return databaseRows(
       this.database.connection
@@ -465,22 +495,20 @@ export class ChannelStore {
 
   agentAssignments(channelId: string, agentId: string): ChannelAssignment[] {
     return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT assignment_json FROM projection_channel_assignments
-            WHERE channel_id = ? AND json_extract(assignment_json, '$.agentId') = ? ORDER BY rowid`,
-        )
-        .all(channelId, agentId),
+      cachedStatement(
+        this.database.connection,
+        `SELECT assignment_json FROM projection_channel_assignments
+          WHERE channel_id = ? AND json_extract(assignment_json, '$.agentId') = ? ORDER BY rowid`,
+      ).all(channelId, agentId),
     ).map((row) => decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))));
   }
 
   assignment(channelId: string, assignmentId: string): ChannelAssignment | null {
     const row = databaseRow(
-      this.database.connection
-        .prepare(
-          "SELECT assignment_json FROM projection_channel_assignments WHERE channel_id = ? AND assignment_id = ?",
-        )
-        .get(channelId, assignmentId),
+      cachedStatement(
+        this.database.connection,
+        "SELECT assignment_json FROM projection_channel_assignments WHERE channel_id = ? AND assignment_id = ?",
+      ).get(channelId, assignmentId),
     );
     return row ? decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))) : null;
   }
@@ -488,13 +516,12 @@ export class ChannelStore {
   assignmentsInStates(channelId: string, states: readonly ChannelAssignment["state"][]): ChannelAssignment[] {
     if (!states.length) return [];
     return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT assignment_json FROM projection_channel_assignments
-            WHERE channel_id = ? AND json_extract(assignment_json, '$.state') IN (${states.map(() => "?").join(", ")})
-            ORDER BY rowid`,
-        )
-        .all(channelId, ...states),
+      cachedStatement(
+        this.database.connection,
+        `SELECT assignment_json FROM projection_channel_assignments
+          WHERE channel_id = ? AND json_extract(assignment_json, '$.state') IN (${states.map(() => "?").join(", ")})
+          ORDER BY rowid`,
+      ).all(channelId, ...states),
     ).map((row) => decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))));
   }
 
