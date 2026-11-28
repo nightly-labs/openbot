@@ -300,11 +300,10 @@ before the Signal start (with 5 s for clock skew), because Signal forgot the rev
 its restart. Tickets issued after the start get no extra check. The Signal homes and Cloudflare use
 NTP, and the homes were less than 1 ms off on 2026-11-28. The old 60 s margin also covered the
 tickets of desktops that connected again in the first minute, so after a restart Signal sent one
-account service request for each route ticket. The desktop ingress connection
-(`signalHome: false`) gets its host ticket after a credential check on the D1 read replica first,
-and on the primary only when the replica does not match. A replica that has not yet seen a
-credential change gives a ticket with the old auth epoch, which Signal refuses after the
-revocation event. An expired token also needs one
+account service request for each route ticket. Host tickets check the machine
+token on the D1 primary, not on a read replica: a replica that has not yet seen a credential change
+would give a ticket with the old auth epoch, and a Signal that started after the revocation event
+would accept it with no check. An expired token also needs one
 durable check before Signal issues a replacement. Later reconnects use the in-memory trust cache.
 This is not a heartbeat. Signal collects these checks for 25 ms and sends up to 100 of them in one
 signed `/v2/remote/resume/validate-batch` request, which reads D1 with one host query and one
