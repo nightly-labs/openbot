@@ -87,6 +87,19 @@ function builtInMcpClient(resource: string, issuer: string | undefined): BuiltIn
   return builtInMcpClients(resource).find((client) => issuersMatch(client.issuer, issuer));
 }
 
+const CALLBACK_PATH_MCP_SERVERS: readonly { resource: string; issuer: string }[] = [
+  { resource: "https://mcp.newrelic.com/mcp", issuer: "https://oauth2.service.newrelic.com" },
+  { resource: "https://mcp.eu.newrelic.com/mcp", issuer: "https://oauth2.service.newrelic.com" },
+];
+
+function needsCallbackPath(resource: string, issuer: string | undefined): boolean {
+  if (!issuer) return false;
+  const key = builtInResourceKey(resource);
+  return CALLBACK_PATH_MCP_SERVERS.some(
+    (server) => builtInResourceKey(server.resource) === key && issuersMatch(server.issuer, issuer),
+  );
+}
+
 function signInAppRedirectUrl(resource: string, own: string): string {
   return builtInMcpClients(resource)[0]?.redirectUrl ?? own;
 }
@@ -796,7 +809,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     this.#options = options;
     this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
     const { unansweredRedirectUrl: unanswered } = options;
-    const localhostNames = [this.#localhostRedirectUrl, localhostRedirectUrl(options.firstRedirectUrl)];
+    const localhostNames = [this.#localhostRedirectUrl, localhostRedirectUrl(this.#firstRedirectUrl())];
     this.#deepLinkRedirectUrl =
       unanswered && localhostNames.includes(unanswered) ? (options.deepLinkRedirectUrl?.() ?? null) : null;
     this.#retryRedirectUrl = this.#deepLinkRedirectUrl ?? this.#otherRedirectName(unanswered);
@@ -809,8 +822,17 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #openedUrl: string | null = null;
   #authorizedClient: OAuthClientInformationFull | undefined;
 
+  #usesCallbackPath = false;
+
+  #firstRedirectUrl(): string {
+    const first = this.#options.firstRedirectUrl;
+    const issuer = this.#activeIssuer ?? this.#record().discovery?.authorizationServerUrl;
+    this.#usesCallbackPath ||= needsCallbackPath(this.#options.resource, issuer);
+    return this.#usesCallbackPath ? (callbackRedirectUrl(first) ?? first) : first;
+  }
+
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
-    for (const address of new Set([this.#options.firstRedirectUrl, this.#options.redirectUrl])) {
+    for (const address of new Set([this.#firstRedirectUrl(), this.#options.redirectUrl])) {
       const localhost = localhostRedirectUrl(address);
       if (!localhost) continue;
       if (redirectUrl === address) return localhost;
@@ -823,7 +845,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const own = this.#options.redirectUrl;
     const localhost = this.#localhostRedirectUrl;
     if (redirectUrl === own || redirectUrl === localhost) return callbackRedirectUrl(redirectUrl);
-    const first = this.#options.firstRedirectUrl;
+    const first = this.#firstRedirectUrl();
     if (first === own || !redirectUrl || (redirectUrl !== first && redirectUrl !== localhostRedirectUrl(first)))
       return null;
     const url = new URL(redirectUrl);
@@ -860,7 +882,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       client_name: MCP_CLIENT_NAME,
       client_uri: "https://openbot.run",
       logo_uri: "https://openbot.run/icon-512x512.png",
-      redirect_uris: [this.#retryRedirectUrl ?? this.#options.firstRedirectUrl],
+      redirect_uris: [this.#retryRedirectUrl ?? this.#firstRedirectUrl()],
       application_type: "native",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -932,7 +954,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   #registersFirstAddress(client: OAuthClientInformationFull): boolean {
-    const first = this.#options.firstRedirectUrl;
+    const first = this.#firstRedirectUrl();
     const localhost = localhostRedirectUrl(first);
     return (
       registersAddress(client.redirect_uris, first) ||
@@ -1054,7 +1076,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const body = registrationBodySchema.parse(JSON.parse(init.body));
     const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
     const deepLink = this.#deepLinkRedirectUrl;
-    const first = this.#options.firstRedirectUrl;
+    const first = this.#firstRedirectUrl();
     const firstNames = [first, localhostRedirectUrl(first)];
     const ownNames = first === this.#options.redirectUrl ? [] : [this.#options.redirectUrl, localhost];
     const names = deepLink && sent === deepLink ? [...firstNames, ...ownNames] : [this.#otherRedirectName(sent)];

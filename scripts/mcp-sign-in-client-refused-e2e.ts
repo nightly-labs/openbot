@@ -7,7 +7,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import { McpOAuth, type McpOAuthRecord } from "../src/backend/mcp-oauth-provider";
+import { McpOAuth, type McpOAuthRecord, mcpOAuthAccountKey } from "../src/backend/mcp-oauth-provider";
 import { inspectMcpServer, testMcpServer } from "../src/backend/mcp-probe";
 
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-refused-e2e");
@@ -387,6 +387,142 @@ async function runCase(
   }
 }
 
+const NEW_RELIC_MCP_URL = "https://mcp.newrelic.com/mcp/";
+const NEW_RELIC_ISSUER = "https://oauth2.service.newrelic.com";
+const NEW_RELIC_REGISTRATION = "https://dcr.service.newrelic.com/register";
+
+async function newRelicCase(
+  name: string,
+  {
+    issuer = NEW_RELIC_ISSUER,
+    mcpUrl = NEW_RELIC_MCP_URL,
+    storedClientRedirects = null,
+    attempts = 1,
+  }: { issuer?: string; mcpUrl?: string; storedClientRedirects?: string[] | null; attempts?: number },
+): Promise<Case> {
+  const redirects: string[] = [];
+  const registrations: (string | null)[] = [];
+  const pages: string[] = [];
+  const authorizationServer = new URL(issuer).origin;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = Object.assign(
+    async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
+      const target = new URL(input instanceof Request ? input.url : input);
+      if (
+        target.origin === new URL(mcpUrl).origin &&
+        target.pathname.startsWith("/.well-known/oauth-protected-resource")
+      )
+        return Response.json({ resource: mcpUrl, authorization_servers: [issuer] });
+      if (
+        target.origin === authorizationServer &&
+        target.pathname.startsWith("/.well-known/oauth-authorization-server")
+      )
+        return Response.json({
+          issuer,
+          authorization_endpoint: `${issuer}/oauth2/auth`,
+          token_endpoint: `${issuer}/oauth2/token`,
+          registration_endpoint: NEW_RELIC_REGISTRATION,
+          response_types_supported: ["code"],
+          code_challenge_methods_supported: ["S256"],
+          grant_types_supported: ["authorization_code", "refresh_token"],
+          token_endpoint_auth_methods_supported: ["none"],
+        });
+      if (target.href === NEW_RELIC_REGISTRATION && init?.method === "POST") {
+        const asked = registrationRequest.parse(JSON.parse(String(init.body)));
+        registrations.push(asked.token_endpoint_auth_method ?? null);
+        redirects.push(`register ${asked.redirect_uris.join(" ")}`);
+        return Response.json(
+          {
+            client_id: `e2e-new-relic-${registrations.length}`,
+            token_endpoint_auth_method: "none",
+            redirect_uris: asked.redirect_uris,
+          },
+          { status: 201 },
+        );
+      }
+      if (target.href === `${issuer}/oauth2/token` && init?.method === "POST") {
+        redirects.push(`token ${new URLSearchParams(String(init.body)).get("redirect_uri")}`);
+        return Response.json({ access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 });
+      }
+      if (target.hostname.endsWith(".newrelic.com") || target.origin === authorizationServer)
+        return Response.json({ error: "not_found" }, { status: 404 });
+      return realFetch(input, init);
+    },
+    realFetch,
+  );
+  try {
+    const key = mcpOAuthAccountKey(mcpUrl);
+    assert.ok(key, "McpOAuth takes the New Relic MCP address");
+    const records = new Map<string, McpOAuthRecord>();
+    if (storedClientRedirects)
+      records.set(key, {
+        client: {
+          client_id: "e2e-unfinished-new-relic",
+          token_endpoint_auth_method: "none",
+          redirect_uris: storedClientRedirects,
+          issuer,
+        },
+      });
+    const oauth: McpOAuth = new McpOAuth({
+      storage: {
+        read: (resource) => records.get(resource) ?? null,
+        write: (resource, record) => Effect.sync(() => void records.set(resource, record)),
+        clear: (resource) => Effect.sync(() => void records.delete(resource)),
+      },
+      openExternal: async () => {
+        throw new Error("A relayed sign-in opened a page on the host.");
+      },
+      redirectUrl: "http://127.0.0.1:28417/mcp-auth",
+      signInTimeoutMs: 10_000,
+      lookup: () => Effect.succeed(["162.247.241.14"]),
+    });
+    let attempt = 0;
+    const relayed = async (page: string) => {
+      pages.push(page);
+      redirects.push(`page ${new URL(page).searchParams.get("redirect_uri")}`);
+      const state = new URL(page).searchParams.get("state");
+      assert.ok(state, "the page has a state");
+      setTimeout(() => {
+        if (attempt < attempts - 1) oauth.cancelSignIn(mcpUrl);
+        else oauth.receiveAuthorizationCode(state, "e2e-grant");
+      }, 50);
+    };
+    const results: Case["attempts"] = [];
+    try {
+      for (attempt = 0; attempt < attempts; attempt++) {
+        const signIn = oauth.signIn(mcpUrl, relayed);
+        assert.ok(signIn, "the New Relic sign-in starts");
+        const error = await runCauseEffect(
+          Effect.gen(function* () {
+            if (!(yield* signIn.begin())) return "the sign-in did not open a page";
+            yield* signIn.complete();
+            return null;
+          }),
+        ).catch((failure: unknown) => (failure instanceof Error ? failure.message : String(failure)));
+        results.push({ toolCount: 0, error });
+      }
+      return {
+        name,
+        attempts: results,
+        registrations,
+        registrationScopes: [],
+        pageScopes: pages.map((page) => new URL(page).searchParams.get("scope")),
+        tokenRequestsWithSecret: [],
+        toolLists: [],
+        pagesOpened: pages.length,
+        redirects,
+        storedClient: records.get(key)?.client !== undefined,
+        signedIn: oauth.signedIn(mcpUrl),
+        failures: [],
+      };
+    } finally {
+      await runCauseEffect(oauth.close());
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
 function check(entry: Case, condition: boolean, text: string): void {
   if (!condition) entry.failures.push(text);
 }
@@ -612,6 +748,57 @@ async function main(): Promise<void> {
     );
     check(openedElsewhere, openedElsewhere.signedIn, "no token is stored after the sign-in");
     report.cases.push(openedElsewhere);
+
+    const newRelicCallback = "http://127.0.0.1:28417/callback";
+    const newRelicSignIn = [`register ${newRelicCallback}`, `page ${newRelicCallback}`, `token ${newRelicCallback}`];
+    const newRelicCases = [
+      { entry: await newRelicCase("new-relic-opened-elsewhere-registers-callback", {}), expected: newRelicSignIn },
+      {
+        entry: await newRelicCase("new-relic-opened-elsewhere-replaces-unfinished-mcp-auth-client", {
+          storedClientRedirects: [ownListener],
+        }),
+        expected: newRelicSignIn,
+      },
+      {
+        entry: await newRelicCase("new-relic-opened-elsewhere-keeps-callback-client", {
+          storedClientRedirects: [newRelicCallback],
+        }),
+        expected: newRelicSignIn.slice(1),
+      },
+      {
+        entry: await newRelicCase("new-relic-address-with-other-issuer-keeps-mcp-auth", {
+          issuer: "https://login.example.com",
+        }),
+        expected: [`register ${ownListener}`, `page ${ownListener}`, `token ${ownListener}`],
+      },
+    ];
+    const newRelicLocalhost = "http://localhost:28417/callback";
+    newRelicCases.push(
+      {
+        entry: await newRelicCase("new-relic-eu-opened-elsewhere-registers-callback", {
+          mcpUrl: "https://mcp.eu.newrelic.com/mcp/",
+        }),
+        expected: newRelicSignIn,
+      },
+      {
+        entry: await newRelicCase("new-relic-opened-elsewhere-retries-unanswered-callback", { attempts: 3 }),
+        expected: [
+          `register ${newRelicCallback}`,
+          `page ${newRelicCallback}`,
+          `register ${newRelicLocalhost}`,
+          `page ${newRelicLocalhost}`,
+          `register ${newRelicCallback}`,
+          `page ${newRelicCallback}`,
+          `token ${newRelicCallback}`,
+        ],
+      },
+    );
+    for (const { entry, expected } of newRelicCases) {
+      check(entry, entry.attempts.at(-1)?.error === null, `the sign-in failed: ${entry.attempts.at(-1)?.error}`);
+      check(entry, entry.redirects.join() === expected.join(), `the addresses were ${entry.redirects.join()}`);
+      check(entry, entry.signedIn, "no token is stored after the sign-in");
+      report.cases.push(entry);
+    }
 
     const lostElsewhere = await runCase("opened-elsewhere-after-lost-callback-sign-in", ["none"], 1, {
       storedClient: "e2e-lost-callback-client",
