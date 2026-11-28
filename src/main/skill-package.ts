@@ -12,7 +12,7 @@ import { causeHelpers } from "../backend/effect-boundary";
 export const SKILL_FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
 
 export const MAX_BYTES = 10 * 1024 * 1024;
-const MAX_FILES = 200;
+export const MAX_FILES = 200;
 export const FINDER_METADATA_FILE = ".DS_Store";
 const EXECUTABLE_ENTRY = { os: 3, attrs: 0o100755 * 0x10000 } as const;
 
@@ -99,23 +99,27 @@ export function readSkillArchive(bytes: Uint8Array): {
 } {
   if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new Error(sourceText("error.skill.packageTooLarge"));
   let raw: Record<string, Uint8Array>;
+  let exceeded: Error | undefined;
   try {
     let expandedSize = 0;
     let fileCount = 0;
     raw = unzipSync(bytes, {
       filter: (file) => {
+        if (file.name.endsWith("/")) return false;
         fileCount += 1;
         expandedSize += file.originalSize;
-        if (fileCount > MAX_FILES || expandedSize > MAX_BYTES) throw new Error("Archive limits exceeded.");
+        if (fileCount > MAX_FILES) exceeded = new Error(sourceText("error.skill.tooManyFiles", { limit: MAX_FILES }));
+        else if (expandedSize > MAX_BYTES) exceeded = new Error(sourceText("error.skill.expandedTooLarge"));
+        if (exceeded) throw exceeded;
         return true;
       },
     });
   } catch {
-    throw new Error(sourceText("error.skill.zipInvalid"));
+    throw exceeded ?? new Error(sourceText("error.skill.zipInvalid"));
   }
   const executableEntries = executableArchiveEntries(bytes);
-  const entries = Object.entries(raw).filter(([name]) => !name.endsWith("/"));
-  if (!entries.length || entries.length > MAX_FILES) throw new Error(sourceText("error.skill.fileCountInvalid"));
+  const entries = Object.entries(raw);
+  if (!entries.length) throw new Error(sourceText("error.skill.fileCountInvalid"));
   const roots = new Set(entries.map(([name]) => name.replaceAll("\\", "/").split("/")[0]));
   const wrapper = roots.size === 1 && entries.every(([name]) => name.includes("/")) ? [...roots][0] : null;
   const result: Record<string, Uint8Array> = {};
