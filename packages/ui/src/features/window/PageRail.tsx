@@ -174,10 +174,11 @@ function paceTick(radius: number, pacePercent: number) {
 function UsageRings(props: {
   row: AccountUsageProviderRow;
   shared: readonly AccountUsageProviderRow[];
+  accounts: readonly AccountUsageProviderRow[];
   onOpen: (button: HTMLElement) => void;
 }) {
   const { t, format } = useText();
-  const rows = () => [props.row, ...props.shared];
+  const rows = () => [props.row, ...props.shared, ...props.accounts];
   const label = () =>
     unavailable()
       ? t("app.rail.usageUnavailable", { name: format.list(rows().map((row) => row.name)) })
@@ -189,8 +190,9 @@ function UsageRings(props: {
             .join(", "),
         });
   const ringRow = () => {
-    const read = rows().filter((row) => !row.readFailed);
-    return (read.length > 0 ? read : rows()).reduce((lowest, row) =>
+    const drawn = [props.row, ...props.shared];
+    const read = drawn.filter((row) => !row.readFailed);
+    return (read.length > 0 ? read : drawn).reduce((lowest, row) =>
       (row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest,
     );
   };
@@ -270,25 +272,31 @@ function UsageRings(props: {
 interface UsageRing {
   row: AccountUsageProviderRow;
   shared: AccountUsageProviderRow[];
+  accounts: AccountUsageProviderRow[];
 }
 
 function ringLeft(ring: UsageRing): number {
   return Math.min(...[ring.row, ...ring.shared].map((row) => row.remainingPercent ?? 100));
 }
 
+function mostLeftRing(rings: readonly UsageRing[]): UsageRing {
+  const read = rings.filter((ring) => !ring.row.readFailed);
+  return (read.length > 0 ? read : rings).reduce((best, ring) => (ringLeft(ring) > ringLeft(best) ? ring : best));
+}
+
 function providerRings(rings: readonly UsageRing[]): UsageRing[] {
-  const byProvider = new Map<AccountUsageProviderRow["provider"], UsageRing>();
-  for (const ring of rings) {
-    const first = byProvider.get(ring.row.provider);
-    if (first) first.shared.push(ring.row, ...ring.shared);
-    else byProvider.set(ring.row.provider, { row: ring.row, shared: [...ring.shared] });
-  }
-  return [...byProvider.values()];
+  const byProvider = new Map<AccountUsageProviderRow["provider"], UsageRing[]>();
+  for (const ring of rings) byProvider.set(ring.row.provider, [...(byProvider.get(ring.row.provider) ?? []), ring]);
+  return [...byProvider.values()].map((group) => {
+    const best = mostLeftRing(group);
+    const others = group.filter((ring) => ring !== best);
+    return { ...best, accounts: others.flatMap((ring) => [ring.row, ...ring.shared, ...ring.accounts]) };
+  });
 }
 
 function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: HTMLElement) => void }) {
   const { t } = useText();
-  const rows = () => props.rings.flatMap((ring) => [ring.row, ...ring.shared]);
+  const rows = () => props.rings.flatMap((ring) => [ring.row, ...ring.shared, ...ring.accounts]);
   return (
     <RailButton
       label={t("app.rail.moreUsage", { count: rows().length })}
@@ -683,7 +691,7 @@ export function PageRail(props: PageRailProps) {
       rows.find((other) => other.accountId === null && other.provider === row.sharedQuotaWith);
     return rows
       .filter((row) => !owner(row))
-      .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
+      .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row), accounts: [] }));
   });
   const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   const ringLayout = createMemo(() => {
@@ -829,7 +837,9 @@ export function PageRail(props: PageRailProps) {
             }}
           >
             <For each={ringLayout().shown} keyed={(ring) => accountUsageRowKey(ring.row)}>
-              {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
+              {(ring) => (
+                <UsageRings row={ring().row} shared={ring().shared} accounts={ring().accounts} onOpen={props.onUsage} />
+              )}
             </For>
             <Show when={ringLayout().more.length > 0}>
               <MoreUsageRings rings={ringLayout().more} onOpen={props.onUsage} />
