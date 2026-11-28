@@ -1,5 +1,6 @@
 import {
   type AgentEvent,
+  type AgentTurnCompletedEvent,
   type ChannelMessage,
   type ChannelTask,
   type ConversationMessage,
@@ -67,8 +68,10 @@ function agentKey(agent: SpeechAgent): string {
 }
 
 const dictated = new Map<string, DictatedMessage>();
+const followed = new Map<string, DictatedMessage>();
 let spoken: SpeechAgent | undefined;
 const loading = new Set<SpeechAgent>();
+const replyStartListeners = new Set<(agent: SpeechAgent) => void>();
 const replyEndListeners = new Set<(agent: SpeechAgent) => void>();
 const drops = new Map<string, number>();
 let readings: Promise<void> = Promise.resolve();
@@ -122,6 +125,7 @@ export function noteDictatedMessage(
   },
 ): void {
   const key = agentKey(agent);
+  followed.delete(key);
   dictated.set(key, {
     dictatedAt: Date.now(),
     language: speechLanguageOf(transcript, "en") ?? "en",
@@ -209,6 +213,7 @@ export function dropDictatedReply(agent: SpeechAgent): void {
   drops.set(key, (drops.get(key) ?? 0) + 1);
   releaseSpeech(agent, false);
   dictated.delete(key);
+  followed.delete(key);
   for (const item of loading) if (agentKey(item) === key) loading.delete(item);
   if (isSpoken(agent)) stopSpokenReply();
 }
@@ -224,6 +229,11 @@ export function stopSpokenReply(): void {
   loading.clear();
   spoken = undefined;
   stopSpeech();
+}
+
+export function onDictatedReplyStart(listener: (agent: SpeechAgent) => void): () => void {
+  replyStartListeners.add(listener);
+  return () => replyStartListeners.delete(listener);
 }
 
 export function onDictatedReplyEnd(listener: (agent: SpeechAgent) => void): () => void {
@@ -274,6 +284,10 @@ export function readDictatedReplies(
   const agent = { serverId, agentId: event.agentId };
   const key = agentKey(agent);
   if (event.type === "turn-started") {
+    if (isMainThread(event.agentId, event.threadId)) {
+      if (event.origin === "unknown") followTurn(key, event.turnId);
+      else if (event.origin === "user") followed.delete(key);
+    }
     if (event.origin === "routine" || event.origin === "agent" || event.origin === "unknown") return;
     if (isSpoken(agent) && isMainThread(event.agentId, event.threadId)) stopSpokenReply();
     const message = dictated.get(key);
@@ -284,6 +298,7 @@ export function readDictatedReplies(
     } else message.turnId = event.turnId;
     return;
   }
+  if (readFollowedTurn(agent, event)) return;
   const message = dictated.get(key);
   if (!message || message.turnId !== event.turnId) return;
   if (event.status === "completed" && event.continues) {
@@ -293,8 +308,31 @@ export function readDictatedReplies(
     return;
   }
   dictated.delete(key);
+  if (event.status === "completed" && message.always && !message.channel)
+    followed.set(key, { ...message, turnId: undefined });
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
   else endAfterReadings(agent);
+}
+
+function followTurn(key: string, turnId: string): void {
+  const message = followed.get(key);
+  if (!message || message.turnId) return;
+  if (Date.now() - message.dictatedAt > DICTATION_LIFETIME_MS) followed.delete(key);
+  else message.turnId = turnId;
+}
+
+function readFollowedTurn(agent: SpeechAgent, event: AgentTurnCompletedEvent): boolean {
+  const key = agentKey(agent);
+  const message = followed.get(key);
+  if (!message?.turnId || message.turnId !== event.turnId) return false;
+  message.turnId = undefined;
+  if (event.status !== "completed") followed.delete(key);
+  else if (!event.quiet && !event.continues) {
+    followed.delete(key);
+    for (const listener of replyStartListeners) listener(agent);
+    void readReply(agent, event.turnId, message);
+  }
+  return true;
 }
 
 function readProgressUpdates(messages: readonly ConversationMessage[], agent: SpeechAgent): void {
