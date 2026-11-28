@@ -714,7 +714,17 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
       void Effect.runPromise(services.providerRuntimes.stop()).catch((error) =>
         logger.warn("Provider runtimes did not stop.", toLogValue(error)),
       );
+    closeDatabaseBeforeSessionEnds();
   });
+}
+
+function closeDatabaseBeforeSessionEnds(): void {
+  if (!services) return;
+  try {
+    services.closeDatabase();
+  } catch (error) {
+    logger.warn("The database did not close before Windows ended the session.", toLogValue(error));
+  }
 }
 
 function registerIpcHandlers({
