@@ -185,7 +185,19 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   const stopReplyStart = onDictatedReplyStart((agent) => {
     if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
-    if (held || step !== "listening" || turn?.spoke || sending > 0) {
+    if (held) {
+      if (heldReplyEnded) heldReplyEnded = false;
+      else followingReplies += 1;
+      return;
+    }
+    if (turn?.spoke || (pushToTalk && talking) || step === "transcribing") {
+      held = true;
+      heldAt = performance.now();
+      heldReplyEnded = false;
+      holdSpeech(target);
+      return;
+    }
+    if (step !== "listening" || sending > 0) {
       followingReplies += 1;
       return;
     }

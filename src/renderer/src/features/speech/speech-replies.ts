@@ -284,7 +284,10 @@ export function readDictatedReplies(
   const agent = { serverId, agentId: event.agentId };
   const key = agentKey(agent);
   if (event.type === "turn-started") {
-    if (event.origin === "unknown" && isMainThread(event.agentId, event.threadId)) followTurn(key, event.turnId);
+    if (isMainThread(event.agentId, event.threadId)) {
+      if (event.origin === "unknown") followTurn(key, event.turnId);
+      else if (event.origin === "user") followed.delete(key);
+    }
     if (event.origin === "routine" || event.origin === "agent" || event.origin === "unknown") return;
     if (isSpoken(agent) && isMainThread(event.agentId, event.threadId)) stopSpokenReply();
     const message = dictated.get(key);
@@ -305,7 +308,8 @@ export function readDictatedReplies(
     return;
   }
   dictated.delete(key);
-  if (event.status === "completed" && !message.channel) followed.set(key, { ...message, turnId: undefined });
+  if (event.status === "completed" && message.always && !message.channel)
+    followed.set(key, { ...message, turnId: undefined });
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
   else endAfterReadings(agent);
 }
