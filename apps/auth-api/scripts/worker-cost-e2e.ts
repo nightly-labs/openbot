@@ -127,7 +127,6 @@ function routes(session: Session): Route[] {
 }
 
 const PROBE_SOURCE = `import worker from "./index.js";
-export * from "./index.js";
 
 const empty = () => ({ requests: 0, statements: 0, batches: 0, direct: 0, primary: 0, replica: 0, reads: 0, writes: 0, cacheHits: 0, cacheMisses: 0, cachePuts: 0 });
 let counts = empty();
