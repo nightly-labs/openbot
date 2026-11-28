@@ -175,7 +175,7 @@ function trimmed<A>(whole: A, lists: readonly WorkflowStep[][]): A {
   for (const steps of lists)
     for (const [index, step] of steps.entries()) {
       if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return whole;
-      const blank: WorkflowStep = { ...step, output: null, error: null };
+      const blank: WorkflowStep = { ...step, output: null, error: null, question: undefined };
       bytes -= bytesOf(step) - bytesOf(blank);
       steps[index] = blank;
     }
