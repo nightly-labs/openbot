@@ -1632,7 +1632,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#channelHeld(agentId) ||
         this.#drain.channelTurnFull(agentId, channelId) ||
         (this.#tasks.oneTurnAtATime(agentId) &&
-          (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
+          (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId) ||
+            (this.#mailbox.nextQueued(agentId) !== null && !this.channels.goesBeforeMainChat(agentId, channelId)) ||
             this.#mailbox.laneActive(agentId, null) ||
             this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId))),
       usageLimited: (agentId) => this.#channelHeld(agentId),

@@ -277,8 +277,12 @@ Channel tools retrieve history, assign a child task, transfer ownership, and rep
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.
 Only assignments and awaited results start turns. Completed child results are combined before the
 owner returns. `channel_assign` and `channel_transfer` refuse a member that answers the same request in a root
-task of its own: another task made it post the same answer again (#11082). The limit is eight automatic assignments per root request and two active assignments
-per channel (`CHANNEL_PARALLEL_LIMIT`).
+task of its own: another task made it post the same answer again (#11082). The limit is eight automatic assignments per root request and two active member assignments
+per channel (`CHANNEL_PARALLEL_LIMIT`). The lead has one more slot of its own: the assignments of
+the lead do not count against the member limit, and a task of the lead does not wait for it, so an
+answer of the lead to a person does not wait behind long member work (#5906). The lead still runs
+one assignment at a time in a channel, and members cannot use its slot. The `channel-full` wait in
+`taskWaits` uses the same rule (`#memberSlotsFull`).
 
 An agent can also give work to a channel from another conversation, such as its direct chat with
 the user. `list_channels` lists the open channels with their lead and members.
@@ -432,7 +436,14 @@ go over it. The work of other agents does not hold it. A task end wakes `Channel
 the first against the same limit. So one channel turn can always
 run beside full tasks, as before, and the agent runs at most the limit plus one side turn. When the provider of the
 agent runs one turn at a time (`concurrentTurns: false`), nothing runs in parallel: its chat and task
-turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment. Only declared `browser` and `workspace:<path>` resources are
+turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment.
+It also holds the main lane for a queued channel task that waited only because the agent was busy,
+when the request of the task is older than the next delivery of the own chat. The channel `busy`
+hook then does not count that queued delivery (`goesBeforeMainChat`). So the channel task starts
+after the current turn and before the own-chat messages that came after it; older messages still go
+first. A task that waits for a different reason (a full channel, a dependency, a resource, a paused
+root, a usage limit) does not hold the main lane. When a pump ends, an agent that this hold no longer
+applies to gets a new drain. Only declared `browser` and `workspace:<path>` resources are
 serialized: the same browser, or two workspaces where one path contains the other. An empty list,
 `none`, and `host` (from an earlier version) reserve nothing. An assignment keeps the resources it
 started with until it ends, and a task with an active assignment starts no second owner. An update
@@ -477,7 +488,9 @@ the person asks for another member or for help, or when a part clearly needs ano
 | Packet budget | 120,000 characters (`CONTEXT_CHARACTERS`) | `channel-history.ts` |
 | Transcript part | budget / 4 (`TRANSCRIPT_SHARE`), newest first | `newest()` |
 | Summary in `prepare` | when the recent messages are more than the transcript part; it keeps the newest half of that part | `summarize` |
+| Summary in `prepare`, most passes | 2 (`PREPARE_SUMMARY_PASSES`); 0 when the background summary still runs after the wait | `summarize` |
 | Summary after a turn | at 0.75 of that threshold (`AHEAD_SHARE`), in the background | `ChannelService.#summarizeAhead` |
+| Wait of a turn start for that summary | 30 seconds at most (`SUMMARY_WAIT_MS`) | `ChannelService.#awaitSummary` |
 | Assignment again at the end | when 2,000 characters or less | `REPEATED_ASSIGNMENT_CHARACTERS` |
 | Provider compaction | at 80% of the context window, or before a turn whose input would fill it over 80% | `ContextCompaction` |
 | `channel_history` page | 24,000 characters (`HISTORY_PAGE_CHARACTERS`); a longer message is cut at 16,000 | `boundedHistoryPage` |
@@ -492,6 +505,11 @@ the person asks for another member or for help, or when a part clearly needs ano
 - The summary keeps the recent messages under the transcript part, so a message is in the summary
   or in the transcript. Only when the oldest recent message still streams does the summary wait,
   and the transcript then leaves out older messages with a line that tells how to read them.
+- A change to a message that the summary already has starts the summary again from the start, so
+  in a long channel the background summary can need many model calls. A turn start does not wait
+  for all of them: it waits at most `SUMMARY_WAIT_MS`, then starts with the summary that is there and
+  the newest messages that fit. Before, each turn in that channel waited until the whole summary was
+  done, which in a channel with thousands of messages took many minutes (#5906).
 - The task facts in the packet have no instruction or expected result: the assignment block gives
   them.
 - The summary block is reference only. The request messages of the task are always in "Referenced

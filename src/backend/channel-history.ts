@@ -73,6 +73,7 @@ const RESUMED_ASSIGNMENT_NOTE =
 const DEPENDENCY_INSTRUCTION_CHARACTERS = 500;
 const TRANSCRIPT_SHARE = 0.25;
 const AHEAD_SHARE = 0.75;
+const PREPARE_SUMMARY_PASSES = 2;
 const HISTORY_PAGE_CHARACTERS = 24_000;
 const HISTORY_MESSAGE_CHARACTERS = 16_000;
 const HISTORY_TASK_CHARACTERS = 2_000;
@@ -311,6 +312,7 @@ const summarize = Effect.fn("ChannelHistory.summarize")(function* (
   lead: AgentSummary,
   fallbacks: readonly AgentSummary[],
   characterBudget: number,
+  passLimit = Number.POSITIVE_INFINITY,
 ) {
   const dependencies = yield* ChannelHistoryDependencies;
   let messages = conversation(yield* channelSync(() => dependencies.store.messages(channelId)));
@@ -318,7 +320,7 @@ const summarize = Effect.fn("ChannelHistory.summarize")(function* (
   let recent = messages.filter((message) => message.sequence > summary.throughSequence);
   let summaryPasses = 0;
   const limit = Math.floor(characterBudget * TRANSCRIPT_SHARE);
-  while (render(recent).length > limit && recent.length > 1) {
+  while (summaryPasses < passLimit && render(recent).length > limit && recent.length > 1) {
     const old: ChannelMessage[] = [];
     let size = 0;
     let remaining = render(recent).length;
@@ -421,6 +423,7 @@ export class ChannelHistory {
       peers: readonly string[],
       requestedBudget = CONTEXT_CHARACTERS,
       resumed = false,
+      summaryPassLimit = PREPARE_SUMMARY_PASSES,
     ): Effect.fn.Return<
       {
         text: string;
@@ -441,6 +444,7 @@ export class ChannelHistory {
         lead ?? agent,
         lead && agent.id !== lead.id ? [agent] : [],
         characterBudget,
+        summaryPassLimit,
       ).pipe(
         Effect.catch((failure) =>
           Effect.gen(function* () {
@@ -694,7 +698,16 @@ export class ChannelHistory {
         return yield* channelFailure(new Error(sourceText("error.backend.channelContextTooLong")));
       return { text, delta, throughSequence, summaryVersion: summary.version, channelFacts, channelMemories };
     },
-    (operation, _task, _agent, _lead, _delivered, _peers, _requestedBudget?: number, _resumed?: boolean) =>
-      operation.pipe(Effect.provide(this.#layer)),
+    (
+      operation,
+      _task,
+      _agent,
+      _lead,
+      _delivered,
+      _peers,
+      _requestedBudget?: number,
+      _resumed?: boolean,
+      _summaryPassLimit?: number,
+    ) => operation.pipe(Effect.provide(this.#layer)),
   );
 }
