@@ -63,7 +63,7 @@ interface Report {
   quiet?: { status: string | null; reply: string; prompts: number };
   noLoad?: { stopStatus: string | null; next: string | null; sessionsOpened: number; loads: number };
   silentNew?: { error: string; elapsedMs: number };
-  heldSession?: ActiveSessionReport;
+  heldSession?: Record<string, ActiveSessionReport>;
   closedHeldSession?: ActiveSessionReport;
   failure?: string;
 }
@@ -573,23 +573,30 @@ try {
   );
   assert.ok(silentStart.elapsedMs >= STALL_MS, "The session start waits for the stall limit first.");
 
-  const heldLog = join(root, "held-session.jsonl");
-  const held = await openStrict("held-session", { FAKE_HANG_MS: String(STALL_MS * 4) });
-  const heldThread = await startThread(held, { cwd: workspace });
-  const heldStall = await runTurn(held, heldThread, { text: "hang", timeoutMs: STALL_MS * 10 });
-  const heldBusy = await runTurn(held, heldThread, { timeoutMs: 10_000 }).then(
-    () => false,
-    (error: unknown) => error instanceof ProviderSessionBusyError,
-  );
-  await waitForEntry(heldLog, (entry) => entry.event === "prompt-ended", 15_000);
-  const heldNext = await runTurn(held, heldThread, { timeoutMs: 10_000 });
-  report.heldSession = await activeSessionReport(heldLog, heldStall, heldNext, heldBusy);
-  assert.equal(heldStall.status, "failed", "A silent turn of a strict agent fails at the stall limit.");
-  assert.equal(heldBusy, true, "While the stopped prompt still runs, the message waits as for a busy session.");
-  assert.equal(heldNext.status, "completed", "The next message uses the session that the agent still holds.");
-  assert.equal(heldNext.reply, "ok", "The agent answers in the held session.");
-  assert.equal(report.heldSession.sameSession, true, "No new session replaces the chat.");
-  assert.ok(report.heldSession.refusedRestores >= 2, "The agent refused to open the held session again.");
+  report.heldSession = {};
+  for (const refusal of ["active", "reason", "busy"]) {
+    const heldLog = join(root, `${refusal}-held-session.jsonl`);
+    const held = await openStrict(`${refusal}-held-session`, {
+      FAKE_HANG_MS: String(STALL_MS * 4),
+      ...(refusal === "active" ? {} : { FAKE_REFUSAL: refusal }),
+    });
+    const heldThread = await startThread(held, { cwd: workspace });
+    const heldStall = await runTurn(held, heldThread, { text: "hang", timeoutMs: STALL_MS * 10 });
+    const heldBusy = await runTurn(held, heldThread, { timeoutMs: 10_000 }).then(
+      () => false,
+      (error: unknown) => error instanceof ProviderSessionBusyError,
+    );
+    await waitForEntry(heldLog, (entry) => entry.event === "prompt-ended", 15_000);
+    const heldNext = await runTurn(held, heldThread, { timeoutMs: 10_000 });
+    const heldReport = await activeSessionReport(heldLog, heldStall, heldNext, heldBusy);
+    report.heldSession[refusal] = heldReport;
+    assert.equal(heldStall.status, "failed", "A silent turn of a strict agent fails at the stall limit.");
+    assert.equal(heldBusy, true, `While the stopped prompt still runs (${refusal}), the message waits as busy.`);
+    assert.equal(heldNext.status, "completed", "The next message uses the session that the agent still holds.");
+    assert.equal(heldNext.reply, "ok", "The agent answers in the held session.");
+    assert.equal(heldReport.sameSession, true, "No new session replaces the chat.");
+    assert.ok(heldReport.refusedRestores >= 2, "The agent refused to open the held session again.");
+  }
 
   const closedLog = join(root, "closed-held-session.jsonl");
   const closed = await openStrict("closed-held-session", { FAKE_CLOSE: "1", FAKE_RESUME: "1" });
