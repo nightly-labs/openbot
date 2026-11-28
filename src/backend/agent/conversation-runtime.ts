@@ -551,7 +551,6 @@ export class ConversationRuntime {
   ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     this.#dropDeletedMessages(snapshot);
-    if (snapshot.threadId) this.#store.database.keepNewMessagesLast(snapshot.threadId, snapshot.messages);
     sortConversationMessages(snapshot.messages);
     const digests = messageDigests();
     perfCount("conversation.emit");
@@ -562,10 +561,12 @@ export class ConversationRuntime {
       this.#retainPublishedSnapshot(snapshot, digests, signature);
       return;
     }
+    let movedTimes = false;
     if (snapshot.threadId) {
       const cached = this.#cachedSnapshot(snapshot);
       const changedMessages = this.#changedMessages(snapshot, snapshot.threadId, digests);
       const removedMessageIds = this.#removedMessageIds(snapshot);
+      const timesBefore = changedMessages.map((message) => message.createdAt);
       if (
         cached &&
         replacedMessageId !== undefined &&
@@ -598,10 +599,12 @@ export class ConversationRuntime {
           detail,
         });
       } else this.#countUnstoredSend(snapshot, snapshot.threadId);
+      movedTimes = changedMessages.some((message, index) => message.createdAt !== timesBefore[index]);
     }
+    if (movedTimes) sortConversationMessages(snapshot.messages);
     const publishes = this.#publishes;
-    const published = this.#publish(snapshot, signature);
-    if (this.#publishes === publishes + 1) this.#retainPublishedSnapshot(snapshot, digests, published);
+    const published = this.#publish(snapshot, movedTimes ? undefined : signature);
+    if (this.#publishes === publishes + 1 && !movedTimes) this.#retainPublishedSnapshot(snapshot, digests, published);
     else this.#retainPublishedSnapshot(snapshot);
   }
 

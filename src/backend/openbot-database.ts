@@ -30,7 +30,6 @@ import {
   type MailboxProjectionChanges,
   type MailboxProjectionState,
 } from "./database/mailbox-projection";
-import { keepNewMessagesLast } from "./database/new-messages-last";
 import {
   type PinnedThreadMessage,
   pinnedThreadMessageCount,
@@ -380,10 +379,6 @@ export class OpenBotDatabase {
     keepMessageTimes?: boolean;
   }): number {
     return this.#conversationWrites.persistConversationChanges(input);
-  }
-
-  keepNewMessagesLast(threadId: string, messages: readonly ConversationMessage[]): void {
-    keepNewMessagesLast(this.#core.connection, threadId, messages);
   }
 
   deleteThreadHistory(input: { agentId: string; threadId: string }): number {

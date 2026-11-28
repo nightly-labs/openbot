@@ -45,10 +45,13 @@ function keepMovedDeliveryTimes(db: DatabaseSync, threadId: string, messages: re
   const rows = databaseRows(
     cachedStatement(
       db,
-      `SELECT message_id, created_at FROM projection_thread_messages
-       WHERE thread_id = ? AND message_id IN (SELECT value FROM json_each(?))
-         AND json_extract(message_json, '$.steered') IS NOT 1`,
-    ).all(threadId, JSON.stringify(deliveries.map((message) => message.id))),
+      `SELECT saved.message_id, saved.created_at
+       FROM json_each(?) AS incoming
+       JOIN projection_thread_messages AS saved
+         ON saved.thread_id = ? AND saved.message_id = json_extract(incoming.value, '$[0]')
+       WHERE saved.created_at > json_extract(incoming.value, '$[1]')
+         AND json_extract(saved.message_json, '$.steered') IS NOT 1`,
+    ).all(JSON.stringify(deliveries.map((message) => [message.id, message.createdAt])), threadId),
   );
   const savedTimes = new Map(
     rows.map((row) => [requiredStringColumn(row, "message_id"), requiredStringColumn(row, "created_at")]),
