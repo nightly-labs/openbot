@@ -437,6 +437,7 @@ export class ConversationWriter {
     detail?: unknown;
     commandId?: string;
     deletedMessageIds?: readonly string[];
+    keepMessageTimes?: boolean;
   }): number {
     const deletedMessageIds = input.deletedMessageIds ?? [];
     const removedMessageIds = [...new Set([...(input.removedMessageIds ?? []), ...deletedMessageIds])];
@@ -445,7 +446,7 @@ export class ConversationWriter {
     const changedMessages = input.changedMessages.filter((message) => !deleted.has(message.id));
     const result = this.#dispatchKeepingNewMessagesLast(
       input.threadId,
-      changedMessages,
+      input.keepMessageTimes ? [] : changedMessages,
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       () => [
         {
@@ -854,7 +855,7 @@ export class ConversationWriter {
   ): T {
     const db = this.#core.connection;
     return withTransaction(db, () => {
-      keepNewMessagesLast(db, threadId, messages);
+      if (this.#core.commandResult(commandId) === undefined) keepNewMessagesLast(db, threadId, messages);
       return this.#core.dispatch(commandId, events(), project);
     });
   }

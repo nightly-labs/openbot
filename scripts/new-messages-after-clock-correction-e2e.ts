@@ -13,7 +13,12 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/new-messages-after-c
 const FAST_CLOCK_MS = 3 * 60 * 60 * 1000;
 const FUTURE_TURNS = 60;
 
-type CaseName = "clock-corrected" | "mailbox-copy-keeps-moved-time" | "normal-clock" | "older-history";
+type CaseName =
+  | "clock-corrected"
+  | "reply-listed-first"
+  | "mailbox-copy-keeps-moved-time"
+  | "normal-clock"
+  | "older-history";
 
 interface CaseReport {
   name: CaseName;
@@ -74,7 +79,9 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
     const prompt = message("new-prompt", "new-turn", "user", sentAt);
     const reply = message("new-reply", "new-turn", "assistant", sentAt + 1);
     const history = message("older-history", "history-turn", "user", now - 2 * 60 * 60 * 1000);
-    held.messages.push(...(name === "older-history" ? [history] : [prompt, reply]));
+    const added =
+      name === "older-history" ? [history] : name === "reply-listed-first" ? [reply, prompt] : [prompt, reply];
+    held.messages.push(...added);
     conversation.emitConversation(held);
 
     if (name === "mailbox-copy-keeps-moved-time") {
@@ -129,7 +136,13 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
   }
 }
 
-const names: CaseName[] = ["clock-corrected", "mailbox-copy-keeps-moved-time", "normal-clock", "older-history"];
+const names: CaseName[] = [
+  "clock-corrected",
+  "reply-listed-first",
+  "mailbox-copy-keeps-moved-time",
+  "normal-clock",
+  "older-history",
+];
 for (const name of names) {
   const result: CaseReport = { name, latestPageTail: [], publishedTail: [], times: {}, passed: false };
   report.cases.push(result);

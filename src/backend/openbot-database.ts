@@ -377,6 +377,7 @@ export class OpenBotDatabase {
     detail?: unknown;
     commandId?: string;
     deletedMessageIds?: readonly string[];
+    keepMessageTimes?: boolean;
   }): number {
     return this.#conversationWrites.persistConversationChanges(input);
   }

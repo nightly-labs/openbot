@@ -21,6 +21,7 @@ export function keepNewMessagesLast(
     const shownAt = Date.parse(message.createdAt);
     if (message.createdAt > newestSaved && Number.isFinite(shownAt)) latest = Math.max(latest, shownAt);
   }
+  const moving: ConversationMessage[] = [];
   for (const message of messages) {
     const savedFuture = futureTimes.get(message.id);
     if (savedFuture !== undefined) {
@@ -28,6 +29,10 @@ export function keepNewMessagesLast(
       continue;
     }
     if (message.createdAt >= newestSaved || (newestPast !== null && message.createdAt <= newestPast)) continue;
+    moving.push(message);
+  }
+  moving.sort((left, right) => (left.createdAt < right.createdAt ? -1 : left.createdAt > right.createdAt ? 1 : 0));
+  for (const message of moving) {
     latest += 1;
     message.createdAt = new Date(latest).toISOString();
   }
