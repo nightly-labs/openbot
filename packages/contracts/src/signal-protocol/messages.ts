@@ -23,6 +23,12 @@ export const SIGNAL_SESSIONS_ENDED_LIMIT = 256;
 
 export type SignalPeer = "host" | "client" | "ingress";
 
+export const INGRESS_ROUTES_CAPABILITY = "ingress-routes";
+
+export const INGRESS_ROUTES_STATUSES = ["accepted", "refused"] as const;
+
+export type IngressRoutesStatus = (typeof INGRESS_ROUTES_STATUSES)[number];
+
 export const SLACK_DELIVERY_BODY_BYTES_LIMIT = 64 * 1024;
 
 export const SLACK_DELIVERY_RESPONSE_BYTES_LIMIT = 4 * 1024;
@@ -114,6 +120,14 @@ export type SignalClientMessage =
     }
   | { type: "queued-delivery-ack"; version: SignalProtocolVersion; id: string }
   | {
+      type: "ingress-routes";
+      version: SignalProtocolVersion;
+      requestId: string;
+      webhookRoute?: string;
+      githubRoute?: string;
+      telegramRoute?: string;
+    }
+  | {
       type: "webhook-delivery-result";
       version: SignalProtocolVersion;
       requestId: string;
@@ -186,6 +200,7 @@ export type SignalServerMessage =
   | { type: "discord-session"; version: SignalProtocolVersion; token: string; guilds: string[] }
   | { type: "webhook-ready"; version: SignalProtocolVersion }
   | { type: "github-ready"; version: SignalProtocolVersion }
+  | { type: "ingress-routes-result"; version: SignalProtocolVersion; requestId: string; status: IngressRoutesStatus }
   | {
       type: "github-delivery";
       version: SignalProtocolVersion;

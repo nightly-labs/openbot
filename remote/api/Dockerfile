@@ -23,10 +23,11 @@ COPY --from=dependencies /app/remote/api/node_modules ./remote/api/node_modules
 COPY packages/contracts ./packages/contracts
 COPY packages/i18n ./packages/i18n
 COPY remote/api ./remote/api
+RUN mkdir -p /var/lib/openbot-signal && chown bun:bun /var/lib/openbot-signal && chmod 700 /var/lib/openbot-signal
 USER bun
 WORKDIR /app/remote/api
 EXPOSE 8443
-HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD bun -e 'const r=await fetch("http://127.0.0.1:8080/health/ready");process.exit(r.ok?0:1)'
+HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD bun -e 'const r=await fetch("http://127.0.0.1:"+(process.env.REMOTE_HEALTH_PORT||"8080")+"/health/ready");process.exit(r.ok?0:1)'
 ARG OPENBOT_SOURCE_COMMIT=unknown
 ENV OPENBOT_SOURCE_COMMIT=$OPENBOT_SOURCE_COMMIT
 ENTRYPOINT ["bun", "src/index.ts"]

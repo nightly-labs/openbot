@@ -58,6 +58,19 @@ interface QueueEntry extends QueuedFrame {
   expiresAt: number;
 }
 
+export interface HandedOverQueue {
+  keys: [string, string][];
+  entries: {
+    id: string;
+    hostId: string;
+    route: IngressRoute;
+    routeKey: string;
+    sealed: string;
+    telegramCallback: QueuedFrame["telegramCallback"];
+    expiresAt: number;
+  }[];
+}
+
 export function queueRouteKey(platform: IngressRoute["platform"], key: string): string {
   return `${platform}:${key}`;
 }
@@ -103,6 +116,60 @@ export class IngressQueue {
     this.#expiry = null;
     this.#queues.clear();
     this.#bytes = 0;
+  }
+
+  handOver(): HandedOverQueue {
+    const now = this.#now();
+    const entries: HandedOverQueue["entries"] = [];
+    for (const [hostId, queue] of this.#queues) {
+      for (const entry of queue) {
+        if (!entry.sealed || entry.expiresAt <= now) continue;
+        entries.push({
+          id: entry.id,
+          hostId,
+          route: entry.ingressRoute,
+          routeKey: entry.route,
+          sealed: entry.sealed,
+          telegramCallback: entry.telegramCallback,
+          expiresAt: entry.expiresAt,
+        });
+      }
+    }
+    const keys = [...this.#keys];
+    this.#queues.clear();
+    this.#bytes = 0;
+    return { keys, entries };
+  }
+
+  adopt(queue: HandedOverQueue): void {
+    for (const [hostId, key] of queue.keys) if (!this.#keys.has(hostId)) this.rememberKey(hostId, key);
+    const now = this.#now();
+    for (const item of queue.entries) {
+      const entries = this.#queues.get(item.hostId) ?? [];
+      const bytes = item.sealed.length;
+      if (
+        item.expiresAt <= now ||
+        entries.length >= this.#limits.maximumPerHost ||
+        this.#bytes + bytes > this.#limits.maximumBytes ||
+        entries.reduce((total, entry) => total + entry.bytes, 0) + bytes > this.#limits.maximumBytesPerHost
+      )
+        continue;
+      if (entries.some((entry) => entry.id === item.id)) continue;
+      entries.push({
+        id: item.id,
+        ingressRoute: item.route,
+        route: item.routeKey,
+        sealed: item.sealed,
+        telegramCallback: item.telegramCallback,
+        order: ++this.#order,
+        sentTo: null,
+        bytes,
+        expiresAt: Math.min(item.expiresAt, now + this.#limits.ttlMilliseconds),
+      });
+      this.#queues.set(item.hostId, entries);
+      this.#bytes += bytes;
+    }
+    if (queue.entries.length > 0) this.#startExpiry();
   }
 
   readonly offline = Effect.fn("IngressQueue.offline")(function* (

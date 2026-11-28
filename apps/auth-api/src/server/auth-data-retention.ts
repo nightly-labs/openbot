@@ -1,13 +1,15 @@
 import { Context, Effect, Layer, Schema } from "effect";
+import { REMOTE_AUTH_EVENT_DELIVERED, REMOTE_AUTH_EVENT_RETENTION_MS } from "./remote-control-plane";
 import { SESSION_CHANGES_RETENTION_MS } from "./session-cache";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60_000;
 const CREDIT_CODE_LIMIT_WINDOW_MS = 60 * 60_000;
+const RATE_LIMIT_PRUNE_CHUNK = 1_000;
+const RATE_LIMIT_PRUNE_CHUNKS_PER_RUN = 10;
 
 export interface AuthRetentionResult {
   challenges: number;
   sessions: number;
-  rateLimits: number;
   creditCodeLimits: number;
   teamTickets: number;
   remoteSessions: number;
@@ -17,6 +19,7 @@ export interface AuthRetentionResult {
   serverClaims: number;
   companySignIn: number;
   sessionChanges: number;
+  remoteAuthEvents: number;
 }
 
 interface AuthRetentionOperation {
@@ -36,11 +39,6 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       name: "sessions",
       sql: "DELETE FROM auth_sessions WHERE expires_at <= ? OR revoked_at IS NOT NULL",
       cutoff: now,
-    },
-    {
-      name: "rateLimits",
-      sql: "DELETE FROM auth_rate_limits WHERE window_start <= ?",
-      cutoff: now - RATE_LIMIT_WINDOW_MS,
     },
     {
       name: "creditCodeLimits",
@@ -107,6 +105,11 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       sql: "DELETE FROM auth_session_changes WHERE changed_at <= ?",
       cutoff: now - SESSION_CHANGES_RETENTION_MS,
     },
+    {
+      name: "remoteAuthEvents",
+      sql: `DELETE FROM remote_auth_events WHERE next_attempt_at = ${REMOTE_AUTH_EVENT_DELIVERED} AND created_at <= ?`,
+      cutoff: now - REMOTE_AUTH_EVENT_RETENTION_MS,
+    },
   ];
 }
 
@@ -128,7 +131,6 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
   const deleted: AuthRetentionResult = {
     challenges: 0,
     sessions: 0,
-    rateLimits: 0,
     creditCodeLimits: 0,
     teamTickets: 0,
     remoteSessions: 0,
@@ -138,6 +140,7 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
     serverClaims: 0,
     companySignIn: 0,
     sessionChanges: 0,
+    remoteAuthEvents: 0,
   };
   for (const [index, operation] of operations.entries()) {
     deleted[operation.name] += results[index]?.meta.changes ?? 0;
@@ -147,4 +150,31 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
 
 export function pruneExpiredAuthData(database: D1Database, now: number) {
   return prune(now).pipe(Effect.provide(Layer.succeed(AuthRetentionDatabase)(database)));
+}
+
+const pruneRateLimits = Effect.fn("AuthRetention.pruneRateLimits")(function* (now: number) {
+  const database = yield* AuthRetentionDatabase;
+  let deleted = 0;
+  for (let chunk = 0; chunk < RATE_LIMIT_PRUNE_CHUNKS_PER_RUN; chunk += 1) {
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        database
+          .prepare(
+            `DELETE FROM auth_rate_limits WHERE rowid IN (
+               SELECT rowid FROM auth_rate_limits WHERE window_start <= ? LIMIT ?
+             )`,
+          )
+          .bind(now - RATE_LIMIT_WINDOW_MS, RATE_LIMIT_PRUNE_CHUNK)
+          .run(),
+      catch: () => new AuthRetentionError({ message: "Rate limit retention failed." }),
+    });
+    const changes = result.meta.changes ?? 0;
+    deleted += changes;
+    if (changes < RATE_LIMIT_PRUNE_CHUNK) break;
+  }
+  return deleted;
+});
+
+export function pruneExpiredRateLimits(database: D1Database, now: number) {
+  return pruneRateLimits(now).pipe(Effect.provide(Layer.succeed(AuthRetentionDatabase)(database)));
 }

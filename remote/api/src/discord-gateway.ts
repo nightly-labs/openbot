@@ -1,5 +1,11 @@
 import { DiscordAPIError, HTTPError, RateLimitError, REST, RequestMethod } from "@discordjs/rest";
-import { WebSocketManager, WebSocketShardEvents, WebSocketShardStatus } from "@discordjs/ws";
+import {
+  CloseCodes,
+  type SessionInfo,
+  WebSocketManager,
+  WebSocketShardEvents,
+  WebSocketShardStatus,
+} from "@discordjs/ws";
 import { DISCORD_GATEWAY_INTENTS, DISCORD_MESSAGE_CONTENT_INTENT } from "@openbot/contracts/discord-app";
 import { GatewayCloseCodes } from "discord-api-types/v10";
 import { Context, Effect, Fiber, FiberSet, Layer, Schedule, Schema } from "effect";
@@ -11,7 +17,12 @@ import {
   DiscordTransportError,
   makeDiscordApi,
 } from "./discord-api";
-import { DISCORD_DIRECT_MESSAGE_REPLY, type DiscordAction, DiscordState } from "./discord-events";
+import {
+  DISCORD_DIRECT_MESSAGE_REPLY,
+  type DiscordAction,
+  DiscordState,
+  type DiscordStateExport,
+} from "./discord-events";
 import type { SignalService } from "./signal-service";
 
 const DISCORD_REQUEST_TIMEOUT_MILLISECONDS = 10_000;
@@ -75,10 +86,21 @@ function makeDiscordRestTransport(rest: REST): DiscordTransport {
   };
 }
 
-export class DiscordGateway extends Context.Service<DiscordGateway, { readonly api: DiscordApi }>()(
-  "@openbot/remote-api/DiscordGateway",
-) {
-  static layer(config: DiscordBotConfig, signal: SignalService, links: DiscordLinks) {
+export interface DiscordGatewayHandoff {
+  sessions: [number, SessionInfo][];
+  state: DiscordStateExport;
+}
+
+export class DiscordGateway extends Context.Service<
+  DiscordGateway,
+  { readonly api: DiscordApi; readonly handOver: Effect.Effect<DiscordGatewayHandoff> }
+>()("@openbot/remote-api/DiscordGateway") {
+  static layer(
+    config: DiscordBotConfig,
+    signal: SignalService,
+    links: DiscordLinks,
+    handoff: DiscordGatewayHandoff | null = null,
+  ) {
     return Layer.effect(
       DiscordGateway,
       Effect.gen(function* () {
@@ -86,9 +108,13 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
           timeout: DISCORD_REQUEST_TIMEOUT_MILLISECONDS,
           retries: 0,
           rejectOnRateLimit: () => true,
+          ...(config.apiOrigin ? { api: `${config.apiOrigin}/api` } : {}),
         }).setToken(config.botToken);
         const transport = makeDiscordRestTransport(rest);
         const state = new DiscordState(config.applicationId);
+        if (handoff) state.load(handoff.state);
+        const sessions = new Map<number, SessionInfo>(handoff?.sessions ?? []);
+        let handedOver = false;
         const run = yield* FiberSet.makeRuntime<never>();
         const unlinking = new Set<string>();
 
@@ -181,7 +207,16 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
           );
 
         const open = (intents: number): WebSocketManager => {
-          const gateway = new WebSocketManager({ token: config.botToken, intents, rest });
+          const gateway = new WebSocketManager({
+            token: config.botToken,
+            intents,
+            rest,
+            retrieveSessionInfo: (shardId) => sessions.get(shardId) ?? null,
+            updateSessionInfo: (shardId, info) => {
+              if (info) sessions.set(shardId, info);
+              else if (!handedOver) sessions.delete(shardId);
+            },
+          });
           gateway.on(WebSocketShardEvents.Dispatch, (payload) => {
             if (current !== gateway) return;
             let actions: DiscordAction[];
@@ -232,6 +267,7 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
         let stopped = 0;
         let stoppedLimit = DISCORD_STOPPED_CHECKS;
         const check = Effect.suspend(() => {
+          if (handedOver) return Effect.void;
           const gateway = current;
           return Effect.tryPromise(async () => gateway.fetchStatus()).pipe(
             Effect.flatMap((shards) =>
@@ -254,7 +290,20 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
           );
         });
         run(check.pipe(Effect.delay(DISCORD_HEALTH_INTERVAL), Effect.forever));
-        return DiscordGateway.of({ api: makeDiscordApi(transport, state) });
+        const handOver = Effect.suspend(() => {
+          const gateway = current;
+          handedOver = true;
+          return Fiber.interrupt(connecting).pipe(
+            Effect.andThen(
+              Effect.tryPromise({
+                try: async () => gateway.destroy({ code: CloseCodes.Resuming, reason: "Signal handoff" }),
+                catch: () => undefined,
+              }).pipe(Effect.ignore),
+            ),
+            Effect.map((): DiscordGatewayHandoff => ({ sessions: [...sessions], state: state.export() })),
+          );
+        });
+        return DiscordGateway.of({ api: makeDiscordApi(transport, state), handOver });
       }),
     );
   }

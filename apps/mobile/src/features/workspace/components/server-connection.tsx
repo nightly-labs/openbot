@@ -287,7 +287,7 @@ export const ServerConnection = memo(function ServerConnection({
       clientRef.current?.networkChanged(moved);
     }
     const phase = lastStatus.current?.status.phase;
-    if (returned && (phase === "waiting" || phase === "cooldown")) controller.current?.refresh();
+    if (returned && (phase === "waiting" || phase === "cooldown")) controller.current?.resume();
     if (active && membershipRefreshPending.current) {
       membershipRefreshPending.current = false;
       void onMembershipChanged?.().catch(() => undefined);

@@ -276,18 +276,16 @@ export class RemoteEventStream {
     this.#transportConnectedAt.set(serverId, Date.now());
   }
 
-  transportDisconnected(serverId: string): boolean {
+  transportDisconnected(serverId: string): void {
     const connectedAt = this.#transportConnectedAt.get(serverId);
     this.#transportConnectedAt.delete(serverId);
-    if (connectedAt === undefined) return !this.#transportDrops.has(serverId);
+    if (connectedAt === undefined) return;
     if (Date.now() - connectedAt >= REMOTE_EVENT_HEALTHY_MS) {
       this.#transportDrops.delete(serverId);
       this.#reconnectAttempts.delete(serverId);
-      return true;
+      return;
     }
-    const drops = (this.#transportDrops.get(serverId) ?? 0) + 1;
-    this.#transportDrops.set(serverId, drops);
-    return drops === 1;
+    this.#transportDrops.set(serverId, (this.#transportDrops.get(serverId) ?? 0) + 1);
   }
 
   clearReconnectBackoff(serverId: string): void {
