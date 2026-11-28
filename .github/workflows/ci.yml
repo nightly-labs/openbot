@@ -284,6 +284,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:host-list-batch
 
+      - name: Run the owner transfer server list E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:owner-transfer-host-list
+
+      - name: Run the owner transfer server drop E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:owner-transfer-host-drop
+
       - name: Run the account service database replica E2E test
         if: ${{ !cancelled() }}
         run: bun run test:d1-replica-reads

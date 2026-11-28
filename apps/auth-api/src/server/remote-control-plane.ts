@@ -109,6 +109,10 @@ const OWNER_TRANSFER_FROM = `FROM remote_owner_transfers t
   JOIN remote_hosts h ON h.host_id = t.host_id
   JOIN users u ON u.id = t.from_user_id`;
 
+const INCOMING_OWNER_TRANSFERS_SQL = `SELECT ${OWNER_TRANSFER_COLUMNS} ${OWNER_TRANSFER_FROM}
+  WHERE t.to_email = ? AND t.status = 'pending' AND t.expires_at > ? AND h.owner_user_id = t.from_user_id
+  ORDER BY t.created_at DESC LIMIT 20`;
+
 interface OwnerTransferRow {
   transfer_id: string;
   host_id: string;
@@ -213,6 +217,86 @@ export type { RemoteMemberRole };
 
 function hostedStorage(plan: string | null, storageTier: number | null): { storageGb: number } | Record<string, never> {
   return isOneOf(BILLING_PLAN_IDS, plan) ? { storageGb: storageTierGb(plan, storageTierOf(storageTier)) } : {};
+}
+
+const LISTED_HOSTS_SQL = `SELECT h.host_id, h.name, h.logo_key, h.appearance_shape, h.appearance_color, h.device_public_key,
+         h.auth_epoch, m.membership_id, m.role, m.hidden_at,
+         (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
+           AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
+         (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
+           AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
+         (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
+           AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier,
+         ${keyHandoversJsonSql("h.host_id")} AS key_handovers,
+         ${ownerLicensesJsonSql("h.owner_user_id")} AS owner_licenses,
+         ${serverMemberLimitValueSql("h.host_id")} AS custom_member_limit,
+         ${serverEntitlementsJsonSql("h.host_id")} AS server_entitlements,
+         ${CUSTOM_SERVER_OFFER_COLUMNS}
+       FROM remote_memberships m
+       JOIN remote_hosts h ON h.host_id = m.host_id
+       LEFT JOIN custom_server_offers o ON o.host_id = h.host_id
+       WHERE m.user_id = ? AND m.status = 'active'
+       ORDER BY h.name, h.host_id`;
+
+type ListedHostRow = {
+  host_id: string;
+  name: string;
+  logo_key: string | null;
+  appearance_shape: string | null;
+  appearance_color: string | null;
+  device_public_key: string | null;
+  auth_epoch: number;
+  membership_id: string;
+  role: RemoteMemberRole;
+  hidden_at: number | null;
+  hosted_plan: string | null;
+  operator_host: string | null;
+  hosted_storage_tier: number | null;
+  key_handovers: string;
+  owner_licenses: string;
+  custom_member_limit: number | null;
+  server_entitlements: string;
+} & CustomServerOfferRow;
+
+function isListedHostRow(row: ListedHostRow | OwnerTransferRow): row is ListedHostRow {
+  return "membership_id" in row;
+}
+
+function isOwnerTransferRow(row: ListedHostRow | OwnerTransferRow): row is OwnerTransferRow {
+  return "transfer_id" in row;
+}
+
+function listedHosts(rows: readonly ListedHostRow[], now: number) {
+  return rows.map((row) => {
+    const license = ownerLicenseFromRows(newestFirst(jsonRows<OwnerLicenseJsonRow>(row.owner_licenses)), now);
+    const plan = serverEntitlementFromRows(
+      newestFirst(jsonRows<ServerEntitlementJsonRow>(row.server_entitlements)),
+      now,
+    );
+    const custom = row.custom_member_limit === null ? null : { member_limit: row.custom_member_limit };
+    const { limit, licenseRaises } = memberLimitFrom(custom, plan, license);
+    return {
+      hostId: row.host_id,
+      name: row.name,
+      logoKey: row.logo_key,
+      appearance: storedAppearance(row.appearance_shape, row.appearance_color),
+      devicePublicKey: row.device_public_key,
+      keyHandovers:
+        keyHandoversFromRows(
+          jsonRows<RemoteHostKeyHandoverRow>(row.key_handovers).sort((left, right) => left.issued_at - right.issued_at),
+        ).get(row.host_id) ?? [],
+      authEpoch: row.auth_epoch,
+      membershipId: row.membership_id,
+      role: row.role,
+      memberLimit: license ? Math.min(limit, license.users) : limit,
+      licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
+      hosted: row.hosted_plan !== null,
+      ...(row.hidden_at === null ? {} : { hidden: true as const }),
+      ...(row.operator_host === null ? {} : { restartAvailable: false }),
+      ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
+      ...customServerPayment(row, row.role),
+    };
+  });
 }
 
 export class RemoteControlPlaneError extends Schema.TaggedError<RemoteControlPlaneError>()("RemoteControlPlaneError", {
@@ -1085,83 +1169,27 @@ export class RemoteControlPlane {
     function* (this: RemoteControlPlane, userId: string) {
       const dependencies = yield* RemoteDependencies;
       const result = yield* remoteCall(() =>
-        dependencies.database
-          .prepare(
-            `SELECT h.host_id, h.name, h.logo_key, h.appearance_shape, h.appearance_color, h.device_public_key,
-           h.auth_epoch, m.membership_id, m.role, m.hidden_at,
-           (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
-           (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
-           (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier,
-           ${keyHandoversJsonSql("h.host_id")} AS key_handovers,
-           ${ownerLicensesJsonSql("h.owner_user_id")} AS owner_licenses,
-           ${serverMemberLimitValueSql("h.host_id")} AS custom_member_limit,
-           ${serverEntitlementsJsonSql("h.host_id")} AS server_entitlements,
-           ${CUSTOM_SERVER_OFFER_COLUMNS}
-         FROM remote_memberships m
-         JOIN remote_hosts h ON h.host_id = m.host_id
-         LEFT JOIN custom_server_offers o ON o.host_id = h.host_id
-         WHERE m.user_id = ? AND m.status = 'active'
-         ORDER BY h.name, h.host_id`,
-          )
-          .bind(userId)
-          .all<
-            {
-              host_id: string;
-              name: string;
-              logo_key: string | null;
-              appearance_shape: string | null;
-              appearance_color: string | null;
-              device_public_key: string | null;
-              auth_epoch: number;
-              membership_id: string;
-              role: RemoteMemberRole;
-              hidden_at: number | null;
-              hosted_plan: string | null;
-              operator_host: string | null;
-              hosted_storage_tier: number | null;
-              key_handovers: string;
-              owner_licenses: string;
-              custom_member_limit: number | null;
-              server_entitlements: string;
-            } & CustomServerOfferRow
-          >(),
+        dependencies.database.prepare(LISTED_HOSTS_SQL).bind(userId).all<ListedHostRow>(),
       );
+      return listedHosts(result.results ?? [], dependencies.now());
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly listHostsWithTransfers = Effect.fn("RemoteControlPlane.listHostsWithTransfers")(
+    function* (this: RemoteControlPlane, user: AuthUser) {
+      const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
-      return (result.results ?? []).map((row) => {
-        const license = ownerLicenseFromRows(newestFirst(jsonRows<OwnerLicenseJsonRow>(row.owner_licenses)), now);
-        const plan = serverEntitlementFromRows(
-          newestFirst(jsonRows<ServerEntitlementJsonRow>(row.server_entitlements)),
-          now,
-        );
-        const custom = row.custom_member_limit === null ? null : { member_limit: row.custom_member_limit };
-        const { limit, licenseRaises } = memberLimitFrom(custom, plan, license);
-        return {
-          hostId: row.host_id,
-          name: row.name,
-          logoKey: row.logo_key,
-          appearance: storedAppearance(row.appearance_shape, row.appearance_color),
-          devicePublicKey: row.device_public_key,
-          keyHandovers:
-            keyHandoversFromRows(
-              jsonRows<RemoteHostKeyHandoverRow>(row.key_handovers).sort(
-                (left, right) => left.issued_at - right.issued_at,
-              ),
-            ).get(row.host_id) ?? [],
-          authEpoch: row.auth_epoch,
-          membershipId: row.membership_id,
-          role: row.role,
-          memberLimit: license ? Math.min(limit, license.users) : limit,
-          licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
-          hosted: row.hosted_plan !== null,
-          ...(row.hidden_at === null ? {} : { hidden: true as const }),
-          ...(row.operator_host === null ? {} : { restartAvailable: false }),
-          ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
-          ...customServerPayment(row, row.role),
-        };
-      });
+      const [hosts, transfers] = yield* remoteCall(() =>
+        dependencies.database.batch<ListedHostRow | OwnerTransferRow>([
+          dependencies.database.prepare(LISTED_HOSTS_SQL).bind(user.id),
+          dependencies.database.prepare(INCOMING_OWNER_TRANSFERS_SQL).bind(user.email.trim().toLowerCase(), now),
+        ]),
+      );
+      return {
+        hosts: listedHosts((hosts?.results ?? []).filter(isListedHostRow), now),
+        pendingIncomingTransfers: (transfers?.results ?? []).filter(isOwnerTransferRow).map(ownerTransferRecord),
+      };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2001,11 +2029,7 @@ export class RemoteControlPlane {
       const dependencies = yield* RemoteDependencies;
       const rows = yield* remoteCall(() =>
         replicaD1(dependencies.database)
-          .prepare(
-            `SELECT ${OWNER_TRANSFER_COLUMNS} ${OWNER_TRANSFER_FROM}
-           WHERE t.to_email = ? AND t.status = 'pending' AND t.expires_at > ? AND h.owner_user_id = t.from_user_id
-           ORDER BY t.created_at DESC LIMIT 20`,
-          )
+          .prepare(INCOMING_OWNER_TRANSFERS_SQL)
           .bind(user.email.trim().toLowerCase(), dependencies.now())
           .all<OwnerTransferRow>(),
       );
