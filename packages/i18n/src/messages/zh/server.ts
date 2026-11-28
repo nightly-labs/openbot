@@ -744,6 +744,7 @@ export const messages = {
   "server.update.reason.browserControl": "助手进行的浏览器控制",
   "server.update.reason.updateOperation": "另一个更新步骤",
   "server.update.reason.initialization": "OpenBot 启动过程",
+  "server.update.reason.openQuestion": "助手所提问题的回答",
   "server.update.reason.other": "其他工作",
   "server.restartNotice.waitingTitle": "{name} 将重启以安装更新",
   "server.restartNotice.waitingVersionTitle": "{name} 将重启以安装 OpenBot {version}",

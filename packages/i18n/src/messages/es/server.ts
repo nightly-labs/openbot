@@ -736,6 +736,7 @@ export const messages = {
   "server.update.reason.browserControl": "control del navegador por un agente",
   "server.update.reason.updateOperation": "otro paso de actualización",
   "server.update.reason.initialization": "el inicio de OpenBot",
+  "server.update.reason.openQuestion": "una respuesta a la pregunta de un agente",
   "server.update.reason.other": "otro trabajo",
   "server.restartNotice.waitingTitle": "{name} se reinicia para instalar una actualización",
   "server.restartNotice.waitingVersionTitle": "{name} se reinicia para instalar OpenBot {version}",

@@ -887,6 +887,7 @@ export const messages = {
   "server.update.reason.browserControl": "تحكم وكيل في المتصفح",
   "server.update.reason.updateOperation": "خطوة تحديث أخرى",
   "server.update.reason.initialization": "بدء OpenBot",
+  "server.update.reason.openQuestion": "إجابة عن سؤال من وكيل",
   "server.update.reason.other": "عمل آخر",
   "server.restartNotice.waitingTitle": "يُعاد تشغيل {name} لتثبيت تحديث",
   "server.restartNotice.waitingVersionTitle": "يُعاد تشغيل {name} لتثبيت OpenBot {version}",

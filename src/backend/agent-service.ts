@@ -2496,7 +2496,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   workBeforeRestart(): string[] {
-    return this.#activeWork((agentId) => this.#queueWaitsForLimitReset(agentId));
+    const work = this.#activeWork((agentId) => this.#queueWaitsForLimitReset(agentId));
+    return this.#attention.hasDetachedQuestionHoldingRestart() ? [...work, "open-question"] : work;
   }
 
   #queueWaitsForLimitReset(agentId: string): boolean {
