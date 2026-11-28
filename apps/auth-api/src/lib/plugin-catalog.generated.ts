@@ -873,6 +873,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "86ecc21e1d5ad08848beb9041e12285ad03431bd3b46134fcf4e7a4802df3f82",
     },
     {
+      slug: "imageat",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "51f452df1a1379e89ac165a9eacb7298099063b1d07acbf17d7d01174d300746",
+    },
+    {
       slug: "incidentio",
       version: "1.0.0",
       featured: false,
@@ -6817,6 +6823,44 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://ifttt.com",
     privacyPolicyUrl: "https://ifttt.com/privacy",
     termsUrl: "https://ifttt.com/terms",
+    skills: [],
+  },
+  imageat: {
+    slug: "imageat",
+    name: "imageat",
+    tagline: "AI images, videos, edits and voice",
+    description:
+      "imageat lets agents generate images and videos with models such as GPT Image, Nano Banana, Seedream, Kling, Veo and Seedance, edit photos (background removal and replacement, inpainting, object eraser, relighting, virtual try-on), make speech and sound effects, and check the credit balance. Each user signs in to their own imageat account through the browser, and every generation uses that account's credits.",
+    category: "design",
+    creatorName: "imageat",
+    iconUrl: "https://imageat.com/imageat-icon-new.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-credits", text: "How many imageat credits do I have?" },
+      {
+        id: "prompt-product-shot",
+        text: "Make an imageat product photo of a glass perfume bottle on wet black stone.",
+      },
+      { id: "prompt-clip", text: "Turn this photo into a 5-second imageat video with a slow camera push-in." },
+    ],
+    apps: [
+      {
+        id: "app-imageat-mcp",
+        name: "imageat",
+        description:
+          "Image and video generation, photo edits, speech, sound effects and credits, over imageat's MCP server with browser sign-in.",
+        iconUrl: "https://imageat.com/imageat-icon-new.png",
+        server: {
+          name: "imageat",
+          transport: "http",
+          url: "https://mcp.imageat.com/mcp",
+          auth: [{ id: "imageat-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://imageat.com",
+    privacyPolicyUrl: "https://imageat.com/privacy-policy",
+    termsUrl: "https://imageat.com/terms-of-service",
     skills: [],
   },
   incidentio: {
