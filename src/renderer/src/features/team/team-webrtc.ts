@@ -112,7 +112,8 @@ interface PeerState {
 const SIGNAL_RENEW_DELAY_MS = 8_000;
 const DISCONNECT_GRACE_MS = 15_000;
 const SIGNAL_READY_DEADLINE_MS = 30_000;
-const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
+const SIGNAL_PROBE_INTERVAL_MS = 60_000;
+const SIGNAL_PROBE_DEADLINE_MS = 15_000;
 const RELAYED_FRAME_DEADLINE_MS = 30_000;
 const SIGNAL_HOLD_SPREAD_MS = 5_000;
 export const CLIENT_RECONFIRM_MS = SIGNAL_CLIENT_RECONNECT_GRACE_MS + 60_000;
@@ -359,24 +360,26 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       sendHello();
     });
   let refusal: string | null = null;
+  let socketError = false;
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
-    refusal = signalErrorCode(event.data) ?? refusal;
+    if (state.closed || state.socket !== socket) return;
+    let message: SignalServerMessage | null;
+    try {
+      message = decodeSignalServerMessage(JSON.parse(event.data));
+    } catch {
+      failSignalProtocol(state);
+      return;
+    }
+    if (message?.type === "error") refusal = message.code;
+    else if (message?.type === "ready") refusal = null;
+    if (message && (state.signalReadyTimer === null || message.type === "ready")) probeSignalLater(state);
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
-        let message: SignalServerMessage | null;
-        try {
-          message = decodeSignalServerMessage(JSON.parse(event.data));
-        } catch {
-          return failSignalProtocol(state);
-        }
         if (message) await handleSignal(state, message);
       })
-      .catch(() => failPeer(state))
-      .then(() => {
-        if (state.socket === socket) probeSignalLater(state);
-      });
+      .catch(() => failPeer(state));
   });
   socket.addEventListener("close", (event) => {
     if (state.socket !== socket) return;
@@ -384,7 +387,13 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
     clearSignalLiveness(state);
     if (state.role === "host") pauseClientReconfirm(state);
     if (state.role === "host" && !state.closed)
-      post({ type: "signal-closed", peerId: state.id, code: String(event.code), terminal: event.code === 4000 });
+      post({
+        type: "signal-closed",
+        peerId: state.id,
+        code: String(event.code),
+        terminal: event.code === 4000,
+        message: refusal ?? (socketError ? "socket_error" : undefined),
+      });
     if (event.code === 4000) {
       disconnect(state.id);
       post({ type: "peer-disconnected", peerId: state.id });
@@ -393,7 +402,10 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
     holdSignalAfterClose(event.code, refusal);
     if (!state.closed) scheduleSignalReconnect(state);
   });
-  socket.addEventListener("error", () => socket.close());
+  socket.addEventListener("error", () => {
+    socketError = true;
+    socket.close();
+  });
   if (open) sendHello();
 }
 
@@ -627,6 +639,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       connectionId: message.connectionId,
       channel: "team",
       sdp: state.privateNetwork ? privateNetworkSdp(requiredDescriptionSdp(answer)) : requiredDescriptionSdp(answer),
+      privateNetwork: state.privateNetwork,
     });
   } else if (message.type === "answer") {
     const previousFingerprint = sdpFingerprint(state.peerConnection?.remoteDescription?.sdp);
@@ -709,6 +722,18 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
       if (state.signalHost && !state.pathLost) {
         state.pathLost = true;
         post({ type: "peer-path-lost", peerId: state.id });
+        if (
+          state.channels.rpc?.readyState === "open" &&
+          state.connectionId &&
+          state.signalHost.socket?.readyState === WebSocket.OPEN
+        ) {
+          sendSignal(state, {
+            type: "ice-restart",
+            version: SIGNAL_PROTOCOL_VERSION,
+            connectionId: state.connectionId,
+            channel: "team",
+          });
+        }
       }
     }
     if (connection.connectionState === "closed") post({ type: "peer-disconnected", peerId: state.id });
@@ -1060,7 +1085,7 @@ function scheduleSignalReconnect(state: PeerState): void {
   }, delay);
 }
 
-function awaitSignalReady(state: PeerState, socket: WebSocket): void {
+function awaitSignalReady(state: PeerState, socket: WebSocket, deadline = SIGNAL_READY_DEADLINE_MS): void {
   if (state.role !== "host") return;
   clearSignalLiveness(state);
   state.signalReadyTimer = window.setTimeout(() => {
@@ -1071,7 +1096,7 @@ function awaitSignalReady(state: PeerState, socket: WebSocket): void {
     socket.close(1000, "No ready");
     post({ type: "signal-closed", peerId: state.id, code: SIGNAL_NO_READY_CLOSE_CODE, terminal: false });
     scheduleSignalReconnect(state);
-  }, SIGNAL_READY_DEADLINE_MS);
+  }, deadline);
 }
 
 function probeSignalLater(state: PeerState): void {
@@ -1081,8 +1106,8 @@ function probeSignalLater(state: PeerState): void {
   state.signalProbeTimer = window.setTimeout(() => {
     state.signalProbeTimer = null;
     if (state.closed || !socket || state.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+    awaitSignalReady(state, socket, SIGNAL_PROBE_DEADLINE_MS);
     sendSignal(state, { type: "turn-refresh", version: SIGNAL_PROTOCOL_VERSION, connectionId: null });
-    awaitSignalReady(state, socket);
   }, SIGNAL_PROBE_INTERVAL_MS);
 }
 

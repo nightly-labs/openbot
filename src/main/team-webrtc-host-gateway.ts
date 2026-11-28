@@ -386,17 +386,18 @@ export class TeamWebRtcHostGateway {
     }
   };
 
-  readonly #onSignalClosed = (peerId: string, code: string, terminal: boolean): void => {
+  readonly #onSignalClosed = (peerId: string, code: string, terminal: boolean, reason: string | undefined): void => {
     if (peerId !== this.#hostId) return;
-    this.#lastSignalEnd = `close ${code}`;
+    const detail = reason ? `${code} (${reason})` : code;
+    this.#lastSignalEnd = `close ${detail}`;
     if (terminal) {
-      logger.warn(`Host Signal socket closed with code ${code}; it does not connect again.`);
+      logger.warn(`Host Signal socket closed with code ${detail}; it does not connect again.`);
       this.#cancelSignalMove();
       this.#cancelSignalLostReport();
     } else {
       if (code === SIGNAL_NO_READY_CLOSE_CODE)
         logger.warn("Host Signal socket did not answer in time; it connects again.");
-      else logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
+      else logger.info(`Host Signal socket closed with code ${detail}; it connects again.`);
       this.#scheduleSignalMove();
       this.#scheduleSignalLostReport();
     }

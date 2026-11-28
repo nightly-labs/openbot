@@ -46,7 +46,7 @@ function hostAwayRetryDelay(failures: number): number {
 }
 
 export interface RemoteRecoveryStatus {
-  phase: "connecting" | "waiting" | "cooldown" | "online" | "suspended";
+  phase: "connecting" | "host-waiting" | "waiting" | "cooldown" | "online" | "suspended";
   attempt: number;
   remainingSeconds: number;
 }
@@ -100,6 +100,7 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.signalClosed",
       "error.remote.relayUnavailable",
       "error.remote.iceFailed",
+      "error.remote.privateNetworkUnreachable",
       "error.remote.connectionServiceUnreachable",
       "error.remote.deviceConnectionServiceUnreachable",
       "error.remote.serverAnswerTimeout",
@@ -154,6 +155,7 @@ export function remoteConnectionFailureDetails(stage: RemoteConnectionStage, err
 
 export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: string | null): string | null {
   if (status.phase === "online") return null;
+  if (status.phase === "host-waiting") return sourceText("error.remote.hostOffline");
   const detail = failure || null;
   if (status.phase === "suspended") {
     return detail

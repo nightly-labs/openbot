@@ -35,6 +35,7 @@ export type RemoteTeamBridgeHandle = {
 interface RemoteTeamBridgeProps extends Omit<RemoteTeamPeerActions, "onTeamEvent"> {
   ref?: Ref<RemoteTeamBridgeHandle>;
   active: boolean;
+  waitForHost: boolean;
   onTeamEvents: (hostId: string, events: RemoteTeamEvent[]) => Promise<void>;
   onCommandResult: (result: RemoteTeamCommandResult) => Promise<void>;
   onReady?: () => Promise<void>;
@@ -79,6 +80,7 @@ function requestError(body: unknown): string {
 export default function RemoteTeamBridge({
   ref,
   active,
+  waitForHost,
   onCommandResult,
   onReady,
   onBrowserViewEvent,
@@ -130,7 +132,8 @@ export default function RemoteTeamBridge({
       await callbacks.onConnectionUpdate(update);
     },
   };
-  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions, { clientProtocol: TEAM_WEB_CLIENT_PROTOCOL });
+  if (!runtime.current)
+    runtime.current = createRemoteTeamPeer(actions, { clientProtocol: TEAM_WEB_CLIENT_PROTOCOL, waitForHost });
   const peer = runtime.current;
   if (!browserView.current)
     browserView.current = createBrowserViewBridge(
@@ -231,6 +234,8 @@ export default function RemoteTeamBridge({
   useEffect(() => {
     if (appliedActive.current === null) setActive(active);
   }, [active, setActive]);
+
+  useEffect(() => peer.setWaitForHost(waitForHost), [peer, waitForHost]);
 
   useEffect(() => {
     const restore = () => peer.networkRestored();

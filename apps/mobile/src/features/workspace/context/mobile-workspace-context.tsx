@@ -1736,7 +1736,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
       if (status.phase === "online" && hostId === activeServerIdRef.current) setHold(null);
       if (status.phase === "online") wakeAttempts.current.delete(hostId);
-      if (status.phase !== "waiting" && status.phase !== "cooldown") return;
+      if (status.phase !== "waiting" && status.phase !== "cooldown" && status.phase !== "host-waiting") return;
       if (!foregroundRef.current) return;
       if (wakeAttempts.current.get(hostId) === status.attempt) return;
       wakeAttempts.current.set(hostId, status.attempt);

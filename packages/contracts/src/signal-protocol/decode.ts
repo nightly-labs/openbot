@@ -81,6 +81,9 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         connectionId: identifier(value.connectionId),
         channel: channel(value.channel),
         sdp: identifier(value.sdp),
+        ...(kind === "answer" && value.privateNetwork !== undefined
+          ? { privateNetwork: flag(value.privateNetwork) }
+          : {}),
       };
     case "ice-candidate":
       return {

@@ -170,6 +170,7 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     connectionId: identifierSchema,
     channel: channelSchema,
     sdp: z.string().min(1).max(60_000),
+    privateNetwork: z.boolean().optional(),
   }),
   z.object({
     type: z.literal("ice-candidate"),

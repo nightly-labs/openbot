@@ -356,6 +356,8 @@ interface PendingRequest {
   profile: RemoteRequestProfile | null;
 }
 
+type RelayRetry = "available" | "pending" | "used";
+
 interface PeerState {
   generation: number;
   hostId: string;
@@ -382,6 +384,9 @@ interface PeerState {
   turnRefreshTimer: ReturnType<typeof setTimeout> | null;
   turnRefreshDueAt: number;
   iceServers: RTCIceServer[];
+  privateNetwork?: boolean;
+  relayRetry: RelayRetry;
+  iceTransportPolicy: RTCIceTransportPolicy;
   restartIceOnReady: boolean;
   lastEventSequence: number;
   eventAckTimer: ReturnType<typeof setTimeout> | null;
@@ -433,7 +438,7 @@ const TYPING_REFRESH_MILLISECONDS = 2_000;
 const SIGNAL_RENEW_DELAY_MS = 8_000;
 const HOST_WAIT_RENEW_MS = 60_000;
 const FAILED_OPENS_BEFORE_NEW_TICKET = 2;
-const HOST_WAIT_TICKET_MS = 10_000;
+const HOST_WAIT_TICKET_MS = 15_000;
 const HOST_WAIT_TICKET_MAX_MS = 5 * 60_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 function signalRetryDelay(attempt: number): number {
@@ -565,7 +570,7 @@ export function createRemoteTeamPeer(
     }),
   );
   const closingSessions = new Map<string, Deferred.Deferred<void>>();
-  let retainedSession: { hostId: string; sessionId: string } | null = null;
+  let retainedSession: { hostId: string; sessionId: string; relayRetry: RelayRetry } | null = null;
   const hostProtocols: RemoteHostProtocols = options.hostProtocols ?? new Map<string, number>();
   const clientProtocol = options.clientProtocol ?? TEAM_WEBRTC_CLIENT_PROTOCOL;
   let lastSignal: { hostId: string; signalUrl: string; iceServers: RTCIceServer[]; at: number } | null = null;
@@ -621,6 +626,9 @@ export function createRemoteTeamPeer(
     execute: (command: RemoteTeamCommand) => runPeerEffect(executeCommand(command, actions)),
     setWaitForHost(value: boolean) {
       waitForHost = value;
+      const state = peer;
+      if (!value && state?.waitingForHost)
+        failPeer(state, referenced(sourceText("error.remote.hostOffline"), "signal/host_unavailable"), actions);
     },
     dispose: async () => {
       active = false;
@@ -1020,7 +1028,8 @@ export function createRemoteTeamPeer(
       if (currentGeneration !== generation || !active)
         return yield* new RemotePeerError({ message: sourceText("error.remote.connectionReplaced") });
       const clientPublicKey = identity.publicKeyPem;
-      const existingSessionId = retainedSession?.hostId === hostId ? retainedSession.sessionId : null;
+      const retained = retainedSession?.hostId === hostId ? retainedSession : null;
+      const existingSessionId = retained?.sessionId ?? null;
       yield* Effect.forkIn(releaseRetainedSession(actions.current.endSession, hostId), workScope, {
         startImmediately: true,
         uninterruptible: true,
@@ -1064,6 +1073,8 @@ export function createRemoteTeamPeer(
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
         iceServers: [],
+        relayRetry: retained?.relayRetry === "pending" ? "used" : (retained?.relayRetry ?? "available"),
+        iceTransportPolicy: retained?.relayRetry === "pending" ? "relay" : "all",
         restartIceOnReady: false,
         lastEventSequence: 0,
         eventAckTimer: null,
@@ -1328,7 +1339,7 @@ export function createRemoteTeamPeer(
             actions.current.onConnectionUpdate({
               hostId: state.hostId,
               state: "connecting",
-              message: sourceText("error.remote.desktopOffline"),
+              message: sourceText("error.remote.hostOffline"),
               hostOffline: true,
             }),
           ),
@@ -1348,6 +1359,11 @@ export function createRemoteTeamPeer(
         if (state.waitingForHost) {
           state.waitingForHost = false;
           armConnectedTimer(state, actions);
+          yield* notify(
+            peerCall(() =>
+              actions.current.onConnectionUpdate({ hostId: state.hostId, state: "connecting", message: null }),
+            ),
+          );
         }
         const turnRefresh = message.connectionId === null;
         if (state.offerPending && Date.now() - state.preparedAt > PREPARED_CONNECTION_LIFETIME_MS)
@@ -1374,7 +1390,10 @@ export function createRemoteTeamPeer(
           else {
             state.offerPending = false;
             yield* peerDecode(() =>
-              preparedConnection.setConfiguration({ iceServers: state.iceServers, bundlePolicy: "max-bundle" }),
+              preparedConnection.setConfiguration({
+                ...preparedConnection.getConfiguration(),
+                iceServers: state.iceServers,
+              }),
             );
             yield* peerDecode(() =>
               sendSignal(state, {
@@ -1414,7 +1433,7 @@ export function createRemoteTeamPeer(
         if (state.connection) {
           const connection = state.connection;
           yield* peerDecode(() =>
-            connection.setConfiguration({ iceServers: state.iceServers, bundlePolicy: "max-bundle" }),
+            connection.setConfiguration({ ...connection.getConfiguration(), iceServers: state.iceServers }),
           );
           if (restartsIce) yield* restartIce(state);
         }
@@ -1457,6 +1476,7 @@ export function createRemoteTeamPeer(
         if (previousFingerprint && nextFingerprint !== previousFingerprint) {
           return yield* new RemotePeerError({ message: sourceText("error.remote.connectionDropped") });
         }
+        state.privateNetwork = message.privateNetwork ?? state.privateNetwork;
         yield* peerCall(() => state.connection?.setRemoteDescription({ type: "answer", sdp: message.sdp }));
         state.iceRestartSentAt = null;
         for (const line of sdpCandidateLines(message.sdp)) state.remoteCandidates.add(line);
@@ -1476,7 +1496,7 @@ export function createRemoteTeamPeer(
           }),
         );
         state.remoteCandidates.add(message.candidate);
-      } else {
+      } else if (state.iceRestartSentAt === null) {
         yield* restartIce(state);
       }
     })();
@@ -1485,7 +1505,11 @@ export function createRemoteTeamPeer(
   function createPeerConnection(state: PeerState, iceServers: RTCIceServer[], actions: ActionsRef): RTCPeerConnection {
     if (typeof RTCPeerConnection !== "function")
       throw referenced(sourceText("error.remote.webrtcBlocked"), "webrtc/unavailable");
-    const connection = new RTCPeerConnection({ iceServers, bundlePolicy: "max-bundle" });
+    const connection = new RTCPeerConnection({
+      iceServers,
+      bundlePolicy: "max-bundle",
+      iceTransportPolicy: state.iceTransportPolicy,
+    });
     state.connection = connection;
     state.iceRestarts = 0;
     state.iceRestartSentAt = null;
@@ -2346,7 +2370,20 @@ export function createRemoteTeamPeer(
     code?: RemoteTeamConnectionUpdate["code"],
   ): void {
     if (state.closed || peer !== state) return;
-    const failure = referenced(failureMessage(error), failureReference(error));
+    const reference = failureReference(error);
+    const iceSetupFailed =
+      !state.authenticated &&
+      (reference === "webrtc/ice/failed" ||
+        reference === "webrtc/ice/disconnected" ||
+        reference === "timeout/connect/ice");
+    if (iceSetupFailed && state.privateNetwork === false && state.relayRetry === "available") {
+      state.relayRetry = "pending";
+      diagnose(state, "stalled", "Retry using TURN only");
+    }
+    const failure =
+      iceSetupFailed && state.privateNetwork
+        ? referenced(sourceText("error.remote.privateNetworkUnreachable"), "webrtc/ice/private_network_unreachable")
+        : referenced(failureMessage(error), reference);
     diagnose(state, "failed", failureDetail(failure, code));
     rejectConnection(state, failure);
     void runPeerEffect(connectionOffline(state, failure, actions, code));
@@ -2476,7 +2513,7 @@ export function createRemoteTeamPeer(
       rejectRequests(new Error(sourceText("error.remote.serverDisconnected")));
       rejectConnection(state, new Error(sourceText("error.remote.serverDisconnected")));
       if (retainSession) {
-        retainedSession = { hostId: state.hostId, sessionId: state.sessionId };
+        retainedSession = { hostId: state.hostId, sessionId: state.sessionId, relayRetry: state.relayRetry };
         return;
       }
       const previous = closingSessions.get(state.hostId);
@@ -2537,6 +2574,7 @@ export function createRemoteTeamPeer(
   }
 
   function settleConnected(state: PeerState): void {
+    state.relayRetry = "available";
     if (state.connectedTimer !== null) clearTimeout(state.connectedTimer);
     state.connectedTimer = null;
     if (state.connected) Deferred.doneUnsafe(state.connected, Effect.void);

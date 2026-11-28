@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { join } from "node:path";
 import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
-import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
+import { type IceServer, SIGNAL_ERROR_CODES } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -20,7 +20,7 @@ interface TeamWebRtcBridgeEvents {
   signalOpen: [peerId: string];
   hostWaiting: [peerId: string];
   signalHeld: [peerId: string, retryInMs: number];
-  signalClosed: [peerId: string, code: string, terminal: boolean];
+  signalClosed: [peerId: string, code: string, terminal: boolean, reason: string | undefined];
   incoming: [
     peerId: string,
     connection: {
@@ -130,6 +130,7 @@ const LIVENESS_INTERVAL_MS = 30_000;
 const LIVENESS_MISSES = 2;
 
 const logger = createOpenBotLogger("team-webrtc-bridge");
+const signalCloseReasonSchema = z.enum([...SIGNAL_ERROR_CODES, "socket_error"]);
 
 export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   readonly #options: TeamWebRtcBridgeOptions;
@@ -466,7 +467,13 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "signal-held" && message.retryInMs !== undefined)
       this.emit("signalHeld", message.peerId, message.retryInMs);
     else if (message.type === "signal-closed" && message.code)
-      this.emit("signalClosed", message.peerId, message.code, message.terminal === true);
+      this.emit(
+        "signalClosed",
+        message.peerId,
+        message.code,
+        message.terminal === true,
+        signalCloseReasonSchema.safeParse(message.message).data,
+      );
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)
       this.emit("connected", message.peerId, {
         localFingerprint: message.localFingerprint,

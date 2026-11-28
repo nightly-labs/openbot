@@ -6,6 +6,7 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { resolve } from "node:path";
 import { createHostGrantKeyPair } from "@openbot/contracts/host-grant";
+import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import {
   GITHUB_DELIVERY_BODY_BYTES_LIMIT,
   GITHUB_DELIVERY_HEADER,
@@ -352,7 +353,14 @@ function remoteTicket(
   overrides: Partial<
     Pick<
       RemoteTicketClaims,
-      "hostId" | "userId" | "membershipId" | "sessionExpiresAt" | "protocolMinimum" | "protocolMaximum" | "signal"
+      | "hostId"
+      | "userId"
+      | "membershipId"
+      | "role"
+      | "sessionExpiresAt"
+      | "protocolMinimum"
+      | "protocolMaximum"
+      | "signal"
     >
   > = {},
   key = privateKey,
@@ -680,6 +688,41 @@ try {
   await waitForReady(`${base}/health/ready`, child);
   const signalReadyAt = Date.now();
   logger.info(`Signal is ready on port ${signalPort}.`);
+
+  await check("Signal connects a waiting client and forwards the host route", async () => {
+    const hostId = "host-waiting-e2e";
+    const client = await connect(signalUrl);
+    let host: Peer | undefined;
+    try {
+      const token = await remoteTicket({ hostId, membershipId: `${hostId}:member`, role: "member" });
+      client.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "client", token, waitForHost: true }));
+      await client.next((frame) => frame.includes('"type":"host-waiting"'), "host waiting");
+      host = await hello(signalUrl, await remoteTicket({ hostId, membershipId: `${hostId}:host` }));
+      const ready = decodeSignalServerMessage(
+        JSON.parse(await client.next((frame) => frame.includes('"type":"ready"'), "waiting client ready")),
+      );
+      if (ready?.type !== "ready" || !ready.connectionId) throw new Error("Signal did not assign a connection.");
+      await host.next((frame) => frame.includes('"type":"peer-ready"'), "host peer ready");
+      host.socket.send(
+        JSON.stringify({
+          type: "answer",
+          version: 1,
+          channel: "team",
+          connectionId: ready.connectionId,
+          sdp: "v=0",
+          privateNetwork: true,
+        }),
+      );
+      const answer = decodeSignalServerMessage(
+        JSON.parse(await client.next((frame) => frame.includes('"type":"answer"'), "host answer")),
+      );
+      expect(answer?.type === "answer" && answer.privateNetwork === true, "Signal dropped the private route.");
+      return "host-waiting → ready on the same socket, then answer with privateNetwork=true";
+    } finally {
+      client.socket.close();
+      host?.socket.close();
+    }
+  });
 
   const ingress = await connect(signalUrl);
   ingress.socket.send(

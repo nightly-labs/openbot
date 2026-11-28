@@ -197,6 +197,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.signalClosed": "The connection to Signal closed before the host answered.",
   "error.remote.relayUnavailable": "Signal sent no relay servers for this connection. Try again later.",
   "error.remote.iceFailed": "A direct connection to the host could not be made. A firewall, VPN or proxy can block it.",
+  "error.remote.privateNetworkUnreachable":
+    "The host uses Private network mode. Connect this device to a private network that can reach the host.",
   "error.remote.iceDisconnected": "The direct connection to the host was lost.",
   "error.remote.webrtcBlocked":
     "This device blocks the connection that OpenBot needs. If Lockdown Mode is on, turn it off for OpenBot in Settings > Privacy & Security > Lockdown Mode.",

@@ -153,6 +153,16 @@ export const ServerConnection = memo(function ServerConnection({
         `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.reference ? ` [${update.reference}]` : ""}${update.hostOffline ? ", host not on Signal" : ""}${update.resync ? ", resync" : ""}`,
       );
       if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
+      const last = lastStatus.current;
+      if (update.state === "connecting" && last && (update.hostOffline || last.status.phase === "host-waiting")) {
+        clearTimeout(resumeTimer.current);
+        resumeTimer.current = undefined;
+        resuming.current = false;
+        const phase = update.hostOffline ? "host-waiting" : "connecting";
+        const status = { phase, attempt: last.status.attempt, remainingSeconds: 0 } as const;
+        lastStatus.current = { status, failure: null };
+        onStatusRef.current(hostId, status, null, false);
+      }
       if (update.state === "online" && update.lostAfterMs !== undefined) lostAfterMs.current = update.lostAfterMs;
       if (update.state === "offline") {
         if (activeRef.current && !backgroundRef.current) analytics.lost();
@@ -306,6 +316,7 @@ export const ServerConnection = memo(function ServerConnection({
       ref={attach}
       hostId={hostId}
       active={active}
+      waitForHost={!background}
       directory={directory}
       onMembershipChanged={onMembershipChanged}
       onNetworkRestored={handleNetworkRestored}

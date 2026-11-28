@@ -71,6 +71,7 @@ export type SignalRelayMessage =
       connectionId: string;
       channel: SignalChannel;
       sdp: string;
+      privateNetwork?: boolean;
     }
   | {
       type: "ice-candidate";

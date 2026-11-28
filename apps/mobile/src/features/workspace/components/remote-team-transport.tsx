@@ -100,6 +100,7 @@ export interface RemoteDesktopStream {
 interface RemoteTeamTransportProps {
   hostId: string;
   active: boolean;
+  waitForHost: boolean;
   directory: RemoteTeamDirectoryClient;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => void;
   onDiagnostic?: (step: RemoteTeamDiagnostic["step"], detail: string | undefined) => void;
@@ -578,6 +579,7 @@ export const RemoteTeamTransport = memo(
         key={bridgeKey}
         ref={bridge}
         active={props.active}
+        waitForHost={props.waitForHost}
         dom={BRIDGE_DOM}
         onCommandResult={handleCommandResult}
         onReady={handleReady}
