@@ -1,4 +1,5 @@
 import { analyticsTokens, type ConversationTurnTrace } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { AgentStep, AgentStepsFacts } from "@openbot/ui/features/conversation/AgentSteps";
 import { silentAgentAnswer } from "@openbot/ui/features/conversation/new-message-tally";
@@ -207,7 +208,7 @@ export function createTurnSteps(deps: {
     const thoughts = thinking.get(turnId);
     const timed: TimedStep[] = [];
     for (const [index, text] of (thoughts?.items ?? []).entries()) {
-      if (!text.trim()) continue;
+      if (!markdownPreviewText(text)) continue;
       const id = thoughts?.itemIds?.[index] ?? `${thoughts?.id}:${index}`;
       const written = Date.parse(thoughts?.itemCreatedAt?.[index] ?? "");
       const at = Number.isFinite(written) ? written : (seenAt.get(id) ?? now);
