@@ -1583,12 +1583,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                   });
                   const resetDelayMs = providerResetDelayMs(failed.message);
                   const spent = resetDelayMs === null && isBalanceDiagnostic(failed.message);
-                  this.#usageLimits.failed(
-                    lead.id,
-                    lead.model,
-                    resetDelayMs,
-                    spent,
-                    failed.causeCode === "authentication",
+                  return (spent ? this.#usageLimits.spentWindowReset(lead.id, lead.model) : Effect.succeed(null)).pipe(
+                    Effect.flatMap((windowReset) =>
+                      windowReset !== null
+                        ? this.#usageLimits.reached(lead.id, windowReset, lead.model)
+                        : Effect.sync(() =>
+                            this.#usageLimits.failed(
+                              lead.id,
+                              lead.model,
+                              resetDelayMs,
+                              spent,
+                              failed.causeCode === "authentication",
+                            ),
+                          ),
+                    ),
                   );
                 }
                 return Effect.void;

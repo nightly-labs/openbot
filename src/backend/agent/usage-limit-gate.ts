@@ -310,6 +310,20 @@ export class UsageLimitGate {
     );
   }).bind(this);
 
+  readonly spentWindowReset = Effect.fn("UsageLimitGate.spentWindowReset")(function* (
+    this: UsageLimitGate,
+    agentId: string,
+    model: string | null = null,
+  ) {
+    const agent = this.#agent(agentId);
+    if (!agent) return null;
+    const usage = yield* this.#hooks.readUsage(providerForAgent(agent), model ?? agent.model, accountOf(agent)).pipe(
+      Effect.timeoutOrElse({ duration: RETURN_READ_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+      Effect.catch(() => Effect.succeed(null)),
+    );
+    return usage ? spentWindowReset(usage) : null;
+  }).bind(this);
+
   readonly completed = Effect.fn("UsageLimitGate.completed")(function* (
     this: UsageLimitGate,
     agentId: string,

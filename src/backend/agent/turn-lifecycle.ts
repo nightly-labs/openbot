@@ -1246,13 +1246,20 @@ export class TurnLifecycle {
     }
   }
 
-  #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
+  readonly #markFailed = Effect.fn("TurnLifecycle.markFailed")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    model: string | null,
+    failover: HeldProviderError,
+  ) {
     const resetDelayMs = providerResetDelayMs(failover.message);
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
+    const windowReset = spent ? yield* this.#usageLimits.spentWindowReset(agentId, model) : null;
+    if (windowReset !== null) return yield* this.#usageLimits.reached(agentId, windowReset, model);
     const { causeCode, provider } = failover.context;
     const notOffered = causeCode === "model_not_found" && provider === "claude";
     this.#usageLimits.failed(agentId, model, resetDelayMs, spent, causeCode === "authentication", notOffered);
-  }
+  });
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
     const threadId = getString(params, "threadId");
@@ -1885,7 +1892,7 @@ export class TurnLifecycle {
           !isRefusedGeminiToken(source.provider, message) &&
           this.#hooks.poolHasOtherAccount(agentId)
         )
-          this.#markFailed(agentId, context.model, { message, context });
+          yield* this.#markFailed(agentId, context.model, { message, context });
         if (
           notification.method === "error" &&
           agentId &&
@@ -2524,7 +2531,7 @@ export class TurnLifecycle {
           (failedOver && mayContinue) || (runsAgainHere && !mayRunAgain) ? yield* continuedWork : undefined,
           running?.failureReports,
         );
-        if (failedOver || (channelRunsAgain && backupTakes())) this.#markFailed(agentId, model, failover);
+        if (failedOver || (channelRunsAgain && backupTakes())) yield* this.#markFailed(agentId, model, failover);
         if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
         this.#hooks.scheduleDrain(agentId);
         return;
@@ -2534,7 +2541,7 @@ export class TurnLifecycle {
         failedKey !== null &&
         ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) || (channelTask && backupTakes()))
       )
-        this.#markFailed(agentId, model, failover);
+        yield* this.#markFailed(agentId, model, failover);
       if (failover) this.#showFailoverError(agentId, threadId, failover, status === "failed" && !limited);
       if (compactionFailure && compactionContinuation)
         this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...compactionFailure.context });
