@@ -59,6 +59,7 @@ const signalMessageTypeSchema = z.enum([
   "telegram-call",
   "queued-delivery-ack",
   "watch-delivery-result",
+  "ingress-routes",
 ]);
 
 const telegramChatIdSchema = z.int();
@@ -162,6 +163,8 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     queueKey: z.string().max(128).optional(),
     webhookFormats: z.array(z.string().min(1).max(64)).max(8).optional().catch(undefined),
     watchRelay: z.boolean().optional(),
+    goAway: z.boolean().optional(),
+    resumeFrom: z.string().min(1).max(8_192).optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),
@@ -207,6 +210,14 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("queued-delivery-ack"),
     version: z.literal(1),
     id: identifierSchema,
+  }),
+  z.object({
+    type: z.literal("ingress-routes"),
+    version: z.literal(1),
+    requestId: identifierSchema,
+    webhookRoute: z.string().min(1).max(8_192).optional(),
+    githubRoute: z.string().min(1).max(16_384).optional(),
+    telegramRoute: z.string().min(1).max(16_384).optional(),
   }),
   z.object({
     type: z.literal("webhook-delivery-result"),

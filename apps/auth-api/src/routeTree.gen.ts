@@ -138,6 +138,7 @@ import { Route as V1AgentTemplatesTemplateIdRouteImport } from './routes/v1/agen
 import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-templates/mine'
 import { Route as V1AppMinimumVersionRouteImport } from './routes/v1/app/minimum-version'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
+import { Route as V1AuthAccessTokenRouteImport } from './routes/v1/auth/access-token'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
 import { Route as V1BrowserExtensionXRulesRouteImport } from './routes/v1/browser-extension/x-rules'
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
@@ -177,6 +178,7 @@ import { Route as V2AdminServerClaimsRouteImport } from './routes/v2/admin/serve
 import { Route as V2DiscordAuthorizeRouteImport } from './routes/v2/discord/authorize'
 import { Route as V2DiscordCallbackRouteImport } from './routes/v2/discord/callback'
 import { Route as V2HostingPlansRouteImport } from './routes/v2/hosting/plans'
+import { Route as V2RemoteAuthEventsRouteImport } from './routes/v2/remote/auth-events'
 import { Route as V2RemoteHostWakeRouteImport } from './routes/v2/remote/host-wake'
 import { Route as V2RemoteRouteWakeRouteImport } from './routes/v2/remote/route-wake'
 import { Route as V2ServerClaimsIndexRouteImport } from './routes/v2/server-claims/index'
@@ -269,6 +271,7 @@ import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './rout
 import { Route as V2RemoteHostsHostIdDiscordRouteRouteImport } from './routes/v2/remote/hosts/$hostId/discord-route'
 import { Route as V2RemoteHostsHostIdGithubRouteRouteImport } from './routes/v2/remote/hosts/$hostId/github-route'
 import { Route as V2RemoteHostsHostIdHiddenRouteImport } from './routes/v2/remote/hosts/$hostId/hidden'
+import { Route as V2RemoteHostsHostIdIngressTicketsRouteImport } from './routes/v2/remote/hosts/$hostId/ingress-tickets'
 import { Route as V2RemoteHostsHostIdInvitesRouteImport } from './routes/v2/remote/hosts/$hostId/invites'
 import { Route as V2RemoteHostsHostIdKeyHandoverRouteImport } from './routes/v2/remote/hosts/$hostId/key-handover'
 import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
@@ -945,6 +948,11 @@ const V1AppMinimumVersionRoute = V1AppMinimumVersionRouteImport.update({
   path: '/v1/app/minimum-version',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1AuthAccessTokenRoute = V1AuthAccessTokenRouteImport.update({
+  id: '/v1/auth/access-token',
+  path: '/v1/auth/access-token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1AuthLogoutRoute = V1AuthLogoutRouteImport.update({
   id: '/v1/auth/logout',
   path: '/v1/auth/logout',
@@ -1146,6 +1154,11 @@ const V2DiscordCallbackRoute = V2DiscordCallbackRouteImport.update({
 const V2HostingPlansRoute = V2HostingPlansRouteImport.update({
   id: '/v2/hosting/plans',
   path: '/v2/hosting/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V2RemoteAuthEventsRoute = V2RemoteAuthEventsRouteImport.update({
+  id: '/v2/remote/auth-events',
+  path: '/v2/remote/auth-events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V2RemoteHostWakeRoute = V2RemoteHostWakeRouteImport.update({
@@ -1651,6 +1664,12 @@ const V2RemoteHostsHostIdHiddenRoute =
     path: '/v2/remote/hosts/$hostId/hidden',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdIngressTicketsRoute =
+  V2RemoteHostsHostIdIngressTicketsRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/ingress-tickets',
+    path: '/v2/remote/hosts/$hostId/ingress-tickets',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdInvitesRoute =
   V2RemoteHostsHostIdInvitesRouteImport.update({
     id: '/v2/remote/hosts/$hostId/invites',
@@ -1984,6 +2003,7 @@ export interface FileRoutesByFullPath {
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
+  '/v1/auth/access-token': typeof V1AuthAccessTokenRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
@@ -2022,6 +2042,7 @@ export interface FileRoutesByFullPath {
   '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
   '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
+  '/v2/remote/auth-events': typeof V2RemoteAuthEventsRoute
   '/v2/remote/host-wake': typeof V2RemoteHostWakeRoute
   '/v2/remote/route-wake': typeof V2RemoteRouteWakeRoute
   '/v2/server-claims/redeem': typeof V2ServerClaimsRedeemRoute
@@ -2115,6 +2136,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
   '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
+  '/v2/remote/hosts/$hostId/ingress-tickets': typeof V2RemoteHostsHostIdIngressTicketsRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2277,6 +2299,7 @@ export interface FileRoutesByTo {
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
+  '/v1/auth/access-token': typeof V1AuthAccessTokenRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
@@ -2315,6 +2338,7 @@ export interface FileRoutesByTo {
   '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
   '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
+  '/v2/remote/auth-events': typeof V2RemoteAuthEventsRoute
   '/v2/remote/host-wake': typeof V2RemoteHostWakeRoute
   '/v2/remote/route-wake': typeof V2RemoteRouteWakeRoute
   '/v2/server-claims/redeem': typeof V2ServerClaimsRedeemRoute
@@ -2408,6 +2432,7 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
   '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
+  '/v2/remote/hosts/$hostId/ingress-tickets': typeof V2RemoteHostsHostIdIngressTicketsRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2575,6 +2600,7 @@ export interface FileRoutesById {
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
+  '/v1/auth/access-token': typeof V1AuthAccessTokenRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
@@ -2613,6 +2639,7 @@ export interface FileRoutesById {
   '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
   '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
+  '/v2/remote/auth-events': typeof V2RemoteAuthEventsRoute
   '/v2/remote/host-wake': typeof V2RemoteHostWakeRoute
   '/v2/remote/route-wake': typeof V2RemoteRouteWakeRoute
   '/v2/server-claims/redeem': typeof V2ServerClaimsRedeemRoute
@@ -2706,6 +2733,7 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
   '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
+  '/v2/remote/hosts/$hostId/ingress-tickets': typeof V2RemoteHostsHostIdIngressTicketsRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2870,6 +2898,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
     | '/v1/app/minimum-version'
+    | '/v1/auth/access-token'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/browser-extension/x-rules'
@@ -2908,6 +2937,7 @@ export interface FileRouteTypes {
     | '/v2/discord/authorize'
     | '/v2/discord/callback'
     | '/v2/hosting/plans'
+    | '/v2/remote/auth-events'
     | '/v2/remote/host-wake'
     | '/v2/remote/route-wake'
     | '/v2/server-claims/redeem'
@@ -3001,6 +3031,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
     | '/v2/remote/hosts/$hostId/hidden'
+    | '/v2/remote/hosts/$hostId/ingress-tickets'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3163,6 +3194,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
     | '/v1/app/minimum-version'
+    | '/v1/auth/access-token'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/browser-extension/x-rules'
@@ -3201,6 +3233,7 @@ export interface FileRouteTypes {
     | '/v2/discord/authorize'
     | '/v2/discord/callback'
     | '/v2/hosting/plans'
+    | '/v2/remote/auth-events'
     | '/v2/remote/host-wake'
     | '/v2/remote/route-wake'
     | '/v2/server-claims/redeem'
@@ -3294,6 +3327,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
     | '/v2/remote/hosts/$hostId/hidden'
+    | '/v2/remote/hosts/$hostId/ingress-tickets'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3460,6 +3494,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
     | '/v1/app/minimum-version'
+    | '/v1/auth/access-token'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/browser-extension/x-rules'
@@ -3498,6 +3533,7 @@ export interface FileRouteTypes {
     | '/v2/discord/authorize'
     | '/v2/discord/callback'
     | '/v2/hosting/plans'
+    | '/v2/remote/auth-events'
     | '/v2/remote/host-wake'
     | '/v2/remote/route-wake'
     | '/v2/server-claims/redeem'
@@ -3591,6 +3627,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
     | '/v2/remote/hosts/$hostId/hidden'
+    | '/v2/remote/hosts/$hostId/ingress-tickets'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3698,6 +3735,7 @@ export interface RootRouteChildren {
   V1AgentTemplatesTemplateIdRoute: typeof V1AgentTemplatesTemplateIdRouteWithChildren
   V1AgentTemplatesMineRoute: typeof V1AgentTemplatesMineRoute
   V1AppMinimumVersionRoute: typeof V1AppMinimumVersionRoute
+  V1AuthAccessTokenRoute: typeof V1AuthAccessTokenRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1BrowserExtensionXRulesRoute: typeof V1BrowserExtensionXRulesRoute
@@ -3728,6 +3766,7 @@ export interface RootRouteChildren {
   V2DiscordAuthorizeRoute: typeof V2DiscordAuthorizeRoute
   V2DiscordCallbackRoute: typeof V2DiscordCallbackRoute
   V2HostingPlansRoute: typeof V2HostingPlansRoute
+  V2RemoteAuthEventsRoute: typeof V2RemoteAuthEventsRoute
   V2RemoteHostWakeRoute: typeof V2RemoteHostWakeRoute
   V2RemoteRouteWakeRoute: typeof V2RemoteRouteWakeRoute
   V2ServerClaimsRedeemRoute: typeof V2ServerClaimsRedeemRoute
@@ -3794,6 +3833,7 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdDiscordRouteRoute: typeof V2RemoteHostsHostIdDiscordRouteRoute
   V2RemoteHostsHostIdGithubRouteRoute: typeof V2RemoteHostsHostIdGithubRouteRoute
   V2RemoteHostsHostIdHiddenRoute: typeof V2RemoteHostsHostIdHiddenRoute
+  V2RemoteHostsHostIdIngressTicketsRoute: typeof V2RemoteHostsHostIdIngressTicketsRoute
   V2RemoteHostsHostIdInvitesRoute: typeof V2RemoteHostsHostIdInvitesRoute
   V2RemoteHostsHostIdKeyHandoverRoute: typeof V2RemoteHostsHostIdKeyHandoverRoute
   V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -4730,6 +4770,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1AppMinimumVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/auth/access-token': {
+      id: '/v1/auth/access-token'
+      path: '/v1/auth/access-token'
+      fullPath: '/v1/auth/access-token'
+      preLoaderRoute: typeof V1AuthAccessTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/auth/logout': {
       id: '/v1/auth/logout'
       path: '/v1/auth/logout'
@@ -5008,6 +5055,13 @@ declare module '@tanstack/solid-router' {
       path: '/v2/hosting/plans'
       fullPath: '/v2/hosting/plans'
       preLoaderRoute: typeof V2HostingPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/auth-events': {
+      id: '/v2/remote/auth-events'
+      path: '/v2/remote/auth-events'
+      fullPath: '/v2/remote/auth-events'
+      preLoaderRoute: typeof V2RemoteAuthEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v2/remote/host-wake': {
@@ -5652,6 +5706,13 @@ declare module '@tanstack/solid-router' {
       path: '/v2/remote/hosts/$hostId/hidden'
       fullPath: '/v2/remote/hosts/$hostId/hidden'
       preLoaderRoute: typeof V2RemoteHostsHostIdHiddenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/hosts/$hostId/ingress-tickets': {
+      id: '/v2/remote/hosts/$hostId/ingress-tickets'
+      path: '/v2/remote/hosts/$hostId/ingress-tickets'
+      fullPath: '/v2/remote/hosts/$hostId/ingress-tickets'
+      preLoaderRoute: typeof V2RemoteHostsHostIdIngressTicketsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v2/remote/hosts/$hostId/invites': {
@@ -6303,6 +6364,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AgentTemplatesTemplateIdRoute: V1AgentTemplatesTemplateIdRouteWithChildren,
   V1AgentTemplatesMineRoute: V1AgentTemplatesMineRoute,
   V1AppMinimumVersionRoute: V1AppMinimumVersionRoute,
+  V1AuthAccessTokenRoute: V1AuthAccessTokenRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1BrowserExtensionXRulesRoute: V1BrowserExtensionXRulesRoute,
@@ -6333,6 +6395,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2DiscordAuthorizeRoute: V2DiscordAuthorizeRoute,
   V2DiscordCallbackRoute: V2DiscordCallbackRoute,
   V2HostingPlansRoute: V2HostingPlansRoute,
+  V2RemoteAuthEventsRoute: V2RemoteAuthEventsRoute,
   V2RemoteHostWakeRoute: V2RemoteHostWakeRoute,
   V2RemoteRouteWakeRoute: V2RemoteRouteWakeRoute,
   V2ServerClaimsRedeemRoute: V2ServerClaimsRedeemRoute,
@@ -6403,6 +6466,8 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteHostsHostIdDiscordRouteRoute: V2RemoteHostsHostIdDiscordRouteRoute,
   V2RemoteHostsHostIdGithubRouteRoute: V2RemoteHostsHostIdGithubRouteRoute,
   V2RemoteHostsHostIdHiddenRoute: V2RemoteHostsHostIdHiddenRoute,
+  V2RemoteHostsHostIdIngressTicketsRoute:
+    V2RemoteHostsHostIdIngressTicketsRoute,
   V2RemoteHostsHostIdInvitesRoute: V2RemoteHostsHostIdInvitesRoute,
   V2RemoteHostsHostIdKeyHandoverRoute: V2RemoteHostsHostIdKeyHandoverRoute,
   V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,

@@ -4,7 +4,10 @@ import { DISCORD_ROUTE_GUILDS_LIMIT } from "./discord-route";
 import { GITHUB_DELIVERY_BODY_BYTES_LIMIT, GITHUB_DELIVERY_ID_PATTERN, GITHUB_EVENT_PATTERN } from "./github-route";
 import {
   type IceServer,
+  INGRESS_ROUTES_STATUSES,
+  type IngressRoutesStatus,
   QUEUED_DELIVERY_SEALED_LIMIT,
+  SIGNAL_GO_AWAY_WITHIN_MS_LIMIT,
   SIGNAL_PROTOCOL_VERSION,
   SIGNAL_SESSIONS_ENDED_LIMIT,
   type SignalChannel,
@@ -49,6 +52,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       };
     case "host-waiting":
       return { type: kind, version, resumeToken: identifier(value.resumeToken) };
+    case "go-away":
+      return { type: kind, version, withinMs: goAwayWindow(value.withinMs) };
     case "sessions-ended":
       return { type: kind, version, sessionIds: sessionIdList(value.sessionIds) };
     case "peer-ready":
@@ -131,6 +136,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
     case "webhook-ready":
     case "github-ready":
       return { type: kind, version };
+    case "ingress-routes-result":
+      return { type: kind, version, requestId: identifier(value.requestId), status: ingressRoutesStatus(value.status) };
     case "github-delivery":
       return {
         type: kind,
@@ -239,6 +246,12 @@ function duration(value: unknown): number {
   return candidate;
 }
 
+function goAwayWindow(value: unknown): number {
+  const candidate = integer(value);
+  if (candidate < 0 || candidate > SIGNAL_GO_AWAY_WITHIN_MS_LIMIT) invalid();
+  return candidate;
+}
+
 function flag(value: unknown): boolean {
   if (!isBoolean(value)) invalid();
   return value;
@@ -321,4 +334,10 @@ function iceServer(value: unknown): IceServer {
 function urlList(value: unknown): string[] {
   if (!Array.isArray(value)) invalid();
   return value.map(text);
+}
+
+function ingressRoutesStatus(value: unknown): IngressRoutesStatus {
+  const status = INGRESS_ROUTES_STATUSES.find((entry) => entry === value);
+  if (!status) invalid();
+  return status;
 }

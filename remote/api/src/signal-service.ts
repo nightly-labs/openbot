@@ -8,6 +8,12 @@ import {
   isIngressQueueKey,
   type QueuedSignalMessage,
 } from "@openbot/contracts/signal-protocol/ingress-queue";
+import {
+  INGRESS_ROUTES_CAPABILITY,
+  SIGNAL_GO_AWAY_CAPABILITY,
+  SIGNAL_GO_AWAY_WITHIN_MS_LIMIT,
+  SIGNAL_RESUME_FROM_CAPABILITY,
+} from "@openbot/contracts/signal-protocol/messages";
 import type { SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   TELEGRAM_CAPABILITY,
@@ -32,7 +38,7 @@ import {
 import type { WebhookRoute, WebhookSignatureFormat } from "@openbot/contracts/signal-protocol/webhook-route";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
-import { IngressQueue, queueRouteKey, type RouteWake, type RouteWaker } from "./ingress-queue";
+import { type HandedOverQueue, IngressQueue, queueRouteKey, type RouteWake, type RouteWaker } from "./ingress-queue";
 import {
   type DecodedSignalClientMessage,
   decodeSignalClientMessage,
@@ -51,6 +57,7 @@ import {
   type TelegramCall,
   type WebhookDeliveryStatus,
 } from "./protocol";
+import type { SignalRefusals } from "./state-snapshot";
 import { runTelegramCall, type SignalTelegram, type TelegramAnswer, telegramFailure } from "./telegram";
 import { RemoteTokenError, RemoteTokenUnavailableError, type TelegramChatLink } from "./tokens";
 
@@ -83,6 +90,7 @@ export interface RemoteTokenProvider {
   verifyResumeToken(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError | RemoteTokenUnavailableError>;
   validateClaims(claims: RemoteTicketClaims): Effect.Effect<boolean, RemoteTokenUnavailableError>;
   issueResumeToken(claims: RemoteTicketClaims): Effect.Effect<string, RemoteTokenError>;
+  verifyContinuity?(token: string, ticket: RemoteTicketClaims): Effect.Effect<boolean>;
   iceServers(claims: RemoteTicketClaims): IceServer[];
   verifySlackRoute?(token: string, hostId: string): Effect.Effect<SlackRoute, RemoteTokenError>;
   validateSlackRoute?(hostId: string, teams: SlackRouteTeam[]): Effect.Effect<string[], RemoteTokenError>;
@@ -137,7 +145,26 @@ interface AuthenticatedPeer {
   webhookFormats: ReadonlySet<string>;
   githubRepositories: string[];
   watchRelay: boolean;
+  goAway: boolean;
   turnCredentials: { iceServers: IceServer[]; issuedAt: number } | null;
+}
+
+export interface SignalGoAwayWaves {
+  waveSize: number;
+  waveIntervalMs: number;
+  withinMs: number;
+}
+
+interface SignalDrain {
+  withinMs: number;
+  hostIds: Set<string>;
+  timers: Set<ReturnType<typeof setTimeout>>;
+}
+
+const CLIENT_GO_AWAY_WINDOW_MS = 5_000;
+
+function clientGoAwayWindow(drain: SignalDrain): number {
+  return Math.min(drain.withinMs, CLIENT_GO_AWAY_WINDOW_MS);
 }
 
 interface ActiveConnection {
@@ -217,6 +244,26 @@ export interface SignalServiceOptions {
 
 class NotEntryError extends Schema.TaggedError<NotEntryError>()("NotEntryError", {}) {}
 const NOT_ENTRY_REASON = "This Signal is not the entry.";
+const HANDOFF_CLOSE_CODE = 1012;
+const HANDOFF_CLOSE_REASON = "This Signal is restarting.";
+
+export interface SignalCutoffs {
+  ticket: number;
+  route: number;
+}
+
+export interface SignalSibling {
+  readonly role: "old" | "new";
+  claimTicket(claims: RemoteTicketClaims): Effect.Effect<boolean, RemoteTokenUnavailableError>;
+  deliverDiscord(guildId: string, delivery: DiscordDelivery): Effect.Effect<boolean>;
+}
+
+export interface SignalSocketCounts {
+  unauthenticated: number;
+  ingress: number;
+  host: number;
+  client: number;
+}
 
 export interface DiscordMembership {
   isMember(guildId: string): boolean | null;
@@ -408,8 +455,12 @@ export class SignalService {
   readonly #revokedSessions = new Map<string, number>();
   readonly #endedHostSessions = new Map<string, Map<string, number>>();
   readonly #rateWindows = new Map<string, { startedAt: number; count: number }>();
-  readonly #ticketsIssuedBeforeStartUntil = Math.floor(Date.now() / 1_000) + TICKET_CLOCK_SKEW_SECONDS;
+  #ticketsIssuedBeforeStartUntil = Math.floor(Date.now() / 1_000) + TICKET_CLOCK_SKEW_SECONDS;
+  #routesIssuedBeforeStartUntil = this.#ticketsIssuedBeforeStartUntil;
+  #sibling: SignalSibling | null = null;
+  #draining = false;
   #lastRatePruneAt = 0;
+  #drain: SignalDrain | null = null;
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
     authenticationFailures: 0,
@@ -477,6 +528,153 @@ export class SignalService {
     return this.#telegram;
   }
 
+  get cutoffs(): SignalCutoffs {
+    return { ticket: this.#ticketsIssuedBeforeStartUntil, route: this.#routesIssuedBeforeStartUntil };
+  }
+
+  setCutoffs(cutoffs: SignalCutoffs): void {
+    this.#ticketsIssuedBeforeStartUntil = cutoffs.ticket;
+    this.#routesIssuedBeforeStartUntil = cutoffs.route;
+  }
+
+  safeCutoffs(): void {
+    const now = Math.floor(Date.now() / 1_000) + TICKET_CLOCK_SKEW_SECONDS;
+    this.setCutoffs({
+      ticket: Math.max(now, this.#ticketsIssuedBeforeStartUntil),
+      route: Math.max(now, this.#routesIssuedBeforeStartUntil),
+    });
+  }
+
+  setSibling(sibling: SignalSibling | null): void {
+    this.#sibling = sibling;
+  }
+
+  get draining(): boolean {
+    return this.#draining;
+  }
+
+  claimTicket(jti: string, expiresAt: number): boolean {
+    this.#pruneReplayCache();
+    if (this.#usedTicketIds.has(jti)) return false;
+    this.#usedTicketIds.set(jti, expiresAt);
+    return true;
+  }
+
+  exportRefusals(): SignalRefusals {
+    this.#pruneReplayCache();
+    return {
+      usedTicketIds: [...this.#usedTicketIds],
+      revokedEpochs: [...this.#revokedEpochs],
+      revokedSessions: [...this.#revokedSessions],
+      endedHostSessions: [...this.#endedHostSessions].map(([hostId, sessions]) => [hostId, [...sessions]] as const),
+      slackRouteFloors: [...this.#slackRouteFloor],
+      telegramRouteFloors: [...this.#telegramRouteFloor],
+      discordRouteFloors: [...this.#discordRouteFloor],
+      webhookRouteFloors: [...this.#webhookRouteFloor],
+    };
+  }
+
+  importRefusals(refusals: SignalRefusals): void {
+    const raise = (target: Map<string, number>, entries: readonly (readonly [string, number])[]) => {
+      for (const [key, value] of entries)
+        if (value > (target.get(key) ?? Number.NEGATIVE_INFINITY)) target.set(key, value);
+    };
+    raise(this.#usedTicketIds, refusals.usedTicketIds);
+    for (const [hostId, authEpoch] of refusals.revokedEpochs) this.revoke(hostId, authEpoch);
+    for (const [sessionId, expiresAt] of refusals.revokedSessions) {
+      raise(this.#revokedSessions, [[sessionId, expiresAt]]);
+      this.#tokens.revokeSession?.(sessionId);
+    }
+    for (const [hostId, sessions] of refusals.endedHostSessions) {
+      for (const [sessionId, expiresAt] of sessions) this.#rememberEndedHostSession(hostId, sessionId, expiresAt);
+    }
+    raise(this.#slackRouteFloor, refusals.slackRouteFloors);
+    raise(this.#telegramRouteFloor, refusals.telegramRouteFloors);
+    raise(this.#discordRouteFloor, refusals.discordRouteFloors);
+    raise(this.#webhookRouteFloor, refusals.webhookRouteFloors);
+    this.#pruneReplayCache();
+  }
+
+  refusesTrust(token: { hostId: string; sessionId: string; authEpoch: number }): boolean {
+    return (this.#revokedEpochs.get(token.hostId) ?? 0) > token.authEpoch || this.#revokedSessions.has(token.sessionId);
+  }
+
+  socketCounts(): SignalSocketCounts {
+    const counts: SignalSocketCounts = { unauthenticated: 0, ingress: 0, host: 0, client: 0 };
+    for (const socketId of this.#sockets.keys()) {
+      const peer = this.#peers.get(socketId);
+      counts[peer ? peer.peer : "unauthenticated"] += 1;
+    }
+    return counts;
+  }
+
+  startDrain(): void {
+    this.#draining = true;
+    for (const socket of [...this.#sockets.values()]) {
+      if (!this.#peers.has(socket.id)) socket.close(HANDOFF_CLOSE_CODE, HANDOFF_CLOSE_REASON);
+    }
+  }
+
+  drainGroups(): { ingress: string[][]; hosts: string[][] } {
+    const ingress: string[][] = [];
+    const hosts: string[][] = [];
+    const grouped = new Set<string>();
+    for (const peer of this.#peers.values()) {
+      if (peer.peer !== "ingress") continue;
+      ingress.push([peer.socket.id]);
+      grouped.add(peer.socket.id);
+    }
+    for (const peer of this.#peers.values()) {
+      if (peer.peer !== "host") continue;
+      const group = [peer.socket.id];
+      for (const connection of this.#connections.values()) {
+        if (connection.host.id === peer.socket.id && !grouped.has(connection.client.id))
+          group.push(connection.client.id);
+      }
+      for (const id of group) grouped.add(id);
+      hosts.push(group);
+    }
+    for (const socketId of this.#sockets.keys()) if (!grouped.has(socketId)) hosts.push([socketId]);
+    return { ingress, hosts };
+  }
+
+  closeForHandoff(socketIds: readonly string[]): void {
+    for (const socketId of socketIds) this.#sockets.get(socketId)?.close(HANDOFF_CLOSE_CODE, HANDOFF_CLOSE_REASON);
+  }
+
+  closeAllForHandoff(): void {
+    this.closeForHandoff([...this.#sockets.keys()]);
+  }
+
+  handOverQueue(): HandedOverQueue {
+    return this.#queue.handOver();
+  }
+
+  adoptQueue(queue: HandedOverQueue): void {
+    this.#queue.adopt(queue);
+    for (const peer of this.#peers.values()) if (peer.peer === "ingress") this.#flushQueue(peer);
+  }
+
+  holdsSlackRoute(appId: string, teamId: string): boolean {
+    const socketId = this.#slackTeams.get(slackRouteKey(appId, teamId));
+    return socketId !== undefined && this.#peers.has(socketId);
+  }
+
+  holdsTelegramChat(botId: string, chatId: string): boolean {
+    const socketId = this.#telegramChats.get(telegramRouteKey(botId, chatId));
+    return socketId !== undefined && this.#peers.has(socketId);
+  }
+
+  holdsGitHubRepository(installationId: number, repositoryId: number): boolean {
+    const hosts = this.#githubRepositories.get(githubRepositoryKey(installationId, repositoryId));
+    return [...(hosts?.values() ?? [])].some((socketId) => this.#peers.has(socketId));
+  }
+
+  holdsDiscordGuild(guildId: string): boolean {
+    const socketId = this.#discordGuilds.get(guildId);
+    return socketId !== undefined && this.#peers.has(socketId);
+  }
+
   closeEntrySockets(): void {
     for (const peer of [...this.#peers.values()]) {
       if (!peer.claims.signal) peer.socket.close(1013, NOT_ENTRY_REASON);
@@ -490,6 +688,8 @@ export class SignalService {
     this.#connectionDropTimers.clear();
     this.#peerExpirationTimers.clear();
     this.#helloTimers.clear();
+    for (const timer of this.#drain?.timers ?? []) clearTimeout(timer);
+    this.#drain?.timers.clear();
     for (const requestId of [...this.#pendingDeliveries.keys()]) this.#settleDelivery(requestId, null);
     for (const requestId of [...this.#pendingWatchRequests.keys()]) this.#settleWatch(requestId, "closed");
     this.#queue.close();
@@ -564,7 +764,7 @@ export class SignalService {
           connectionId: message.connectionId,
           resumeToken,
           iceServers: peer.turnCredentials.iceServers,
-          ...this.#capabilities(peer.peer),
+          ...this.#capabilities(peer),
         });
         return;
       }
@@ -596,6 +796,14 @@ export class SignalService {
           return;
         }
         this.#settleWatch(message.requestId, message);
+        return;
+      }
+      if (message.type === "ingress-routes") {
+        if (peer.peer !== "ingress") {
+          this.#fail(socket, "permission_denied", "Only an ingress socket can add routes.");
+          return;
+        }
+        yield* this.#addIngressRoutes(peer, message);
         return;
       }
       if (message.type === "telegram-call") {
@@ -631,7 +839,10 @@ export class SignalService {
       if (peer.peer === "host") {
         const hostSockets = this.#hosts.get(peer.claims.hostId);
         hostSockets?.delete(socket.id);
-        if (hostSockets?.size === 0) this.#hosts.delete(peer.claims.hostId);
+        if (hostSockets?.size === 0) {
+          this.#hosts.delete(peer.claims.hostId);
+          this.#sendClientsGoAway(peer.claims.hostId);
+        }
       }
       if (peer.peer === "ingress") {
         for (const route of peer.slackTeams) {
@@ -773,7 +984,16 @@ export class SignalService {
     );
   }
 
-  deliverDiscord(guildId: string, delivery: DiscordDelivery): boolean {
+  #keepDiscord(guildId: string, delivery: DiscordDelivery, frame: QueuedSignalMessage): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      this.#metrics.discordDeliveriesUnavailable += 1;
+      return delivery.kind === "removed"
+        ? Effect.void
+        : this.#keep({ platform: "discord", guildId }, guildId, true, frame).pipe(Effect.asVoid);
+    });
+  }
+
+  deliverDiscord(guildId: string, delivery: DiscordDelivery, forwarded = false): boolean {
     const socketId = this.#discordGuilds.get(guildId);
     const ingress = socketId ? this.#peers.get(socketId) : undefined;
     const frame = { type: "discord-delivery", version: 1, guildId, delivery } as const;
@@ -783,8 +1003,19 @@ export class SignalService {
       return false;
     }
     if (!ingress) {
-      this.#metrics.discordDeliveriesUnavailable += 1;
-      if (delivery.kind !== "removed") this.#fork(this.#keep({ platform: "discord", guildId }, guildId, true, frame));
+      const sibling = this.#sibling;
+      if (sibling && !forwarded) {
+        this.#fork(
+          sibling
+            .deliverDiscord(guildId, delivery)
+            .pipe(
+              Effect.flatMap((delivered) => (delivered ? Effect.void : this.#keepDiscord(guildId, delivery, frame))),
+            ),
+        );
+        return false;
+      }
+      if (forwarded) return false;
+      this.#fork(this.#keepDiscord(guildId, delivery, frame));
       return false;
     }
     ingress.socket.send(message);
@@ -1349,12 +1580,67 @@ export class SignalService {
     }),
   );
 
-  #capabilities(peer: AuthenticatedPeer["peer"]): { capabilities?: string[] } {
-    if (peer !== "ingress") return {};
+  goAway(waves: SignalGoAwayWaves): { hosts: number; waves: number; withoutCapability: number } {
+    const withinMs = Math.min(Math.max(0, Math.floor(waves.withinMs)), SIGNAL_GO_AWAY_WITHIN_MS_LIMIT);
+    const drain = this.#drain ?? { withinMs, hostIds: new Set<string>(), timers: new Set() };
+    drain.withinMs = withinMs;
+    this.#drain = drain;
+    const hostIds: string[] = [];
+    let withoutCapability = 0;
+    for (const hostId of this.#hosts.keys()) {
+      if (drain.hostIds.has(hostId)) continue;
+      if (this.#currentHost(hostId)?.goAway) hostIds.push(hostId);
+      else withoutCapability += 1;
+    }
+    const waveSize = Math.max(1, Math.floor(waves.waveSize));
+    const waveCount = Math.ceil(hostIds.length / waveSize);
+    for (let wave = 0; wave < waveCount; wave += 1) {
+      const batch = hostIds.slice(wave * waveSize, (wave + 1) * waveSize);
+      for (const hostId of batch) drain.hostIds.add(hostId);
+      const send = () => {
+        for (const hostId of batch) this.#sendHostGoAway(hostId);
+      };
+      if (wave === 0) {
+        send();
+        continue;
+      }
+      const timer = setTimeout(() => {
+        drain.timers.delete(timer);
+        send();
+      }, wave * Math.max(0, waves.waveIntervalMs));
+      timer.unref?.();
+      drain.timers.add(timer);
+    }
+    return { hosts: hostIds.length, waves: waveCount, withoutCapability };
+  }
+
+  #sendHostGoAway(hostId: string): void {
+    const drain = this.#drain;
+    if (!drain) return;
+    drain.hostIds.add(hostId);
+    for (const socketId of this.#hosts.get(hostId) ?? []) {
+      const host = this.#peers.get(socketId);
+      if (host?.goAway) this.#send(host.socket, { type: "go-away", version: 1, withinMs: drain.withinMs });
+    }
+  }
+
+  #sendClientsGoAway(hostId: string): void {
+    const drain = this.#drain;
+    if (!drain?.hostIds.has(hostId)) return;
+    for (const peer of this.#peers.values()) {
+      if (peer.peer === "client" && peer.goAway && peer.claims.hostId === hostId)
+        this.#send(peer.socket, { type: "go-away", version: 1, withinMs: clientGoAwayWindow(drain) });
+    }
+  }
+
+  #capabilities(peer: AuthenticatedPeer): { capabilities?: string[] } {
+    if (peer.peer !== "ingress")
+      return peer.goAway ? { capabilities: [SIGNAL_GO_AWAY_CAPABILITY, SIGNAL_RESUME_FROM_CAPABILITY] } : {};
     const capabilities = [
       ...(this.#telegram ? [TELEGRAM_CAPABILITY] : []),
       ...(this.#queue.enabled ? [INGRESS_QUEUE_CAPABILITY] : []),
       WATCH_RELAY_CAPABILITY,
+      INGRESS_ROUTES_CAPABILITY,
     ];
     return capabilities.length > 0 ? { capabilities } : {};
   }
@@ -1438,6 +1724,10 @@ export class SignalService {
           this.#fail(socket, "protocol_error", "This socket is already authenticated.", 1008);
           return;
         }
+        if (this.#draining) {
+          socket.close(HANDOFF_CLOSE_CODE, HANDOFF_CLOSE_REASON);
+          return;
+        }
         const tokens = yield* SignalTokens;
         let usedInitialTicket = true;
         let step: AuthenticationStep = "ticket";
@@ -1484,7 +1774,7 @@ export class SignalService {
             if (message.slackRoute) {
               if (!tokens.verifySlackRoute) return yield* new RemoteTokenError({ message: "Slack route required." });
               slackRoute = yield* tokens.verifySlackRoute(message.slackRoute, claims.hostId);
-              if (this.#issuedBeforeStart(slackRoute.issuedAt)) {
+              if (this.#routeIssuedBeforeStart(slackRoute.issuedAt)) {
                 if (!tokens.validateSlackRoute)
                   return yield* new RemoteTokenError({ message: "Slack route validation required." });
                 const linked = new Set(yield* tokens.validateSlackRoute(claims.hostId, slackRoute.teams));
@@ -1495,7 +1785,7 @@ export class SignalService {
               if (!tokens.verifyDiscordRoute)
                 return yield* new RemoteTokenError({ message: "Discord route verification required." });
               discordRoute = yield* tokens.verifyDiscordRoute(message.discordRoute, claims.hostId);
-              if (this.#issuedBeforeStart(discordRoute.issuedAt)) {
+              if (this.#routeIssuedBeforeStart(discordRoute.issuedAt)) {
                 if (!tokens.validateDiscordRoute)
                   return yield* new RemoteTokenError({ message: "Discord route validation required." });
                 const linked = new Set(yield* tokens.validateDiscordRoute(claims.hostId, discordRoute.guilds));
@@ -1506,7 +1796,7 @@ export class SignalService {
               if (!tokens.verifyWebhookRoute)
                 return yield* new RemoteTokenError({ message: "Webhook route verification required." });
               webhookRoute = yield* tokens.verifyWebhookRoute(message.webhookRoute, claims.hostId);
-              if (this.#issuedBeforeStart(webhookRoute.issuedAt)) {
+              if (this.#routeIssuedBeforeStart(webhookRoute.issuedAt)) {
                 if (!tokens.validateWebhookRoute)
                   return yield* new RemoteTokenError({ message: "Webhook route validation required." });
                 const linked = new Set(yield* tokens.validateWebhookRoute(claims.hostId, webhookRoute.routes));
@@ -1524,7 +1814,7 @@ export class SignalService {
                 return yield* new RemoteTokenError({ message: "Telegram route verification required." });
               const verified = yield* tokens.verifyTelegramRoute(message.telegramRoute, claims.hostId);
               telegramRoute = { chats: verified.chats.filter((chat) => telegram.bot.hasBot(chat.botId)) };
-              if (this.#issuedBeforeStart(verified.issuedAt) && telegramRoute.chats.length > 0) {
+              if (this.#routeIssuedBeforeStart(verified.issuedAt) && telegramRoute.chats.length > 0) {
                 if (!tokens.validateTelegramRoute)
                   return yield* new RemoteTokenError({ message: "Telegram route validation required." });
                 const linked = new Set(
@@ -1545,7 +1835,26 @@ export class SignalService {
           this.#pruneReplayCache();
           if (usedInitialTicket && this.#usedTicketIds.has(claims.jti))
             return yield* new RemoteTokenError({ message: "Ticket was already used." });
-          return { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken };
+          const sibling = this.#sibling;
+          if (usedInitialTicket && sibling) {
+            this.#usedTicketIds.set(claims.jti, claims.exp);
+            if (!(yield* sibling.claimTicket(claims)))
+              return yield* new RemoteTokenError({ message: "Ticket was already used." });
+          }
+          const continued =
+            usedInitialTicket && message.peer === "client" && message.resumeFrom && tokens.verifyContinuity
+              ? yield* tokens.verifyContinuity(message.resumeFrom, claims)
+              : false;
+          return {
+            claims,
+            slackRoute,
+            telegramRoute,
+            discordRoute,
+            webhookRoute,
+            githubRoute,
+            resumeToken,
+            continued,
+          };
         }).pipe(Effect.result);
         if (Result.isFailure(authentication)) {
           const failure = authentication.failure;
@@ -1573,7 +1882,7 @@ export class SignalService {
           socket.close(1013, NOT_ENTRY_REASON);
           return;
         }
-        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken } =
+        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, githubRoute, resumeToken, continued } =
           authentication.success;
         const replaced = message.peer === "client" ? this.#clientForSession(claims) : null;
         if (
@@ -1590,7 +1899,7 @@ export class SignalService {
           peer: message.peer,
           connectionId: null,
           releasedConnectionId: null,
-          resumed: !usedInitialTicket,
+          resumed: !usedInitialTicket || continued,
           multiplex: message.peer === "host" && message.multiplex === true,
           slackTeams: slackRoute.teams.map((team) => slackRouteKey(team.appId, team.id)),
           telegramChats: [],
@@ -1602,6 +1911,7 @@ export class SignalService {
             githubRepositoryKey(repository.installationId, repository.id),
           ),
           watchRelay: message.peer === "ingress" && message.watchRelay === true,
+          goAway: message.peer !== "ingress" && message.goAway === true,
           turnCredentials: null,
         };
         this.#peers.set(socket.id, peer);
@@ -1663,7 +1973,7 @@ export class SignalService {
             connectionId: null,
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
-            ...this.#capabilities("ingress"),
+            ...this.#capabilities(peer),
           });
           if (webhookRoute.routes.length > 0) {
             this.#send(socket, { type: "webhook-ready", version: 1 });
@@ -1700,9 +2010,11 @@ export class SignalService {
             connectionId: null,
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
+            ...this.#capabilities(peer),
           });
           this.#sendEndedHostSessions(peer);
           yield* this.#restoreWaitingClients(peer);
+          if (this.#drain) this.#sendHostGoAway(claims.hostId);
           return;
         }
         const host = this.#currentHost(claims.hostId);
@@ -1710,6 +2022,8 @@ export class SignalService {
           if (replaced && peer.resumed) peer.releasedConnectionId = replaced.releasedConnectionId;
           if (replaced && this.#peers.has(replaced.socket.id)) this.#replaceClientPeer(replaced);
           this.#send(socket, { type: "host-waiting", version: 1, resumeToken });
+          if (peer.goAway && this.#drain?.hostIds.has(claims.hostId))
+            this.#send(socket, { type: "go-away", version: 1, withinMs: clientGoAwayWindow(this.#drain) });
           return;
         }
         if (!host) {
@@ -1749,6 +2063,7 @@ export class SignalService {
           resumeToken,
           iceServers: this.#tokens.iceServers(claims),
           reconnectGraceMs: this.#reconnectGrace(host),
+          ...this.#capabilities(peer),
         });
         this.#send(host.socket, {
           type: "peer-ready",
@@ -1764,8 +2079,106 @@ export class SignalService {
       }),
   );
 
+  readonly #addIngressRoutes = Effect.fn("Signal.addIngressRoutes")(
+    (peer: AuthenticatedPeer, message: Extract<SignalClientMessage, { type: "ingress-routes" }>) =>
+      Effect.gen({ self: this }, function* () {
+        const tokens = yield* SignalTokens;
+        const hostId = peer.claims.hostId;
+        const verified = yield* Effect.gen({ self: this }, function* () {
+          let webhookRoute: WebhookRouteTicket = { routes: [] };
+          let githubRoute: GitHubRoute = { repositories: [] };
+          let telegramRoute: TelegramRoute = { chats: [] };
+          if (message.webhookRoute) {
+            if (!tokens.verifyWebhookRoute)
+              return yield* new RemoteTokenError({ message: "Webhook route verification required." });
+            webhookRoute = yield* tokens.verifyWebhookRoute(message.webhookRoute, hostId);
+            if (this.#issuedBeforeStart(webhookRoute.issuedAt)) {
+              if (!tokens.validateWebhookRoute)
+                return yield* new RemoteTokenError({ message: "Webhook route validation required." });
+              const linked = new Set(yield* tokens.validateWebhookRoute(hostId, webhookRoute.routes));
+              webhookRoute = { routes: webhookRoute.routes.filter((route) => linked.has(route.id)) };
+            }
+          }
+          if (message.githubRoute) {
+            if (!tokens.verifyGitHubRoute)
+              return yield* new RemoteTokenError({ message: "GitHub route verification required." });
+            githubRoute = yield* tokens.verifyGitHubRoute(message.githubRoute, hostId);
+          }
+          const telegram = this.#telegram;
+          if (message.telegramRoute && telegram) {
+            if (!tokens.verifyTelegramRoute)
+              return yield* new RemoteTokenError({ message: "Telegram route verification required." });
+            const ticket = yield* tokens.verifyTelegramRoute(message.telegramRoute, hostId);
+            telegramRoute = { chats: ticket.chats.filter((chat) => telegram.bot.hasBot(chat.botId)) };
+            if (this.#issuedBeforeStart(ticket.issuedAt) && telegramRoute.chats.length > 0) {
+              if (!tokens.validateTelegramRoute)
+                return yield* new RemoteTokenError({ message: "Telegram route validation required." });
+              const linked = new Set(
+                (yield* tokens.validateTelegramRoute(hostId, telegramRoute.chats)).map(telegramRouteChatKey),
+              );
+              telegramRoute = { chats: telegramRoute.chats.filter((chat) => linked.has(telegramRouteChatKey(chat))) };
+            }
+          }
+          return { webhookRoute, githubRoute, telegramRoute };
+        }).pipe(Effect.result);
+        const socket = peer.socket;
+        if (this.#peers.get(socket.id) !== peer) return;
+        if (Result.isFailure(verified)) {
+          this.#send(socket, {
+            type: "ingress-routes-result",
+            version: 1,
+            requestId: message.requestId,
+            status: "refused",
+          });
+          return;
+        }
+        const { webhookRoute, githubRoute, telegramRoute } = verified.success;
+        for (const route of webhookRoute.routes) {
+          if (route.linkedAt < (this.#webhookRouteFloor.get(route.id) ?? 0)) continue;
+          this.#webhookRouteFloor.set(route.id, route.linkedAt);
+          this.#webhookRoutes.set(route.id, socket.id);
+          if (!peer.webhookRoutes.includes(route.id)) peer.webhookRoutes.push(route.id);
+        }
+        for (const repository of githubRoute.repositories) {
+          const route = githubRepositoryKey(repository.installationId, repository.id);
+          const hosts = this.#githubRepositories.get(route) ?? new Map<string, string>();
+          hosts.set(hostId, socket.id);
+          this.#githubRepositories.set(route, hosts);
+          if (!peer.githubRepositories.includes(route)) peer.githubRepositories.push(route);
+        }
+        for (const chat of telegramRoute.chats) {
+          const route = telegramRouteKey(chat.botId, chat.id);
+          if (chat.linkedAt < (this.#telegramRouteFloor.get(route) ?? 0)) continue;
+          this.#telegramRouteFloor.set(route, chat.linkedAt);
+          this.#telegramChats.set(route, socket.id);
+          if (!peer.telegramChats.includes(route)) peer.telegramChats.push(route);
+        }
+        if (message.telegramRoute && this.#telegram) {
+          const now = Date.now();
+          for (const [route, link] of this.#telegramLinks) {
+            if (link.hostId !== hostId || link.expiresAt <= now || peer.telegramChats.includes(route)) continue;
+            if (link.linkedAt < (this.#telegramRouteFloor.get(route) ?? 0)) continue;
+            this.#telegramChats.set(route, socket.id);
+            peer.telegramChats.push(route);
+          }
+        }
+        this.#send(socket, {
+          type: "ingress-routes-result",
+          version: 1,
+          requestId: message.requestId,
+          status: "accepted",
+        });
+        if (webhookRoute.routes.length > 0) this.#send(socket, { type: "webhook-ready", version: 1 });
+        if (message.githubRoute) this.#send(socket, { type: "github-ready", version: 1 });
+      }),
+  );
+
   #issuedBeforeStart(issuedAt: number | undefined): boolean {
     return issuedAt === undefined || issuedAt <= this.#ticketsIssuedBeforeStartUntil;
+  }
+
+  #routeIssuedBeforeStart(issuedAt: number | undefined): boolean {
+    return issuedAt === undefined || issuedAt <= this.#routesIssuedBeforeStartUntil;
   }
 
   #currentHost(hostId: string): AuthenticatedPeer | null {
@@ -1832,6 +2245,7 @@ export class SignalService {
           resumeToken,
           iceServers: this.#tokens.iceServers(client.claims),
           reconnectGraceMs: this.#reconnectGrace(host),
+          ...this.#capabilities(client),
         });
         this.#send(host.socket, {
           type: "peer-ready",

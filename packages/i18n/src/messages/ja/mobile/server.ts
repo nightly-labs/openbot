@@ -1378,6 +1378,7 @@ export const messages = {
   "mobile.server.planLimits.windowLeft": "{window} 残り {percent}%",
   "mobile.server.planLimits.resetsAt": "{time} にリセット",
   "mobile.server.planLimits.empty": "上限を報告したプロバイダーはまだありません。",
+  "mobile.server.planLimits.notReported": "使用量データなし",
   "mobile.server.planLimits.more": "+{number}",
   "mobile.server.planLimits.window.limit": "上限",
   "mobile.server.planLimits.window.weekly": "週間",

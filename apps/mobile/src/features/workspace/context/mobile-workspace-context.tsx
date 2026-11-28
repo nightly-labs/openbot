@@ -191,6 +191,7 @@ import { agentInitialMessage, type NewAgentInput } from "@/features/agents/model
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
+import { fetchMobileAccount } from "@/features/auth/api/account-fetch";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
@@ -209,7 +210,6 @@ import { forgetAgentBackdrops, retainAgentBackdrops } from "@/features/settings/
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
-import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import { forgetPhoneFeedback, shownPhoneFeedback } from "@/features/support/model/support-log-capture";
 import { useWatchAwake } from "@/features/watch/model/watch-awake";
@@ -1612,11 +1612,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     () =>
       createHostedServerWake((hostId) =>
         Effect.tryPromise((signal) =>
-          fetch(new URL(`/v2/hosting/servers/${encodeURIComponent(hostId)}/wake`, session.apiUrl).toString(), {
-            method: "POST",
-            headers: { Authorization: `Bearer ${session.sessionToken}` },
-            signal,
-          }),
+          fetchMobileAccount(
+            { apiUrl: session.apiUrl, sessionToken: session.sessionToken },
+            `/v2/hosting/servers/${encodeURIComponent(hostId)}/wake`,
+            {
+              method: "POST",
+              signal,
+            },
+          ),
         ),
       ),
     [session.apiUrl, session.sessionToken],
@@ -1696,6 +1699,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const wakeSelectedServer = useCallback(
     (hostId: string) => {
       if (!foregroundRef.current || hostId !== activeServerIdRef.current) return;
+      if (serversRef.current.find((server) => server.id === hostId)?.hosted !== true) return;
       void runTeamEffect(wakeHostedServer(hostId)).then((waking) => {
         if (!waking || hostId !== activeServerIdRef.current) return;
         hostedServerStarting(hostId);
@@ -2356,13 +2360,21 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY),
       readWholeApproval: async (serverId, approval) => {
         if (!hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY)) return;
-        const whole = await runTeamRequest(
-          readPendingApproval(teamApi(serverId), { agentId: approval.agentId, requestId: approval.requestId }),
-        ).catch((error: unknown) => {
-          if (error instanceof InactiveRequestError)
-            liveState.update("approvalRequests", (current) => dropApproval(current, serverId, approval.requestId));
-          throw error;
-        });
+        const read = () =>
+          runTeamRequest(
+            readPendingApproval(teamApi(serverId), { agentId: approval.agentId, requestId: approval.requestId }),
+          );
+        const whole = await read()
+          .catch(async (error: unknown) => {
+            if (!(error instanceof Error) || !isConnectionStop(error)) throw error;
+            await connectionWaits.whenOnlineAgain(serverId);
+            return read();
+          })
+          .catch((error: unknown) => {
+            if (error instanceof InactiveRequestError)
+              liveState.update("approvalRequests", (current) => dropApproval(current, serverId, approval.requestId));
+            throw error;
+          });
         liveState.update("approvalRequests", (current) => {
           const previous = current[serverId];
           if (!previous) return current;
@@ -2945,6 +2957,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     applyHostColors,
     pushSidebarPins,
     preferenceStore,
+    connectionWaits,
   ]);
 
   const activeServer = useMemo(

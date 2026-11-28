@@ -51,6 +51,13 @@ describe("redactText", () => {
     }
   });
 
+  it("redacts an OpenBot account access token", () => {
+    const token = `oba1.${run64(48)}.${run64(43)}`;
+    expect(redactText(`access ${token} expired`)).toBe("access [redacted] expired");
+    expect(redactText(`{"accessToken":"${token}","expiresAt":1}`)).not.toContain(token);
+    expect(redactPostText(`token ${token} sent`)).toBe("token [redacted] sent");
+  });
+
   it("redacts a JSON Web Token", () => {
     const token = `eyJ${run64(20)}.eyJ${run64(40)}.${run64(43)}`;
     expect(redactText(`session ${token} expired`)).toBe("session [redacted] expired");

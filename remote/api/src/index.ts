@@ -1,15 +1,26 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-protocol/ingress-queue";
+import type { Server } from "bun";
 import { Context, Effect, Layer, ManagedRuntime, Schema, Semaphore } from "effect";
-import { createRemoteApiApp, prometheusMetrics } from "./app";
+import { goAwayRoute } from "./admin-go-away";
+import { applyAuthEvent, createRemoteApiApp, decodeAuthEvent, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
 import type { DiscordApi } from "./discord-api";
-import { DiscordGateway } from "./discord-gateway";
+import { DiscordGateway, type DiscordGatewayHandoff } from "./discord-gateway";
 import { SignalEntry } from "./entry";
+import { SignalHandoff } from "./handoff";
 import type { RouteWake } from "./ingress-queue";
 import { makeResumeBatcher } from "./resume-batch";
+import { sameSecret } from "./same-secret";
 import { SignalService } from "./signal-service";
+import {
+  openSnapshot,
+  readSnapshotFile,
+  type SignalStatePayload,
+  sealSnapshot,
+  writeSnapshotFile,
+} from "./state-snapshot";
 import { TelegramBotApi } from "./telegram";
 import {
   RemoteTokenError,
@@ -46,6 +57,15 @@ const TelegramValidation = Schema.Struct({
 const TelegramLink = Schema.Struct({ hostId: Schema.String, linkedAt: Schema.Int });
 const DiscordValidation = Schema.Struct({ guilds: Schema.Array(Schema.String) });
 const WebhookValidation = Schema.Struct({ routes: Schema.Array(Schema.String) });
+const AuthEventPage = Schema.Struct({
+  events: Schema.Array(Schema.Struct({ eventId: Schema.String, attemptedAt: Schema.Number, payload: Schema.String })),
+  more: Schema.Boolean,
+});
+type AuthEventCursor = { attemptedAt: number; eventId: string };
+const AUTH_EVENT_PAGE_LIMIT = 500;
+const AUTH_EVENT_CATCH_UP_MILLISECONDS = 3_000;
+const AUTH_EVENT_CATCH_UP_OVERLAP_MILLISECONDS = 120_000;
+const SIGTERM_DRAIN_SLACK_MILLISECONDS = 15_000;
 const RouteWakeAnswer = Schema.Struct({
   hostId: Schema.NullOr(Schema.String),
   state: Schema.Literals(ROUTE_HOST_STATES),
@@ -84,6 +104,10 @@ class ControlPlane extends Context.Service<
     supportsRouteWake(): Effect.Effect<boolean>;
     hostWake(hostId: string): Effect.Effect<RouteWake, ControlPlaneError>;
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
+    authEventsAfter(
+      cursor: AuthEventCursor,
+      timeoutMilliseconds: number,
+    ): Effect.Effect<typeof AuthEventPage.Type, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
   static layer = Layer.effect(
@@ -283,6 +307,23 @@ class ControlPlane extends Context.Service<
             releaseResponse,
           ).pipe(Effect.catch(() => Effect.succeed(false))),
         ),
+        authEventsAfter: Effect.fn("ControlPlane.authEventsAfter")((cursor, timeoutMilliseconds) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/auth-events", { after: cursor, limit: AUTH_EVENT_PAGE_LIMIT }, timeoutMilliseconds),
+            (response) =>
+              Effect.gen(function* () {
+                if (!response.ok)
+                  return yield* new ControlPlaneError({
+                    message: "The account service did not return the auth events.",
+                  });
+                return yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(AuthEventPage)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+              }),
+            releaseResponse,
+          ),
+        ),
         discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
           Effect.acquireUseRelease(
             ask("/v2/remote/discord-route/removed", { guildId }),
@@ -412,25 +453,186 @@ if (!discordConfig) {
   console.log("OpenBot Discord is off: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are not both set and valid.");
 }
 let discordApi: DiscordApi | null = null;
+let discordGateway: DiscordGateway["Service"] | null = null;
+let takeOverDiscord: (handoff: DiscordGatewayHandoff | null) => void = () => undefined;
+let discordTakeover: Promise<DiscordGatewayHandoff | null> = Promise.resolve(null);
 const discordWhileEntry: Effect.Effect<void> = discordConfig
   ? Effect.scoped(
       Effect.gen(function* () {
+        const takeover = yield* Effect.promise(() => discordTakeover);
+        discordTakeover = Promise.resolve(null);
         const services = yield* Layer.build(
-          DiscordGateway.layer(discordConfig, signal, {
-            removed: (guildId) => controlPlaneService.discordGuildRemoved(guildId),
-            reconcile: (guildIds, before) => controlPlaneService.reconcileDiscordGuilds(guildIds, before),
-          }),
+          DiscordGateway.layer(
+            discordConfig,
+            signal,
+            {
+              removed: (guildId) => controlPlaneService.discordGuildRemoved(guildId),
+              reconcile: (guildIds, before) => controlPlaneService.reconcileDiscordGuilds(guildIds, before),
+            },
+            takeover,
+          ),
         );
-        discordApi = Context.get(services, DiscordGateway).api;
+        const gateway = Context.get(services, DiscordGateway);
+        discordGateway = gateway;
+        discordApi = gateway.api;
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             discordApi = null;
+            discordGateway = null;
           }),
         );
         return yield* Effect.never;
       }),
     )
   : Effect.void;
+const startedAt = Date.now();
+let lastAuthEventAt: number | null = null;
+const stateDirectory = config.stateDirectory;
+const servers = new Set<Server<unknown>>();
+const statePayload = (): SignalStatePayload => {
+  const cutoffs = signal.cutoffs;
+  return {
+    version: 1,
+    signalId: config.signalId ?? "",
+    writtenAt: Date.now(),
+    lastAuthEventAt,
+    ticketCutoff: cutoffs.ticket,
+    routeCutoff: cutoffs.route,
+    trusted: tokens.exportTrustedResumeTokens(),
+    refusals: signal.exportRefusals(),
+  };
+};
+const writeSnapshot = async () => {
+  if (!stateDirectory) return;
+  await controlPlane.runPromise(
+    writeSnapshotFile(stateDirectory, sealSnapshot(statePayload(), config.sessionSecret)).pipe(
+      Effect.catch(() => Effect.sync(() => console.error("OpenBot Signal could not write its state snapshot."))),
+    ),
+  );
+};
+const handoff = new SignalHandoff({
+  healthPort: config.healthPort,
+  mainPort: config.port,
+  peerPort: config.handoffPeerPort,
+  token: config.handoffToken,
+  drainSeconds: config.drainSeconds,
+  signal,
+  tokens,
+  runtime: signalRuntime,
+  discordApi: () => discordApi,
+  sealedState: () => sealSnapshot(statePayload(), config.sessionSecret),
+  writeSnapshot,
+  handle: (request) => app.handle(request),
+  stopListening: () => {
+    for (const server of servers) void server.stop(false);
+  },
+  discordHandOver: async () => (discordGateway ? Effect.runPromise(discordGateway.handOver) : null),
+  discordTakeOver: (takeover) => takeOverDiscord(takeover),
+  authEventApplied: () => {
+    lastAuthEventAt = Date.now();
+  },
+  exit: () => shutdown(),
+});
+const healthServer = Bun.serve({
+  hostname: config.healthHost,
+  port: config.healthPort,
+  routes: {
+    "/health/live": () =>
+      Response.json({
+        service: "openbot-remote-api",
+        status: "live",
+        state: handoff.state,
+        commit: config.sourceCommit,
+      }),
+    "/health/ready": () =>
+      handoff.state === "ready"
+        ? Response.json({ service: "openbot-remote-api", status: "ready", state: handoff.state })
+        : Response.json({ service: "openbot-remote-api", status: "not_ready", state: handoff.state }, { status: 503 }),
+    "/metrics": (request) => {
+      const authorization = request.headers.get("Authorization") ?? "";
+      if (!config.metricsToken || !sameSecret(authorization, `Bearer ${config.metricsToken}`))
+        return new Response("Not found", { status: 404 });
+      return new Response(prometheusMetrics(signal, turnRelays, entry), {
+        headers: { "Content-Type": "text/plain; version=0.0.4" },
+      });
+    },
+    ...handoff.routes(),
+    "/admin/go-away": { POST: goAwayRoute(signal, config.adminToken) },
+  },
+  fetch: () => new Response("Not found", { status: 404 }),
+});
+
+const catchUpAuthEvents = async (since: number): Promise<boolean> => {
+  const deadline = Date.now() + AUTH_EVENT_CATCH_UP_MILLISECONDS;
+  let cursor: AuthEventCursor = {
+    attemptedAt: Math.max(0, since - AUTH_EVENT_CATCH_UP_OVERLAP_MILLISECONDS),
+    eventId: "",
+  };
+  for (;;) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return false;
+    const page = await controlPlane.runPromise(
+      controlPlaneService.authEventsAfter(cursor, remaining).pipe(Effect.catch(() => Effect.succeed(null))),
+    );
+    if (!page) return false;
+    for (const row of page.events) {
+      const event = decodeAuthEvent(row.payload);
+      if (event) applyAuthEvent(signal, event);
+      cursor = { attemptedAt: row.attemptedAt, eventId: row.eventId };
+    }
+    if (page.events.length > 0) lastAuthEventAt = Date.now();
+    if (!page.more) return true;
+  }
+};
+
+const restoreState = async (): Promise<void> => {
+  const joined = await handoff.join();
+  if (joined.kind === "refused") {
+    console.error("OpenBot Signal could not join the running Signal process. It stops.");
+    process.exit(1);
+  }
+  if (joined.kind === "joined") {
+    const opened = openSnapshot(joined.snapshot, config.sessionSecret, config.signalId ?? "", Date.now());
+    if (!opened.ok) {
+      console.error(`OpenBot Signal refused the state of the running process (${opened.reason}). It stops.`);
+      process.exit(1);
+    }
+    discordTakeover = new Promise((resolve) => {
+      takeOverDiscord = resolve;
+    });
+    if (!joined.discord) takeOverDiscord(null);
+    handoff.link("old");
+    signal.importRefusals(opened.payload.refusals);
+    signal.setCutoffs({ ticket: opened.payload.ticketCutoff, route: opened.payload.routeCutoff });
+    tokens.importTrustedResumeTokens(opened.payload.trusted, (token) => signal.refusesTrust(token));
+    lastAuthEventAt = opened.payload.lastAuthEventAt;
+    if (!(await catchUpAuthEvents(opened.payload.writtenAt)))
+      console.error("OpenBot Signal could not read the recent auth events. The running process gave its state.");
+    console.log("OpenBot Signal joined the running process and took its state.");
+    return;
+  }
+  const sealed = stateDirectory ? await controlPlane.runPromise(readSnapshotFile(stateDirectory)) : null;
+  if (!sealed) return;
+  const opened = openSnapshot(sealed, config.sessionSecret, config.signalId ?? "", Date.now());
+  if (!opened.ok) {
+    console.error(`OpenBot Signal refused its state snapshot (${opened.reason}). Each session is checked again.`);
+    return;
+  }
+  signal.importRefusals(opened.payload.refusals);
+  if (!(await catchUpAuthEvents(opened.payload.writtenAt))) {
+    console.error("OpenBot Signal could not read the recent auth events. Each session is checked again.");
+    return;
+  }
+  tokens.importTrustedResumeTokens(opened.payload.trusted, (token) => signal.refusesTrust(token));
+  signal.setCutoffs({
+    ticket: signal.cutoffs.ticket,
+    route: Math.min(signal.cutoffs.route, opened.payload.routeCutoff),
+  });
+  lastAuthEventAt = opened.payload.lastAuthEventAt;
+  console.log("OpenBot Signal restored its state snapshot.");
+};
+await restoreState();
+
 const setTelegramWebhooks = () => {
   if (signal.telegram) void signalRuntime.runPromise(signal.telegram.bot.setWebhooks());
 };
@@ -445,11 +647,17 @@ const entryRuntime = ManagedRuntime.make(
   }),
 );
 await entryRuntime.runPromise(Effect.void);
-const app = createRemoteApiApp(config, signal, signalRuntime, turnRelays, entry, () => discordApi);
-const listen = () =>
+const app = createRemoteApiApp(config, signal, signalRuntime, turnRelays, entry, () => discordApi, {
+  handoff: handoff.app,
+  authEventApplied: () => {
+    lastAuthEventAt = Date.now();
+  },
+});
+const listen = () => {
   app.listen({
     hostname: config.host,
     port: config.port,
+    reusePort: true,
     ...(tlsPaths
       ? {
           tls: {
@@ -459,25 +667,14 @@ const listen = () =>
         }
       : {}),
   });
+  if (app.server) servers.add(app.server);
+};
 listen();
-if (entry.isEntry) setTelegramWebhooks();
-const healthServer = Bun.serve({
-  hostname: config.healthHost,
-  port: config.healthPort,
-  routes: {
-    "/health/live": () => Response.json({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }),
-    "/health/ready": () => Response.json({ service: "openbot-remote-api", status: "ready" }),
-    "/metrics": (request) => {
-      const authorization = request.headers.get("Authorization") ?? "";
-      if (!config.metricsToken || !sameSecret(authorization, `Bearer ${config.metricsToken}`))
-        return new Response("Not found", { status: 404 });
-      return new Response(prometheusMetrics(signal, turnRelays, entry), {
-        headers: { "Content-Type": "text/plain; version=0.0.4" },
-      });
-    },
-  },
-  fetch: () => new Response("Not found", { status: 404 }),
-});
+handoff.ready();
+if (entry.isEntry && handoff.role === null) setTelegramWebhooks();
+const snapshotTimer = stateDirectory ? setInterval(() => void writeSnapshot(), config.snapshotSeconds * 1_000) : null;
+if (stateDirectory) void writeSnapshot();
+console.log(`OpenBot Signal health is at http://${config.healthHost}:${healthServer.port} (${startedAt}).`);
 
 const protocol = tlsPaths ? "https" : "http";
 console.log(`OpenBot Remote API is ready at ${protocol}://${config.host}:${config.port}`);
@@ -494,7 +691,7 @@ let shuttingDown = false;
 const certificateTimer = setInterval(() => void reloadTlsWhenChanged(), 5 * 60_000);
 
 function reloadTlsWhenChanged(): Promise<void> {
-  if (!tlsPaths || shuttingDown) return Promise.resolve();
+  if (!tlsPaths || shuttingDown || handoff.state === "draining") return Promise.resolve();
   pendingReload ??= controlPlane
     .runPromise(reloadTlsEffect())
     .catch(() => {
@@ -509,15 +706,16 @@ function reloadTlsWhenChanged(): Promise<void> {
 const reloadTlsEffect = Effect.fn("Signal.reloadTls")(function* () {
   const nextHash = yield* tlsCertificateHash();
   if (shuttingDown || !nextHash || nextHash === certificateHash) return;
-  yield* Effect.tryPromise({
-    try: () => app.stop(true),
-    catch: () => new ControlPlaneError({ message: "The Signal listener could not be stopped." }),
-  });
-  if (shuttingDown) return;
+  if (handoff.state === "draining") return;
+  const previous = app.server;
   yield* Effect.try({
     try: listen,
     catch: () => new ControlPlaneError({ message: "The Signal listener could not be restarted." }),
   });
+  if (previous && previous !== app.server) {
+    servers.delete(previous);
+    void previous.stop(false);
+  }
   certificateHash = nextHash;
   console.log("OpenBot Remote API reloaded its TLS certificate.");
 });
@@ -533,14 +731,18 @@ function tlsCertificateHash(): Effect.Effect<string | null> {
 }
 
 let pendingShutdown: Promise<void> | null = null;
-const shutdown = () => {
+function shutdown(): Promise<void> {
   shuttingDown = true;
   pendingShutdown ??= (async () => {
     clearInterval(certificateTimer);
+    if (snapshotTimer) clearInterval(snapshotTimer);
+    handoff.close();
     healthServer.stop(true);
     await pendingReload;
     try {
-      await app.stop(true);
+      for (const server of servers) void server.stop(true);
+      servers.clear();
+      if (app.server) await app.stop(true);
     } finally {
       try {
         await entryRuntime.dispose();
@@ -554,10 +756,15 @@ const shutdown = () => {
     process.exit(0);
   })();
   return pendingShutdown;
+}
+const drainThenStop = () => {
+  if (handoff.state === "starting") {
+    void shutdown();
+    return;
+  }
+  const bound = setTimeout(() => void shutdown(), config.drainSeconds * 1_000 + SIGTERM_DRAIN_SLACK_MILLISECONDS);
+  bound.unref();
+  void handoff.drain().catch(() => shutdown());
 };
 process.once("SIGINT", () => void shutdown());
-process.once("SIGTERM", () => void shutdown());
-
-function sameSecret(actual: string, expected: string): boolean {
-  return timingSafeEqual(createHash("sha256").update(actual).digest(), createHash("sha256").update(expected).digest());
-}
+process.once("SIGTERM", drainThenStop);

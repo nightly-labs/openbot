@@ -1,4 +1,10 @@
-import { agentProviderName, decodeHostProviderAccounts, isAccountUsage } from "@openbot/contracts/ipc";
+import {
+  type AgentProviderId,
+  agentProviderDescriptor,
+  agentProviderName,
+  decodeHostProviderAccounts,
+  isAccountUsage,
+} from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
   type PlanLimitListedWindow,
@@ -12,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { File, Paths } from "expo-file-system";
 import { useEffect, useMemo } from "react";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { isProviderKeyAccount } from "@/features/servers/model/provider-admin";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -99,13 +106,28 @@ export function usePlanLimits(serverId: string) {
     if (account && reading) saveReading(account, serverId, reading);
   }, [account, serverId, reading]);
   const rows = useMemo(() => planLimitRows(limits.data?.usage), [limits.data]);
+  const notReported = useMemo(
+    () => (accounts ? planLimitsNotReported(limits.data?.accounts ?? null, rows) : []),
+    [accounts, limits.data, rows],
+  );
   return {
     rows,
+    notReported,
     usage: limits.data?.usage ?? null,
     accounts: limits.data?.accounts ?? null,
     online,
     loading: online && limits.isPending,
   };
+}
+
+function planLimitsNotReported(accounts: PlanLimits["accounts"], rows: readonly PlanLimitRow[]): AgentProviderId[] {
+  return (accounts ?? []).flatMap(({ provider, accounts: list }) =>
+    !agentProviderDescriptor(provider).reportsUsage &&
+    !rows.some((row) => row.provider === provider) &&
+    list.some((account) => account.state === "connected" && !isProviderKeyAccount(provider, account.id))
+      ? [provider]
+      : [],
+  );
 }
 
 export function planLimitName(row: PlanLimitRow, accounts: PlanLimits["accounts"], t: Translate): string {
@@ -128,6 +150,15 @@ export function planLimitName(row: PlanLimitRow, accounts: PlanLimits["accounts"
 
 export function lowestPlanLimitsFirst(rows: readonly PlanLimitRow[]): PlanLimitRow[] {
   return [...rows].sort((left, right) => left.remainingPercent - right.remainingPercent);
+}
+
+export function mostLeftAccountPerProvider(rows: readonly PlanLimitRow[]): PlanLimitRow[] {
+  const best = new Map<AgentProviderId, PlanLimitRow>();
+  for (const row of rows) {
+    const current = best.get(row.provider);
+    if (!current || row.remainingPercent > current.remainingPercent) best.set(row.provider, row);
+  }
+  return lowestPlanLimitsFirst([...best.values()]);
 }
 
 export const PLAN_LIMIT_RESET_FORMAT: Intl.DateTimeFormatOptions = {

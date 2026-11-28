@@ -9,6 +9,7 @@ import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { isAvatarColor } from "@openbot/contracts/ipc";
 import { isSignalHomeId } from "@openbot/contracts/ipc-host-signal-home";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
+import { INGRESS_TICKET_ROUTES, type IngressTicketRoute } from "@openbot/contracts/remote-control-plane";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
 import {
@@ -86,7 +87,15 @@ import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 }
 import { CUSTOM_SERVER_OFFER_COLUMNS, type CustomServerOfferRow, customServerPayment } from "./custom-server-offers";
 import { updateSessionActivity } from "./d1-auth-repository";
 import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
-import { type HostCredentialCache, isolateHostCredentials } from "./host-credential-cache";
+import { type HostCredentialCache, isolateHostCredentials, sameHash } from "./host-credential-cache";
+import {
+  HOST_STATE_RECHECK_MS,
+  HOST_STATE_SIGN_IN_RECHECK_MS,
+  type HostStateStore,
+  hostCopyFresh,
+  hostStateStore,
+} from "./host-state";
+import type { HostStateCopy, HostStateCredential, HostStateListing, HostStateSession } from "./host-state-object";
 import { primaryD1, replicaD1 } from "./observed-d1";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import { CHECKOUT_LIFETIME_SECONDS } from "./stripe-client";
@@ -97,6 +106,12 @@ const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
 const AUTH_EVENT_SEND_CONCURRENCY = 6;
 const AUTH_EVENT_CLAIM_MS = 2 * 60_000;
+const HOST_STATE_RETRY_TARGETS = JSON.stringify(["host-state:"]);
+const HOST_STATE_RETRY_MS = 10_000;
+const HOST_STATE_RETRY_DELAY = "1 second";
+export const REMOTE_AUTH_EVENT_DELIVERED = Number.MAX_SAFE_INTEGER;
+export const REMOTE_AUTH_EVENT_RETENTION_MS = 24 * 60 * 60_000;
+export const REMOTE_AUTH_EVENT_PAGE_LIMIT = 500;
 const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
 const MAX_PERMANENT_INVITES_PER_HOST = 5;
 const MAX_TELEGRAM_LINK_CODES_PER_HOST = 10;
@@ -110,6 +125,10 @@ const BILLED_SERVER_SQL = `(EXISTS(SELECT 1 FROM hosted_servers WHERE server_id 
 const OWNER_TRANSFER_FROM = `FROM remote_owner_transfers t
   JOIN remote_hosts h ON h.host_id = t.host_id
   JOIN users u ON u.id = t.from_user_id`;
+
+const INCOMING_OWNER_TRANSFERS_SQL = `SELECT ${OWNER_TRANSFER_COLUMNS} ${OWNER_TRANSFER_FROM}
+  WHERE t.to_email = ? AND t.status = 'pending' AND t.expires_at > ? AND h.owner_user_id = t.from_user_id
+  ORDER BY t.created_at DESC LIMIT 20`;
 
 interface OwnerTransferRow {
   transfer_id: string;
@@ -217,6 +236,14 @@ function hostedStorage(plan: string | null, storageTier: number | null): { stora
   return isOneOf(BILLING_PLAN_IDS, plan) ? { storageGb: storageTierGb(plan, storageTierOf(storageTier)) } : {};
 }
 
+function isListedHostRow(row: ListedHostRow | OwnerTransferRow): row is ListedHostRow {
+  return "membership_id" in row;
+}
+
+function isOwnerTransferRow(row: ListedHostRow | OwnerTransferRow): row is OwnerTransferRow {
+  return "transfer_id" in row;
+}
+
 export class RemoteControlPlaneError extends Schema.TaggedError<RemoteControlPlaneError>()("RemoteControlPlaneError", {
   status: Schema.Number,
   code: Schema.String,
@@ -251,11 +278,7 @@ function readsFrom(database: D1Database, reads: RemoteReads): D1Database {
 
 function machineTokenMatches(host: RemoteHostRow, providedHash: string): boolean {
   const expected = host.machine_token_hash ?? "";
-  let difference = expected.length ^ providedHash.length;
-  for (let index = 0; index < providedHash.length; index += 1) {
-    difference |= expected.charCodeAt(index) ^ providedHash.charCodeAt(index);
-  }
-  return expected !== "" && difference === 0;
+  return expected !== "" && sameHash(expected, providedHash);
 }
 
 export interface SqlCondition {
@@ -330,16 +353,7 @@ function keyHandoversFromRows(rows: readonly RemoteHostKeyHandoverRow[]): Map<st
   return handovers;
 }
 
-interface RemoteHostRow {
-  host_id: string;
-  owner_user_id: string;
-  name: string;
-  logo_key: string | null;
-  auth_epoch: number;
-  machine_token_hash: string | null;
-  device_public_key: string | null;
-  signal_home: string | null;
-}
+type RemoteHostRow = HostStateCredential;
 
 interface RemoteHostKeyHandoverRow {
   host_id: string;
@@ -372,6 +386,43 @@ export type RemoteResumeClaims = Pick<
 >;
 
 export const REMOTE_RESUME_BATCH_LIMIT = 100;
+
+interface IngressRouteError {
+  error: string;
+}
+
+interface IngressTicketResults {
+  slack?: { ticket: string; teams: string[] } | IngressRouteError;
+  discord?: { ticket: string } | IngressRouteError;
+  telegram?: { ticket: string; chats: string[] } | IngressRouteError;
+  webhook?: { ticket: string; routes: string[] };
+}
+
+interface IngressRouteRow {
+  id: string;
+  parent_id: string;
+  linked_at: number;
+}
+
+const INGRESS_ROUTE_QUERIES: Record<IngressTicketRoute, string> = {
+  slack:
+    "SELECT team_id AS id, app_id AS parent_id, connected_at AS linked_at FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+  discord:
+    "SELECT guild_id AS id, '' AS parent_id, connected_at AS linked_at FROM discord_guild_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+  telegram:
+    "SELECT chat_id AS id, bot_id AS parent_id, linked_at FROM telegram_chat_routes WHERE host_id = ? ORDER BY linked_at DESC LIMIT ?",
+  webhook: `SELECT route_id AS id, '' AS parent_id, connected_at AS linked_at FROM webhook_routes
+    WHERE host_id = ? AND revoked_at IS NULL
+      AND account_id = (SELECT owner_user_id FROM remote_hosts WHERE host_id = ?)
+    ORDER BY connected_at DESC LIMIT ?`,
+};
+
+function ingressRouteBindings(route: IngressTicketRoute, hostId: string): (string | number)[] {
+  if (route === "slack") return [hostId, SLACK_ROUTE_TEAMS_LIMIT];
+  if (route === "discord") return [hostId, DISCORD_ROUTE_GUILDS_LIMIT];
+  if (route === "telegram") return [hostId, TELEGRAM_ROUTE_CHATS_LIMIT];
+  return [hostId, hostId, WEBHOOK_ROUTES_LIMIT];
+}
 
 type RemoteResumeHostRow = Pick<RemoteHostRow, "host_id" | "owner_user_id" | "auth_epoch">;
 
@@ -419,6 +470,153 @@ const RESUME_SESSION_ACTIVE = `(s.auth_session_hash IS NULL OR EXISTS(
               AND a.user_id = s.user_id AND a.revoked_at IS NULL AND a.expires_at > ?
           ))`;
 
+const HOST_CREDENTIAL_COLUMNS =
+  "host_id, owner_user_id, name, logo_key, auth_epoch, machine_token_hash, device_public_key, signal_home, signal_home_failed, signal_home_failed_at";
+
+const SESSION_COPY_COLUMNS = `s.session_id, s.host_id AS session_host_id, s.user_id AS session_user_id, s.expires_at,
+                s.ended_at, s.auth_session_hash, CASE WHEN ${RESUME_SESSION_ACTIVE} THEN 1 ELSE 0 END AS auth_live,
+                m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch, h.signal_home
+           FROM remote_sessions s
+           JOIN remote_memberships m ON m.membership_id = s.membership_id
+           JOIN remote_hosts h ON h.host_id = s.host_id`;
+
+const LISTED_HOST_COLUMNS = `h.host_id, h.name, h.logo_key, h.appearance_shape, h.appearance_color, h.device_public_key,
+           h.auth_epoch, m.membership_id, m.role, m.hidden_at,
+           (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
+           (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
+           (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier`;
+
+const HOST_LISTING_COLUMNS = `${keyHandoversJsonSql("h.host_id")} AS key_handovers,
+           ${ownerLicensesJsonSql("h.owner_user_id")} AS owner_licenses,
+           ${serverMemberLimitValueSql("h.host_id")} AS custom_member_limit,
+           ${serverEntitlementsJsonSql("h.host_id")} AS server_entitlements`;
+
+const LISTED_HOST_SOURCE = `FROM remote_memberships m
+         JOIN remote_hosts h ON h.host_id = m.host_id
+         LEFT JOIN custom_server_offers o ON o.host_id = h.host_id
+         WHERE m.user_id = ? AND m.status = 'active'
+         ORDER BY h.name, h.host_id`;
+
+const LISTED_HOSTS_SQL = `SELECT ${LISTED_HOST_COLUMNS},
+         ${HOST_LISTING_COLUMNS},
+         ${CUSTOM_SERVER_OFFER_COLUMNS}
+       ${LISTED_HOST_SOURCE}`;
+
+type ListedHostRow = {
+  host_id: string;
+  name: string;
+  logo_key: string | null;
+  appearance_shape: string | null;
+  appearance_color: string | null;
+  device_public_key: string | null;
+  auth_epoch: number;
+  membership_id: string;
+  role: RemoteMemberRole;
+  hidden_at: number | null;
+  hosted_plan: string | null;
+  operator_host: string | null;
+  hosted_storage_tier: number | null;
+} & HostStateListing &
+  CustomServerOfferRow;
+
+function listedHosts(rows: readonly ListedHostRow[], now: number) {
+  return rows.map((row) => listedHost(row, now));
+}
+
+function listedHost(row: ListedHostRow, now: number) {
+  const license = ownerLicenseFromRows(newestFirst(jsonRows<OwnerLicenseJsonRow>(row.owner_licenses)), now);
+  const plan = serverEntitlementFromRows(newestFirst(jsonRows<ServerEntitlementJsonRow>(row.server_entitlements)), now);
+  const custom = row.custom_member_limit === null ? null : { member_limit: row.custom_member_limit };
+  const { limit, licenseRaises } = memberLimitFrom(custom, plan, license);
+  return {
+    hostId: row.host_id,
+    name: row.name,
+    logoKey: row.logo_key,
+    appearance: storedAppearance(row.appearance_shape, row.appearance_color),
+    devicePublicKey: row.device_public_key,
+    keyHandovers:
+      keyHandoversFromRows(
+        jsonRows<RemoteHostKeyHandoverRow>(row.key_handovers).sort((left, right) => left.issued_at - right.issued_at),
+      ).get(row.host_id) ?? [],
+    authEpoch: row.auth_epoch,
+    membershipId: row.membership_id,
+    role: row.role,
+    memberLimit: license ? Math.min(limit, license.users) : limit,
+    licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
+    hosted: row.hosted_plan !== null,
+    ...(row.hidden_at === null ? {} : { hidden: true as const }),
+    ...(row.operator_host === null ? {} : { restartAvailable: false }),
+    ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
+    ...customServerPayment(row, row.role),
+  };
+}
+
+interface HostCopyRequest {
+  credential: boolean;
+  sessions: string[];
+  listing: boolean;
+}
+
+interface HostCopies {
+  hosts: Map<string, RemoteHostRow>;
+  sessions: Map<string, HostStateCopy<HostStateSession>>;
+  listings: Map<string, HostStateListing>;
+}
+
+interface HostListingRow extends HostStateListing {
+  host_id: string;
+}
+
+function hostCopyRequest(hostId: string, request: Partial<HostCopyRequest>): Map<string, HostCopyRequest> {
+  return new Map([
+    [
+      hostId,
+      { credential: request.credential ?? false, sessions: request.sessions ?? [], listing: request.listing ?? false },
+    ],
+  ]);
+}
+
+function resumeCopyRequests(claims: readonly RemoteResumeClaims[]): Map<string, HostCopyRequest> {
+  const requests = new Map<string, HostCopyRequest>();
+  for (const claim of claims) {
+    const request = requests.get(claim.hostId) ?? { credential: false, sessions: [], listing: false };
+    if (claim.role === "host") request.credential = true;
+    else if (!request.sessions.includes(claim.sessionId)) request.sessions.push(claim.sessionId);
+    requests.set(claim.hostId, request);
+  }
+  return requests;
+}
+
+function periodEndPassed(rows: readonly { current_period_end: number | null }[], since: number, now: number): boolean {
+  return rows.some(
+    (row) => row.current_period_end !== null && row.current_period_end > since && row.current_period_end <= now,
+  );
+}
+
+function listingCopyFresh(
+  copy: HostStateCopy<HostStateListing> | null | undefined,
+  now: number,
+): copy is HostStateCopy<HostStateListing> {
+  if (!hostCopyFresh(copy, now)) return false;
+  return (
+    !periodEndPassed(jsonRows<OwnerLicenseJsonRow>(copy.value.owner_licenses), copy.checkedAt, now) &&
+    !periodEndPassed(jsonRows<ServerEntitlementJsonRow>(copy.value.server_entitlements), copy.checkedAt, now)
+  );
+}
+
+function sessionCopyOpen(session: HostStateSession, hostId: string, now: number): boolean {
+  return (
+    session.session_host_id === hostId &&
+    session.host_id === hostId &&
+    session.ended_at === null &&
+    session.expires_at > now &&
+    session.status === "active"
+  );
+}
+
 const SIGNED_IN_SESSION_SQL = `SELECT a.user_id AS account_user_id, a.last_used_at AS account_last_used_at,
          t.session_id, t.expires_at, t.ended_at, t.membership_id, t.host_id, t.user_id, t.role, t.status,
          t.auth_epoch, t.signal_home
@@ -454,56 +652,6 @@ function signedInSession(row: SignedInSessionRow): SignedInSession {
   const { account_user_id: userId, account_last_used_at: _, ...session } = row;
   return { userId, session: session.session_id === null ? null : session };
 }
-
-interface ResumeRows {
-  hosts: ReadonlyMap<string, RemoteResumeHostRow>;
-  sessions: ReadonlyMap<string, RemoteSessionRow>;
-}
-
-function resumeClaimsMatch(claims: RemoteResumeClaims, rows: ResumeRows, now: number): boolean {
-  if (claims.role === "host") return hostResumeClaimsMatch(claims, rows.hosts.get(claims.hostId));
-  return sessionResumeClaimsMatch(claims, rows.sessions.get(claims.sessionId), now);
-}
-
-const resumeRows = Effect.fn("RemoteControlPlane.resumeRows")(function* (
-  database: D1Database,
-  claims: readonly RemoteResumeClaims[],
-  now: number,
-): Effect.fn.Return<ResumeRows, RemoteFailure> {
-  const hostIds = [...new Set(claims.filter((entry) => entry.role === "host").map((entry) => entry.hostId))];
-  const sessionIds = [...new Set(claims.filter((entry) => entry.role !== "host").map((entry) => entry.sessionId))];
-  const [hostRows, sessionRows] = yield* Effect.all(
-    [
-      hostIds.length === 0
-        ? Effect.succeed([])
-        : remoteCall(() =>
-            database
-              .prepare(
-                `SELECT host_id, owner_user_id, auth_epoch FROM remote_hosts
-                  WHERE host_id IN (SELECT value FROM json_each(?))`,
-              )
-              .bind(JSON.stringify(hostIds))
-              .all<RemoteResumeHostRow>(),
-          ).pipe(Effect.map((result) => result.results)),
-      sessionIds.length === 0
-        ? Effect.succeed([])
-        : remoteCall(() =>
-            database
-              .prepare(
-                `SELECT ${RESUME_SESSION_COLUMNS}
-                  WHERE s.session_id IN (SELECT value FROM json_each(?)) AND ${RESUME_SESSION_ACTIVE}`,
-              )
-              .bind(JSON.stringify(sessionIds), now)
-              .all<RemoteSessionRow>(),
-          ).pipe(Effect.map((result) => result.results)),
-    ],
-    { concurrency: "unbounded" },
-  );
-  return {
-    hosts: new Map(hostRows.map((row) => [row.host_id, row])),
-    sessions: new Map(sessionRows.map((row) => [row.session_id, row])),
-  };
-});
 
 function remoteSessionActive(session: RemoteSessionRow | null, now: number): session is RemoteSessionRow {
   return session !== null && !session.ended_at && session.expires_at > now && session.status === "active";
@@ -554,9 +702,30 @@ interface RemoteAuthEventRow {
   pending_targets: string | null;
 }
 
+interface RemoteAuthEventPageRow {
+  event_id: string;
+  payload: string;
+  attempted_at: number;
+}
+
+export interface RemoteAuthEventCursor {
+  attemptedAt: number;
+  eventId: string;
+}
+
+export interface RemoteAuthEventPage {
+  events: { eventId: string; attemptedAt: number; payload: string }[];
+  more: boolean;
+}
+
 export type RemoteAuthEventBindings = Pick<
   WorkerBindings,
-  "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_URLS" | "REMOTE_AUTH_WEBHOOK_SECRET"
+  | "DB"
+  | "REMOTE_AUTH_WEBHOOK_URL"
+  | "REMOTE_AUTH_WEBHOOK_URLS"
+  | "REMOTE_AUTH_WEBHOOK_SECRET"
+  | "HOST_STATE"
+  | "HOST_STATE_MODE"
 >;
 
 export interface RemoteSignalPlan {
@@ -586,6 +755,7 @@ const SIGNAL_COUNTRY_PATTERN = /^[A-Z][A-Z0-9]$/u;
 const NEAR_SIGNAL_HOME_MARGIN_KM = 1_000;
 const EARTH_RADIUS_KM = 6_371;
 const SIGNAL_HOME_MOVE_TIMEOUT_MS = 2_000;
+const SIGNAL_HOME_FAILURE_HOLD_MS = 60 * 60_000;
 
 interface RemotePublicJwk extends DynamicRecord {
   kid: string;
@@ -777,6 +947,84 @@ class DiscordRouteSigner {
   }).bind(this);
 }
 
+function lastBuilt<Input, Value>(
+  keyOf: (input: Input) => readonly (string | undefined)[],
+  build: (input: Input) => Value,
+): (input: Input) => Value {
+  let last: { key: readonly (string | undefined)[]; value: Value } | null = null;
+  return (input) => {
+    const key = keyOf(input);
+    if (last?.key.every((part, index) => part === key[index])) return last.value;
+    const value = build(input);
+    last = { key, value };
+    return value;
+  };
+}
+
+type RouteSignerBindings = Pick<
+  WorkerBindings,
+  | "REMOTE_TICKET_PUBLIC_JWKS"
+  | "SLACK_ROUTE_PRIVATE_JWK"
+  | "SLACK_ROUTE_KEY_ID"
+  | "DISCORD_ROUTE_PRIVATE_JWK"
+  | "DISCORD_ROUTE_KEY_ID"
+>;
+
+const sharedRouteSigner = lastBuilt(
+  (bindings: RouteSignerBindings) => [
+    bindings.SLACK_ROUTE_PRIVATE_JWK,
+    bindings.SLACK_ROUTE_KEY_ID,
+    bindings.REMOTE_TICKET_PUBLIC_JWKS,
+  ],
+  (bindings) =>
+    bindings.SLACK_ROUTE_PRIVATE_JWK && bindings.SLACK_ROUTE_KEY_ID && bindings.REMOTE_TICKET_PUBLIC_JWKS
+      ? new RouteSigner({
+          privateJwk: bindings.SLACK_ROUTE_PRIVATE_JWK,
+          publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
+          keyId: bindings.SLACK_ROUTE_KEY_ID,
+        })
+      : null,
+);
+
+const sharedDiscordRouteSigner = lastBuilt(
+  (bindings: RouteSignerBindings) => [
+    bindings.DISCORD_ROUTE_PRIVATE_JWK,
+    bindings.DISCORD_ROUTE_KEY_ID,
+    bindings.REMOTE_TICKET_PUBLIC_JWKS,
+  ],
+  (bindings) =>
+    bindings.DISCORD_ROUTE_PRIVATE_JWK && bindings.DISCORD_ROUTE_KEY_ID && bindings.REMOTE_TICKET_PUBLIC_JWKS
+      ? new DiscordRouteSigner({
+          privateJwk: bindings.DISCORD_ROUTE_PRIVATE_JWK,
+          publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
+          keyId: bindings.DISCORD_ROUTE_KEY_ID,
+        })
+      : null,
+);
+
+const sharedSignalPlan = lastBuilt(
+  (
+    bindings: Pick<
+      WorkerBindings,
+      "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES" | "REMOTE_SIGNAL_HOME_LOCATIONS" | "REMOTE_SIGNAL_HOME_COUNTRIES"
+    >,
+  ) => [
+    bindings.REMOTE_SIGNAL_URL,
+    bindings.REMOTE_SIGNAL_HOMES,
+    bindings.REMOTE_SIGNAL_HOME_LOCATIONS,
+    bindings.REMOTE_SIGNAL_HOME_COUNTRIES,
+  ],
+  remoteSignalPlan,
+);
+
+const sharedWebhookUrls = lastBuilt(
+  (bindings: Pick<WorkerBindings, "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_URLS">) => [
+    bindings.REMOTE_AUTH_WEBHOOK_URLS,
+    bindings.REMOTE_AUTH_WEBHOOK_URL,
+  ],
+  remoteAuthWebhookUrls,
+);
+
 const ticketSigners = new Map<string, { config: TicketSignerConfig; signer: RemoteTicketSigner }>();
 
 function sharedTicketSigner(config: TicketSignerConfig): RemoteTicketSigner {
@@ -803,6 +1051,7 @@ class RemoteDependencies extends Context.Service<
     signal: RemoteSignalPlan | null;
     webhookUrls: readonly string[];
     webhookSecret: string | null;
+    hostState: HostStateStore | null;
   }
 >()("auth-api/RemoteControlPlane/Dependencies") {}
 
@@ -811,6 +1060,7 @@ export class RemoteControlPlane {
 
   readonly #database: D1Database;
   readonly #signer: RemoteTicketSigner;
+  #leasedAuthEventIds: string[] = [];
   readonly #hostCredentials: HostCredentialCache;
 
   constructor(
@@ -833,12 +1083,15 @@ export class RemoteControlPlane {
       | "DISCORD_ROUTE_KEY_ID"
       | "TELEGRAM_BOT_ID"
       | "TELEGRAM_BOT_USERNAME"
+      | "HOST_STATE"
+      | "HOST_STATE_MODE"
     >,
     options: {
       fetch?: RemoteFetch;
       now?: () => number;
       schedule?: (delivery: Effect.Effect<void, RemoteFailure>) => void;
       hostCredentials?: HostCredentialCache;
+      hostState?: HostStateStore | null;
     } = {},
   ) {
     if (!bindings.REMOTE_TICKET_PRIVATE_JWK || !bindings.REMOTE_TICKET_PUBLIC_JWKS || !bindings.REMOTE_TICKET_KEY_ID) {
@@ -851,29 +1104,15 @@ export class RemoteControlPlane {
       publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
       keyId: bindings.REMOTE_TICKET_KEY_ID,
     });
-    const routeSigner =
-      bindings.SLACK_ROUTE_PRIVATE_JWK && bindings.SLACK_ROUTE_KEY_ID
-        ? new RouteSigner({
-            privateJwk: bindings.SLACK_ROUTE_PRIVATE_JWK,
-            publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
-            keyId: bindings.SLACK_ROUTE_KEY_ID,
-          })
-        : null;
-    const discordRouteSigner =
-      bindings.DISCORD_ROUTE_PRIVATE_JWK && bindings.DISCORD_ROUTE_KEY_ID
-        ? new DiscordRouteSigner({
-            privateJwk: bindings.DISCORD_ROUTE_PRIVATE_JWK,
-            publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
-            keyId: bindings.DISCORD_ROUTE_KEY_ID,
-          })
-        : null;
+    const routeSigner = sharedRouteSigner(bindings);
+    const discordRouteSigner = sharedDiscordRouteSigner(bindings);
     const telegramBotId = bindings.TELEGRAM_BOT_ID?.trim();
     const telegramBotUsername = bindings.TELEGRAM_BOT_USERNAME?.trim();
     const telegram =
       telegramBotId && telegramBotUsername && TELEGRAM_BOT_ID_PATTERN.test(telegramBotId)
         ? { botId: telegramBotId, botUsername: telegramBotUsername }
         : null;
-    const webhookUrls = remoteAuthWebhookUrls(bindings);
+    const webhookUrls = sharedWebhookUrls(bindings);
     const webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
     const fetcher: RemoteFetch = options.fetch ?? ((input, init) => fetch(input, init));
     const now = options.now ?? Date.now;
@@ -887,9 +1126,13 @@ export class RemoteControlPlane {
       now,
       schedule,
       fetch: fetcher,
-      signal: remoteSignalPlan(bindings),
+      signal: sharedSignalPlan(bindings),
       webhookUrls,
       webhookSecret,
+      hostState:
+        options.hostState === undefined
+          ? hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE)
+          : options.hostState,
     });
   }
 
@@ -949,27 +1192,53 @@ export class RemoteControlPlane {
         existing.machine_token_hash !== providedMachineTokenHash ||
         LEGACY_SHA256_HEX_PATTERN.test(existing.machine_token_hash ?? "");
       if (!rotateCredential && existing) {
-        const metadata = yield* remoteCall(() =>
-          dependencies.database.batch([
-            dependencies.database
-              .prepare(
-                `UPDATE remote_hosts SET name = ?, device_public_key = ?, updated_at = ?
-             WHERE host_id = ? AND owner_user_id = ?`,
-              )
-              .bind(name, devicePublicKey, now, hostId, user.id),
-            dependencies.database
-              .prepare(
-                `INSERT INTO remote_memberships(
-               membership_id, host_id, user_id, role, status, created_at, updated_at
-             )
-             SELECT ?, host_id, ?, 'owner', 'active', ?, ?
-             FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
-             ON CONFLICT(host_id, user_id) DO UPDATE SET
-               role = 'owner', status = 'active', updated_at = excluded.updated_at`,
-              )
-              .bind(ownerMembershipId, user.id, now, now, hostId, user.id),
-          ]),
+        const current = yield* remoteCall(() =>
+          dependencies.database
+            .prepare(
+              `SELECT membership_id, host_id, user_id, role, status
+             FROM remote_memberships WHERE host_id = ? AND user_id = ? LIMIT 1`,
+            )
+            .bind(hostId, user.id)
+            .first<RemoteMembershipRow>(),
         );
+        const writes = [
+          ...(existing.name === name
+            ? []
+            : [
+                dependencies.database
+                  .prepare(
+                    `UPDATE remote_hosts SET name = ?, device_public_key = ?, updated_at = ?
+                 WHERE host_id = ? AND owner_user_id = ?`,
+                  )
+                  .bind(name, devicePublicKey, now, hostId, user.id),
+              ]),
+          ...(current?.role === "owner" && current.status === "active"
+            ? []
+            : [
+                dependencies.database
+                  .prepare(
+                    `INSERT INTO remote_memberships(
+                   membership_id, host_id, user_id, role, status, created_at, updated_at
+                 )
+                 SELECT ?, host_id, ?, 'owner', 'active', ?, ?
+                 FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
+                 ON CONFLICT(host_id, user_id) DO UPDATE SET
+                   role = 'owner', status = 'active', updated_at = excluded.updated_at`,
+                  )
+                  .bind(ownerMembershipId, user.id, now, now, hostId, user.id),
+              ]),
+        ];
+        if (writes.length === 0 && current) {
+          return {
+            hostId,
+            name,
+            membershipId: current.membership_id,
+            authEpoch: existing.auth_epoch,
+            machineToken: null,
+          };
+        }
+        const metadata = yield* remoteCall(() => dependencies.database.batch(writes));
+        yield* this.#hostChanged(hostId);
         if (metadata.some((result) => (result.meta.changes ?? 0) !== 1)) {
           return yield* new RemoteControlPlaneError(
             403,
@@ -991,7 +1260,7 @@ export class RemoteControlPlane {
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
       const membershipId = ownerMembershipId;
-      const [, ...registration] = yield* remoteCall(() =>
+      const [, hostWrite, , ...events] = yield* remoteCall(() =>
         dependencies.database.batch([
           dependencies.database
             .prepare(
@@ -1023,7 +1292,8 @@ export class RemoteControlPlane {
            SELECT ?, host_id, ?, 'owner', 'active', ?, ?
            FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?
            ON CONFLICT(host_id, user_id) DO UPDATE SET
-             role = 'owner', status = 'active', updated_at = excluded.updated_at`,
+             role = 'owner', status = 'active', updated_at = excluded.updated_at
+           WHERE remote_memberships.role != 'owner' OR remote_memberships.status != 'active'`,
             )
             .bind(membershipId, user.id, now, now, hostId, user.id),
           this.#authEpochEventStatement(hostId, now, user.id),
@@ -1033,7 +1303,8 @@ export class RemoteControlPlane {
         ]),
       );
       this.#hostCredentials.forget(hostId);
-      if (registration.some((result) => (result.meta.changes ?? 0) !== 1)) {
+      yield* this.#hostChanged(hostId);
+      if ([hostWrite, ...events].some((result) => (result?.meta.changes ?? 0) !== 1)) {
         return yield* new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
       }
       yield* this.#flushAuthEvents();
@@ -1078,6 +1349,7 @@ export class RemoteControlPlane {
         ]),
       );
       this.#hostCredentials.forget(hostId);
+      yield* this.#hostChanged(hostId);
       yield* this.#flushAuthEvents();
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1166,6 +1438,7 @@ export class RemoteControlPlane {
             .bind(hostId, hostId, HOST_KEY_HANDOVER_LIMIT),
         ]),
       );
+      yield* this.#hostChanged(hostId);
       if (inserted?.meta.changes !== 1 || updated?.meta.changes !== 1) {
         const current = yield* this.#host(hostId);
         if (current?.device_public_key === handover.publicKey && (yield* this.#handoverStored(handover))) {
@@ -1181,90 +1454,122 @@ export class RemoteControlPlane {
   readonly listHosts = Effect.fn("RemoteControlPlane.listHosts")(
     function* (this: RemoteControlPlane, userId: string) {
       const dependencies = yield* RemoteDependencies;
+      if (dependencies.hostState?.mode === "read") {
+        return listedHosts(yield* this.#copiedHostList(userId), dependencies.now());
+      }
       const memberHosts = (database: D1Database) =>
-        remoteCall(() =>
-          database
-            .prepare(
-              `SELECT h.host_id, h.name, h.logo_key, h.appearance_shape, h.appearance_color, h.device_public_key,
-           h.auth_epoch, m.membership_id, m.role, m.hidden_at,
-           (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
-           (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
-           (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier,
-           ${keyHandoversJsonSql("h.host_id")} AS key_handovers,
-           ${ownerLicensesJsonSql("h.owner_user_id")} AS owner_licenses,
-           ${serverMemberLimitValueSql("h.host_id")} AS custom_member_limit,
-           ${serverEntitlementsJsonSql("h.host_id")} AS server_entitlements,
-           ${CUSTOM_SERVER_OFFER_COLUMNS}
-         FROM remote_memberships m
-         JOIN remote_hosts h ON h.host_id = m.host_id
-         LEFT JOIN custom_server_offers o ON o.host_id = h.host_id
-         WHERE m.user_id = ? AND m.status = 'active'
-         ORDER BY h.name, h.host_id`,
-            )
-            .bind(userId)
-            .all<
-              {
-                host_id: string;
-                name: string;
-                logo_key: string | null;
-                appearance_shape: string | null;
-                appearance_color: string | null;
-                device_public_key: string | null;
-                auth_epoch: number;
-                membership_id: string;
-                role: RemoteMemberRole;
-                hidden_at: number | null;
-                hosted_plan: string | null;
-                operator_host: string | null;
-                hosted_storage_tier: number | null;
-                key_handovers: string;
-                owner_licenses: string;
-                custom_member_limit: number | null;
-                server_entitlements: string;
-              } & CustomServerOfferRow
-            >(),
-        ).pipe(Effect.map((result) => result.results ?? []));
+        remoteCall(() => database.prepare(LISTED_HOSTS_SQL).bind(userId).all<ListedHostRow>()).pipe(
+          Effect.map((result) => result.results ?? []),
+        );
       const replica = yield* memberHosts(replicaD1(dependencies.database));
       const rows = replica.length > 0 ? replica : yield* memberHosts(primaryD1(dependencies.database));
-      const now = dependencies.now();
-      return rows.map((row) => {
-        const license = ownerLicenseFromRows(newestFirst(jsonRows<OwnerLicenseJsonRow>(row.owner_licenses)), now);
-        const plan = serverEntitlementFromRows(
-          newestFirst(jsonRows<ServerEntitlementJsonRow>(row.server_entitlements)),
-          now,
-        );
-        const custom = row.custom_member_limit === null ? null : { member_limit: row.custom_member_limit };
-        const { limit, licenseRaises } = memberLimitFrom(custom, plan, license);
-        return {
-          hostId: row.host_id,
-          name: row.name,
-          logoKey: row.logo_key,
-          appearance: storedAppearance(row.appearance_shape, row.appearance_color),
-          devicePublicKey: row.device_public_key,
-          keyHandovers:
-            keyHandoversFromRows(
-              jsonRows<RemoteHostKeyHandoverRow>(row.key_handovers).sort(
-                (left, right) => left.issued_at - right.issued_at,
-              ),
-            ).get(row.host_id) ?? [],
-          authEpoch: row.auth_epoch,
-          membershipId: row.membership_id,
-          role: row.role,
-          memberLimit: license ? Math.min(limit, license.users) : limit,
-          licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
-          hosted: row.hosted_plan !== null,
-          ...(row.hidden_at === null ? {} : { hidden: true as const }),
-          ...(row.operator_host === null ? {} : { restartAvailable: false }),
-          ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
-          ...customServerPayment(row, row.role),
-        };
-      });
+      return listedHosts(rows, dependencies.now());
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
+
+  readonly listHostsWithTransfers = Effect.fn("RemoteControlPlane.listHostsWithTransfers")(
+    function* (this: RemoteControlPlane, user: AuthUser) {
+      const dependencies = yield* RemoteDependencies;
+      const now = dependencies.now();
+      if (dependencies.hostState?.mode === "read") {
+        const [rows, transfers] = yield* Effect.all(
+          [
+            this.#copiedHostList(user.id),
+            remoteCall(() =>
+              dependencies.database
+                .prepare(INCOMING_OWNER_TRANSFERS_SQL)
+                .bind(user.email.trim().toLowerCase(), now)
+                .all<OwnerTransferRow>(),
+            ),
+          ],
+          { concurrency: "unbounded" },
+        );
+        return {
+          hosts: listedHosts(rows, now),
+          pendingIncomingTransfers: (transfers.results ?? []).map(ownerTransferRecord),
+        };
+      }
+      const hostsAndTransfers = (database: D1Database) =>
+        remoteCall(() =>
+          database.batch<ListedHostRow | OwnerTransferRow>([
+            database.prepare(LISTED_HOSTS_SQL).bind(user.id),
+            database.prepare(INCOMING_OWNER_TRANSFERS_SQL).bind(user.email.trim().toLowerCase(), now),
+          ]),
+        ).pipe(
+          Effect.map(([hosts, transfers]) => ({
+            hosts: (hosts?.results ?? []).filter(isListedHostRow),
+            transfers: (transfers?.results ?? []).filter(isOwnerTransferRow),
+          })),
+        );
+      const replica = yield* hostsAndTransfers(replicaD1(dependencies.database));
+      const listed = replica.hosts.length > 0 ? replica : yield* hostsAndTransfers(primaryD1(dependencies.database));
+      return {
+        hosts: listedHosts(listed.hosts, now),
+        pendingIncomingTransfers: listed.transfers.map(ownerTransferRecord),
+      };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly #copiedHostList = Effect.fn("RemoteControlPlane.copiedHostList")(function* (
+    this: RemoteControlPlane,
+    userId: string,
+  ): Effect.fn.Return<ListedHostRow[], RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const result = yield* remoteCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT ${LISTED_HOST_COLUMNS},
+           ${CUSTOM_SERVER_OFFER_COLUMNS}
+         ${LISTED_HOST_SOURCE}`,
+        )
+        .bind(userId)
+        .all<Omit<ListedHostRow, keyof HostStateListing>>(),
+    );
+    const rows = result.results ?? [];
+    if (rows.length === 0) return [];
+    const now = dependencies.now();
+    const requests = new Map(
+      rows.map((row) => [row.host_id, { credential: false, sessions: [], listing: true } satisfies HostCopyRequest]),
+    );
+    const copies = yield* this.#hostCopies(requests, now);
+    const listings = copies?.listings ?? new Map<string, HostStateListing>();
+    const missing = rows.filter((row) => !listings.has(row.host_id)).map((row) => row.host_id);
+    const read = missing.length === 0 ? [] : yield* this.#hostListings(missing);
+    for (const listing of read) listings.set(listing.host_id, listing);
+    return rows.flatMap((row) => {
+      const listing = listings.get(row.host_id);
+      return listing
+        ? [
+            {
+              ...row,
+              key_handovers: listing.key_handovers,
+              owner_licenses: listing.owner_licenses,
+              custom_member_limit: listing.custom_member_limit,
+              server_entitlements: listing.server_entitlements,
+            },
+          ]
+        : [];
+    });
+  });
+
+  readonly #hostListings = Effect.fn("RemoteControlPlane.hostListings")(function* (
+    this: RemoteControlPlane,
+    hostIds: readonly string[],
+  ): Effect.fn.Return<HostListingRow[], RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const result = yield* remoteCall(() =>
+      readsFrom(dependencies.database, "primary")
+        .prepare(
+          `SELECT h.host_id, ${HOST_LISTING_COLUMNS}
+             FROM remote_hosts h WHERE h.host_id IN (SELECT value FROM json_each(?))`,
+        )
+        .bind(JSON.stringify(hostIds))
+        .all<HostListingRow>(),
+    );
+    return result.results ?? [];
+  });
 
   readonly createInvite = Effect.fn("RemoteControlPlane.createInvite")(
     function* (
@@ -1495,6 +1800,7 @@ export class RemoteControlPlane {
           .bind(logoKey, dependencies.now(), hostId)
           .run(),
       );
+      yield* this.#hostChanged(hostId);
       return host.logo_key;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1731,6 +2037,7 @@ export class RemoteControlPlane {
           this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now),
         ]),
       );
+      if ((accepted[0]?.meta.changes ?? 0) > 0) yield* this.#hostChanged(invite.host_id);
       if ((accepted[0]?.meta.changes ?? 0) !== 1 || (accepted[1]?.meta.changes ?? 0) !== 1) {
         const concurrent = yield* remoteCall(() =>
           dependencies.database
@@ -1813,6 +2120,7 @@ export class RemoteControlPlane {
         ]),
       );
       if ((joined[0]?.meta.changes ?? 0) === 1) {
+        yield* this.#hostChanged(hostId);
         yield* this.#flushAuthEvents();
         return "joined";
       }
@@ -1970,6 +2278,7 @@ export class RemoteControlPlane {
           this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now, applied),
         ]),
       );
+      yield* this.#hostChanged(input.hostId);
       yield* this.#flushAuthEvents();
       if ((changed[0]?.meta.changes ?? 0) === 1) return;
       const current = yield* remoteCall(() =>
@@ -2101,11 +2410,7 @@ export class RemoteControlPlane {
       const dependencies = yield* RemoteDependencies;
       const rows = yield* remoteCall(() =>
         replicaD1(dependencies.database)
-          .prepare(
-            `SELECT ${OWNER_TRANSFER_COLUMNS} ${OWNER_TRANSFER_FROM}
-           WHERE t.to_email = ? AND t.status = 'pending' AND t.expires_at > ? AND h.owner_user_id = t.from_user_id
-           ORDER BY t.created_at DESC LIMIT 20`,
-          )
+          .prepare(INCOMING_OWNER_TRANSFERS_SQL)
           .bind(user.email.trim().toLowerCase(), dependencies.now())
           .all<OwnerTransferRow>(),
       );
@@ -2237,6 +2542,7 @@ export class RemoteControlPlane {
           this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now, applied),
         ]),
       );
+      yield* this.#hostChanged(hostId);
       if ((accepted?.meta.changes ?? 0) !== 1) return yield* ownerTransferInvalid();
       yield* this.#flushAuthEvents();
       return { hostId, hostName: transfer.host_name };
@@ -2535,6 +2841,7 @@ export class RemoteControlPlane {
           this.#authEventStatement(event, now),
         ]),
       );
+      yield* this.#hostChanged(session.host_id);
       yield* this.#flushAuthEvents();
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -2544,8 +2851,8 @@ export class RemoteControlPlane {
     function* (this: RemoteControlPlane, userId: string): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
-      yield* remoteCall(() =>
-        dependencies.database.batch([
+      const [, ended] = yield* remoteCall(() =>
+        dependencies.database.batch<{ host_id: string }>([
           dependencies.database
             .prepare(
               `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
@@ -2557,10 +2864,15 @@ export class RemoteControlPlane {
             )
             .bind(now, now, userId),
           dependencies.database
-            .prepare("UPDATE remote_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL")
+            .prepare("UPDATE remote_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL RETURNING host_id")
             .bind(now, userId),
         ]),
       );
+      const endedHosts = new Set((ended?.results ?? []).map((row) => row.host_id));
+      yield* Effect.forEach(endedHosts, (hostId) => this.#hostChanged(hostId), {
+        concurrency: "unbounded",
+        discard: true,
+      });
       yield* this.#flushAuthEvents();
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -2598,25 +2910,55 @@ export class RemoteControlPlane {
       const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
       if (!resumeClaimsLive(claims, now)) return false;
+      const copies = yield* this.#hostCopies(resumeCopyRequests([claims]), now);
+      if (copies) {
+        const [valid] = yield* this.#copiedClaimsMatch([claims], copies, now);
+        return valid === true;
+      }
       if (claims.role === "host") {
-        const replica = yield* this.#host(claims.hostId, "replica");
-        if (hostResumeClaimsMatch(claims, replica ?? undefined)) return true;
-        const host = yield* this.#host(claims.hostId, "primary");
+        const host = yield* this.#host(claims.hostId);
         return hostResumeClaimsMatch(claims, host ?? undefined);
       }
-      const resumeSession = (database: D1Database) =>
-        remoteCall(() =>
-          database
-            .prepare(`SELECT ${RESUME_SESSION_COLUMNS} WHERE s.session_id = ? AND ${RESUME_SESSION_ACTIVE} LIMIT 1`)
-            .bind(claims.sessionId, now)
-            .first<RemoteSessionRow>(),
-        );
-      const replica = yield* resumeSession(replicaD1(dependencies.database));
-      if (sessionResumeClaimsMatch(claims, replica, now)) return true;
-      return sessionResumeClaimsMatch(claims, yield* resumeSession(primaryD1(dependencies.database)), now);
+      const session = yield* remoteCall(() =>
+        dependencies.database
+          .prepare(`SELECT ${RESUME_SESSION_COLUMNS} WHERE s.session_id = ? AND ${RESUME_SESSION_ACTIVE} LIMIT 1`)
+          .bind(claims.sessionId, now)
+          .first<RemoteSessionRow>(),
+      );
+      return sessionResumeClaimsMatch(claims, session, now);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
+
+  readonly authEventsAfter = Effect.fn("RemoteControlPlane.authEventsAfter")(
+    function* (
+      cursor: RemoteAuthEventCursor,
+      limit: number,
+    ): Effect.fn.Return<RemoteAuthEventPage, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      const pageLimit = Math.min(Math.max(1, Math.floor(limit)), REMOTE_AUTH_EVENT_PAGE_LIMIT);
+      const rows = yield* remoteCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT event_id, payload, attempted_at FROM remote_auth_events
+              WHERE (attempted_at, event_id) > (?, ?)
+              ORDER BY attempted_at, event_id LIMIT ?`,
+          )
+          .bind(cursor.attemptedAt, cursor.eventId, pageLimit + 1)
+          .all<RemoteAuthEventPageRow>(),
+      );
+      const page = rows.results ?? [];
+      return {
+        events: page.slice(0, pageLimit).map((row) => ({
+          eventId: row.event_id,
+          attemptedAt: row.attempted_at,
+          payload: row.payload,
+        })),
+        more: page.length > pageLimit,
+      };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  );
 
   readonly validateResumeClaimsBatch = Effect.fn("RemoteControlPlane.validateResumeClaimsBatch")(
     function* (
@@ -2626,15 +2968,46 @@ export class RemoteControlPlane {
       const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
       const live = batch.filter((claims) => resumeClaimsLive(claims, now));
-      const replica = yield* resumeRows(replicaD1(dependencies.database), live, now);
-      const unconfirmed = live.filter((claims) => !resumeClaimsMatch(claims, replica, now));
-      const primary =
-        unconfirmed.length === 0 ? replica : yield* resumeRows(primaryD1(dependencies.database), unconfirmed, now);
-      return batch.map(
-        (claims) =>
-          resumeClaimsLive(claims, now) &&
-          (resumeClaimsMatch(claims, replica, now) || resumeClaimsMatch(claims, primary, now)),
+      const copies = live.length === 0 ? null : yield* this.#hostCopies(resumeCopyRequests(live), now);
+      if (copies) return yield* this.#copiedClaimsMatch(batch, copies, now);
+      const hostIds = [...new Set(live.filter((claims) => claims.role === "host").map((claims) => claims.hostId))];
+      const sessionIds = [
+        ...new Set(live.filter((claims) => claims.role !== "host").map((claims) => claims.sessionId)),
+      ];
+      const [hostRows, sessionRows] = yield* Effect.all(
+        [
+          hostIds.length === 0
+            ? Effect.succeed([])
+            : remoteCall(() =>
+                dependencies.database
+                  .prepare(
+                    `SELECT host_id, owner_user_id, auth_epoch FROM remote_hosts
+                      WHERE host_id IN (SELECT value FROM json_each(?))`,
+                  )
+                  .bind(JSON.stringify(hostIds))
+                  .all<RemoteResumeHostRow>(),
+              ).pipe(Effect.map((result) => result.results)),
+          sessionIds.length === 0
+            ? Effect.succeed([])
+            : remoteCall(() =>
+                dependencies.database
+                  .prepare(
+                    `SELECT ${RESUME_SESSION_COLUMNS}
+                      WHERE s.session_id IN (SELECT value FROM json_each(?)) AND ${RESUME_SESSION_ACTIVE}`,
+                  )
+                  .bind(JSON.stringify(sessionIds), now)
+                  .all<RemoteSessionRow>(),
+              ).pipe(Effect.map((result) => result.results)),
+        ],
+        { concurrency: "unbounded" },
       );
+      const hosts = new Map(hostRows.map((row) => [row.host_id, row]));
+      const sessions = new Map(sessionRows.map((row) => [row.session_id, row]));
+      return batch.map((claims) => {
+        if (!resumeClaimsLive(claims, now)) return false;
+        if (claims.role === "host") return hostResumeClaimsMatch(claims, hosts.get(claims.hostId));
+        return sessionResumeClaimsMatch(claims, sessions.get(claims.sessionId), now);
+      });
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2760,18 +3133,17 @@ export class RemoteControlPlane {
       const membership = yield* remoteCall(() =>
         dependencies.database
           .prepare(
-            `SELECT m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch, h.signal_home
+            `SELECT m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
          WHERE m.host_id = ? AND m.user_id = ? AND m.status = 'active' LIMIT 1`,
           )
           .bind(input.hostId, input.userId)
-          .first<RemoteMembershipRow & { auth_epoch: number; signal_home: string | null }>(),
+          .first<RemoteMembershipRow & { auth_epoch: number }>(),
       );
       const member = yield* remoteValidate(() => this.#assertRole(membership, ["owner", "admin", "member"]));
       const signal = dependencies.signal;
       if (!signal) return yield* remoteSignalNotConfigured();
-      const home = configuredSignalHome(signal, member.signal_home);
       const issued = yield* dependencies.signer.issueWatch({
         claims: {
           watchSessionId: input.watchSessionId,
@@ -2781,18 +3153,18 @@ export class RemoteControlPlane {
           role: member.role,
           authEpoch: member.auth_epoch,
           clientPublicKey: input.clientPublicKey,
-          ...(home ? { signal: home.id } : {}),
         },
         sessionExpiresAt: input.sessionExpiresAt,
         now: dependencies.now(),
       });
-      return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
+      return { ...issued, signalUrl: signal.entryUrl };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
   readonly planChanged = Effect.fn("RemoteControlPlane.planChanged")(
     function* (this: RemoteControlPlane, hostId: string): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+      yield* this.#hostChanged(hostId);
       yield* this.#serversChanged(
         "SELECT user_id FROM remote_memberships WHERE host_id = ? AND status = 'active'",
         hostId,
@@ -2806,6 +3178,7 @@ export class RemoteControlPlane {
       this: RemoteControlPlane,
       ownerUserId: string,
     ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+      yield* this.#ownerHostsChanged(ownerUserId);
       yield* this.#serversChanged(
         `SELECT DISTINCT m.user_id FROM remote_memberships m JOIN remote_hosts h ON h.host_id = m.host_id
           WHERE h.owner_user_id = ? AND m.status = 'active'`,
@@ -2949,6 +3322,7 @@ export class RemoteControlPlane {
         ]),
       );
       this.#hostCredentials.forget(hostId);
+      yield* this.#hostChanged(hostId);
       yield* this.#flushAuthEvents();
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -2980,7 +3354,7 @@ export class RemoteControlPlane {
             .prepare("UPDATE remote_hosts SET signal_home = NULL WHERE host_id = ?")
             .bind(hostId)
             .run(),
-        );
+        ).pipe(Effect.andThen(this.#hostChanged(hostId)));
       const home = placement.signalHome
         ? yield* this.#placeHost(host, signal, placement.failedSignalUrl, {
             location: placement.location ?? null,
@@ -3585,6 +3959,96 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly issueIngressTickets = Effect.fn("RemoteControlPlane.issueIngressTickets")(
+    function* (
+      this: RemoteControlPlane,
+      hostId: string,
+      machineToken: string,
+      wanted: ReadonlySet<IngressTicketRoute>,
+    ) {
+      const dependencies = yield* RemoteDependencies;
+      const host = yield* this.authenticateHost(hostId, machineToken);
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      const routeSigner = dependencies.routeSigner;
+      const discordSigner = dependencies.discordRouteSigner;
+      const configured: Record<IngressTicketRoute, boolean> = {
+        slack: routeSigner !== null,
+        discord: discordSigner !== null,
+        telegram: routeSigner !== null && dependencies.telegram !== null,
+        webhook: true,
+      };
+      const reads = INGRESS_TICKET_ROUTES.filter((route) => wanted.has(route) && configured[route]);
+      const statements = reads.map((route) =>
+        dependencies.database.prepare(INGRESS_ROUTE_QUERIES[route]).bind(...ingressRouteBindings(route, hostId)),
+      );
+      const results =
+        statements.length === 0
+          ? []
+          : yield* remoteCall(() => dependencies.database.batch<IngressRouteRow>(statements));
+      const rowsOf = (route: IngressTicketRoute): IngressRouteRow[] => results[reads.indexOf(route)]?.results ?? [];
+      const now = dependencies.now();
+      const routes: IngressTicketResults = {};
+      if (wanted.has("slack"))
+        if (!routeSigner) routes.slack = { error: "slack_not_configured" };
+        else {
+          const teams = rowsOf("slack").map((row) => ({ id: row.id, appId: row.parent_id, linkedAt: row.linked_at }));
+          routes.slack = {
+            ticket: yield* routeSigner.issue({
+              audience: SLACK_ROUTE_AUDIENCE,
+              claims: { hid: hostId, teams } satisfies Omit<SlackRouteClaims, "aud" | "iat" | "exp">,
+              ttlSeconds: SLACK_ROUTE_TTL_SECONDS,
+              now,
+            }),
+            teams: teams.map((team) => team.id),
+          };
+        }
+      if (wanted.has("discord"))
+        if (!discordSigner) routes.discord = { error: "discord_not_configured" };
+        else {
+          const guilds = rowsOf("discord").map((row) => ({ id: row.id, linkedAt: row.linked_at }));
+          routes.discord = { ticket: yield* discordSigner.issue({ hostId, guilds, now }) };
+        }
+      if (wanted.has("telegram"))
+        if (!routeSigner || !dependencies.telegram) routes.telegram = { error: "telegram_not_configured" };
+        else {
+          const chats: TelegramRouteChat[] = rowsOf("telegram").map((row) => ({
+            id: row.id,
+            botId: row.parent_id,
+            linkedAt: row.linked_at,
+          }));
+          routes.telegram = {
+            ticket: yield* routeSigner.issue({
+              audience: TELEGRAM_ROUTE_AUDIENCE,
+              claims: { hid: hostId, chats } satisfies Omit<TelegramRouteClaims, "aud" | "iat" | "exp">,
+              ttlSeconds: TELEGRAM_ROUTE_TTL_SECONDS,
+              now,
+            }),
+            chats: chats.map((chat) => chat.id),
+          };
+        }
+      if (wanted.has("webhook")) {
+        const webhookRoutes = rowsOf("webhook").map((row) => ({ id: row.id, linkedAt: row.linked_at }));
+        routes.webhook = {
+          ticket: yield* dependencies.signer.issueWebhookRoute({ hostId, routes: webhookRoutes, now }),
+          routes: webhookRoutes.map((route) => route.id),
+        };
+      }
+      const issued = yield* dependencies.signer.issue({
+        sessionId: `host-${hostId}`,
+        hostId,
+        userId: host.owner_user_id,
+        membershipId: `${hostId}:host`,
+        role: "host",
+        authEpoch: host.auth_epoch,
+        sessionExpiresAt: PERSISTENT_SESSION_EXPIRES_AT,
+        now,
+      });
+      return { ...issued, signalUrl: signal.entryUrl, routes };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly validateTelegramRoute = Effect.fn("RemoteControlPlane.validateTelegramRoute")(
     function* (
       this: RemoteControlPlane,
@@ -3655,7 +4119,8 @@ export class RemoteControlPlane {
       const provided = yield* sha256(machineToken).pipe(
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
-      const host = yield* this.#host(hostId);
+      const stored = yield* this.#storedHost(hostId, provided);
+      const host = stored ? stored.host : yield* this.#host(hostId);
       if (!host || !machineTokenMatches(host, provided)) {
         return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
       }
@@ -3675,8 +4140,13 @@ export class RemoteControlPlane {
         Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
       );
       if (this.#hostCredentials.accepts(hostId, provided, dependencies.now())) return;
-      const replica = yield* this.#host(hostId, "replica");
-      const host = replica && machineTokenMatches(replica, provided) ? replica : yield* this.#host(hostId, "primary");
+      const stored = yield* this.#storedHost(hostId, provided);
+      const replica = stored ? null : yield* this.#host(hostId, "replica");
+      const host = stored
+        ? stored.host
+        : replica && machineTokenMatches(replica, provided)
+          ? replica
+          : yield* this.#host(hostId, "primary");
       if (!host || !machineTokenMatches(host, provided)) {
         return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
       }
@@ -3693,6 +4163,12 @@ export class RemoteControlPlane {
     ): Effect.fn.Return<boolean, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
+      const copies = yield* this.#hostCopies(hostCopyRequest(hostId, { sessions: [sessionId] }), now);
+      if (copies) {
+        const copy = copies.sessions.get(sessionId);
+        if (!copy || !sessionCopyOpen(copy.value, hostId, now)) return false;
+        return (yield* this.#signInLive([copy], now)).has(sessionId);
+      }
       const open = (database: D1Database) =>
         remoteCall(() =>
           database
@@ -3913,12 +4389,214 @@ export class RemoteControlPlane {
     const dependencies = yield* RemoteDependencies;
     return yield* remoteCall(() =>
       readsFrom(dependencies.database, reads)
-        .prepare(
-          `SELECT host_id, owner_user_id, name, logo_key, auth_epoch, machine_token_hash, device_public_key, signal_home
-         FROM remote_hosts WHERE host_id = ? LIMIT 1`,
-        )
+        .prepare(`SELECT ${HOST_CREDENTIAL_COLUMNS} FROM remote_hosts WHERE host_id = ? LIMIT 1`)
         .bind(hostId)
         .first<RemoteHostRow>(),
+    );
+  });
+
+  readonly #storedHost = Effect.fn("RemoteControlPlane.storedHost")(function* (
+    this: RemoteControlPlane,
+    hostId: string,
+    providedHash: string,
+  ): Effect.fn.Return<{ host: RemoteHostRow | null } | null, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const hostState = dependencies.hostState;
+    if (hostState?.mode !== "read") return null;
+    const snapshot = yield* hostState.read(hostId, { credential: true });
+    if (!snapshot) return null;
+    const checkedAt = dependencies.now();
+    if (hostCopyFresh(snapshot.credential, checkedAt) && machineTokenMatches(snapshot.credential.value, providedHash))
+      return { host: snapshot.credential.value };
+    const host = yield* this.#host(hostId, "primary");
+    if (host) yield* hostState.fill(hostId, snapshot.generation, checkedAt, { credential: { value: host, checkedAt } });
+    return { host };
+  });
+
+  readonly #hostCopies = Effect.fn("RemoteControlPlane.hostCopies")(function* (
+    this: RemoteControlPlane,
+    requests: ReadonlyMap<string, HostCopyRequest>,
+    now: number,
+  ): Effect.fn.Return<HostCopies | null, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const hostState = dependencies.hostState;
+    if (hostState?.mode !== "read") return null;
+    const entries = [...requests];
+    const snapshots = yield* Effect.forEach(entries, ([hostId, request]) => hostState.read(hostId, request), {
+      concurrency: "unbounded",
+    });
+    const copies: HostCopies = { hosts: new Map(), sessions: new Map(), listings: new Map() };
+    const missingHosts: string[] = [];
+    const missingSessions: string[] = [];
+    const missingListings: string[] = [];
+    entries.forEach(([hostId, request], index) => {
+      const snapshot = snapshots[index];
+      const credential = snapshot?.credential;
+      if (request.credential && hostCopyFresh(credential, now)) copies.hosts.set(hostId, credential.value);
+      else if (request.credential) missingHosts.push(hostId);
+      const listing = snapshot?.listing;
+      if (request.listing && listingCopyFresh(listing, now)) copies.listings.set(hostId, listing.value);
+      else if (request.listing) missingListings.push(hostId);
+      for (const sessionId of request.sessions) {
+        const copy = snapshot?.sessions[sessionId];
+        if (hostCopyFresh(copy, now)) copies.sessions.set(sessionId, copy);
+        else missingSessions.push(sessionId);
+      }
+    });
+    const primary = readsFrom(dependencies.database, "primary");
+    const [hostRows, sessionRows, listingRows] = yield* Effect.all(
+      [
+        missingHosts.length === 0
+          ? Effect.succeed([])
+          : remoteCall(() =>
+              primary
+                .prepare(
+                  `SELECT ${HOST_CREDENTIAL_COLUMNS} FROM remote_hosts WHERE host_id IN (SELECT value FROM json_each(?))`,
+                )
+                .bind(JSON.stringify(missingHosts))
+                .all<RemoteHostRow>(),
+            ).pipe(Effect.map((result) => result.results)),
+        missingSessions.length === 0
+          ? Effect.succeed([])
+          : remoteCall(() =>
+              primary
+                .prepare(`SELECT ${SESSION_COPY_COLUMNS} WHERE s.session_id IN (SELECT value FROM json_each(?))`)
+                .bind(now, JSON.stringify(missingSessions))
+                .all<HostStateSession>(),
+            ).pipe(Effect.map((result) => result.results)),
+        missingListings.length === 0 ? Effect.succeed([]) : this.#hostListings(missingListings),
+      ],
+      { concurrency: "unbounded" },
+    );
+    const readHosts = new Map(hostRows.map((host) => [host.host_id, host]));
+    const readListings = new Map<string, HostStateListing>();
+    for (const { host_id, ...listing } of listingRows) {
+      readListings.set(host_id, listing);
+      copies.listings.set(host_id, listing);
+    }
+    for (const host of hostRows) copies.hosts.set(host.host_id, host);
+    for (const session of sessionRows) copies.sessions.set(session.session_id, { value: session, checkedAt: now });
+    yield* Effect.forEach(
+      entries,
+      ([hostId, request], index) => {
+        const snapshot = snapshots[index];
+        const credential = request.credential ? readHosts.get(hostId) : undefined;
+        const sessions = sessionRows
+          .filter(
+            (session) =>
+              session.session_host_id === hostId &&
+              session.host_id === hostId &&
+              request.sessions.includes(session.session_id),
+          )
+          .map((value) => ({ value, checkedAt: now }));
+        const listing = request.listing ? readListings.get(hostId) : undefined;
+        if (!snapshot || (!credential && !listing && sessions.length === 0)) return Effect.void;
+        return hostState.fill(hostId, snapshot.generation, now, {
+          ...(credential ? { credential: { value: credential, checkedAt: now } } : {}),
+          ...(sessions.length > 0 ? { sessions } : {}),
+          ...(listing ? { listing: { value: listing, checkedAt: now } } : {}),
+        });
+      },
+      { concurrency: "unbounded", discard: true },
+    );
+    return copies;
+  });
+
+  readonly #signInLive = Effect.fn("RemoteControlPlane.signInLive")(function* (
+    this: RemoteControlPlane,
+    copies: readonly HostStateCopy<HostStateSession>[],
+    now: number,
+  ): Effect.fn.Return<Set<string>, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const live = new Set<string>();
+    const recheck: HostStateSession[] = [];
+    for (const copy of copies) {
+      const session = copy.value;
+      if (session.auth_live !== 1) continue;
+      if (session.auth_session_hash === null || hostCopyFresh(copy, now, HOST_STATE_SIGN_IN_RECHECK_MS))
+        live.add(session.session_id);
+      else recheck.push(session);
+    }
+    if (recheck.length === 0) return live;
+    const hashes = [...new Set(recheck.map((session) => session.auth_session_hash))];
+    const signedIn = yield* remoteCall(() =>
+      readsFrom(dependencies.database, "replica")
+        .prepare(
+          `SELECT token_hash, user_id FROM auth_sessions
+            WHERE token_hash IN (SELECT value FROM json_each(?)) AND revoked_at IS NULL AND expires_at > ?`,
+        )
+        .bind(JSON.stringify(hashes), now)
+        .all<{ token_hash: string; user_id: string }>(),
+    );
+    const owners = new Map(signedIn.results.map((row) => [row.token_hash, row.user_id]));
+    for (const session of recheck) {
+      if (session.auth_session_hash !== null && owners.get(session.auth_session_hash) === session.session_user_id)
+        live.add(session.session_id);
+    }
+    return live;
+  });
+
+  readonly #copiedClaimsMatch = Effect.fn("RemoteControlPlane.copiedClaimsMatch")(function* (
+    this: RemoteControlPlane,
+    batch: readonly RemoteResumeClaims[],
+    copies: HostCopies,
+    now: number,
+  ): Effect.fn.Return<boolean[], RemoteFailure, RemoteDependencies> {
+    const sessionCopy = (claims: RemoteResumeClaims) => {
+      if (claims.role === "host" || !resumeClaimsLive(claims, now)) return undefined;
+      const copy = copies.sessions.get(claims.sessionId);
+      return copy && sessionResumeClaimsMatch(claims, copy.value, now) ? copy : undefined;
+    };
+    const matching = batch.flatMap((claims) => sessionCopy(claims) ?? []);
+    const live = yield* this.#signInLive(matching, now);
+    return batch.map((claims) => {
+      if (!resumeClaimsLive(claims, now)) return false;
+      if (claims.role === "host") return hostResumeClaimsMatch(claims, copies.hosts.get(claims.hostId));
+      const copy = sessionCopy(claims);
+      return copy !== undefined && live.has(copy.value.session_id);
+    });
+  });
+
+  readonly #ownerHostsChanged = Effect.fn("RemoteControlPlane.ownerHostsChanged")(function* (
+    this: RemoteControlPlane,
+    ownerUserId: string,
+  ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    if (!dependencies.hostState) return;
+    const owned = yield* remoteCall(() =>
+      dependencies.database
+        .prepare("SELECT host_id FROM remote_hosts WHERE owner_user_id = ?")
+        .bind(ownerUserId)
+        .all<{ host_id: string }>(),
+    );
+    yield* Effect.forEach(owned.results ?? [], (host) => this.#hostChanged(host.host_id), {
+      concurrency: "unbounded",
+      discard: true,
+    });
+  });
+
+  readonly #hostChanged = Effect.fn("RemoteControlPlane.hostChanged")(function* (
+    this: RemoteControlPlane,
+    hostId: string,
+  ): Effect.fn.Return<void, never, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const hostState = dependencies.hostState;
+    if (!hostState || (yield* hostState.invalidate(hostId))) return;
+    const queued = yield* Effect.result(
+      remoteCall(() => hostStateRetryStatement(dependencies.database, hostId, dependencies.now()).run()),
+    );
+    if (Result.isFailure(queued)) {
+      console.error("Host state invalidation could not be queued.");
+      return;
+    }
+    dependencies.schedule?.(
+      Effect.sleep(HOST_STATE_RETRY_DELAY).pipe(
+        Effect.andThen(
+          Effect.suspend(() =>
+            retryHostStateInvalidations({ database: dependencies.database, hostState, now: dependencies.now() }),
+          ),
+        ),
+      ),
     );
   });
 
@@ -3930,24 +4608,34 @@ export class RemoteControlPlane {
     place: SignalHostPlace,
   ): Effect.fn.Return<RemoteSignalHome | null, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
+    const now = dependencies.now();
     const current = configuredSignalHome(signal, host.signal_home);
     const preferred = configuredSignalHome(signal, place.preferred);
-    if (preferred && preferred.url !== failedSignalUrl) {
+    const failed = signalHomeAtUrl(signal, failedSignalUrl);
+    const avoided = avoidedSignalUrls(signal, host, failedSignalUrl, now);
+    const store = (chosen: RemoteSignalHome) =>
+      this.#storeSignalHome(
+        host,
+        signal,
+        chosen,
+        failed && failed.id !== chosen.id ? { id: failed.id, at: now } : null,
+      );
+    if (preferred && !avoided.includes(preferred.url)) {
       if (preferred.id === host.signal_home) return preferred;
       if (yield* signalAnswers(dependencies.fetch, preferred.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
-        return yield* this.#storeSignalHome(host, signal, preferred);
+        return yield* store(preferred);
     }
-    const candidates = nearSignalHomes(signal, failedSignalUrl, place);
+    const candidates = nearSignalHomes(signal, avoided, place);
     if (current && candidates.includes(current.id)) return current;
     const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, candidates));
     if (!chosen || chosen.id === host.signal_home) return chosen;
     if (
       current &&
-      current.url !== failedSignalUrl &&
+      !avoided.includes(current.url) &&
       !(yield* signalAnswers(dependencies.fetch, chosen.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
     )
       return current;
-    return yield* this.#storeSignalHome(host, signal, chosen);
+    return yield* store(chosen);
   });
 
   readonly #storeSignalHome = Effect.fn("RemoteControlPlane.storeSignalHome")(function* (
@@ -3955,14 +4643,23 @@ export class RemoteControlPlane {
     host: RemoteHostRow,
     signal: RemoteSignalPlan,
     chosen: RemoteSignalHome,
+    failed: { id: string; at: number } | null,
   ): Effect.fn.Return<RemoteSignalHome, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
     const stored = yield* remoteCall(() =>
-      dependencies.database
-        .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
-        .bind(chosen.id, host.host_id, host.signal_home)
-        .run(),
+      (failed
+        ? dependencies.database
+            .prepare(
+              `UPDATE remote_hosts SET signal_home = ?, signal_home_failed = ?, signal_home_failed_at = ?
+               WHERE host_id = ? AND signal_home IS ?`,
+            )
+            .bind(chosen.id, failed.id, failed.at, host.host_id, host.signal_home)
+        : dependencies.database
+            .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
+            .bind(chosen.id, host.host_id, host.signal_home)
+      ).run(),
     );
+    yield* this.#hostChanged(host.host_id);
     if ((stored.meta.changes ?? 0) === 1) return chosen;
     const raced = yield* remoteCall(() =>
       dependencies.database
@@ -4034,8 +4731,14 @@ export class RemoteControlPlane {
     return row !== null;
   });
 
+  #leaseAuthEvent(now: number): { eventId: string; until: number } {
+    const eventId = crypto.randomUUID();
+    this.#leasedAuthEventIds.push(eventId);
+    return { eventId, until: now + AUTH_EVENT_CLAIM_MS };
+  }
+
   #authEventStatement(event: RemoteAuthEvent, now: number, condition?: SqlCondition): D1PreparedStatement {
-    return authEventStatement(this.#database, event, now, condition);
+    return authEventStatement(this.#database, event, now, condition, this.#leaseAuthEvent(now));
   }
 
   #authEpochEventStatement(
@@ -4044,6 +4747,7 @@ export class RemoteControlPlane {
     ownerUserId?: string,
     condition?: SqlCondition,
   ): D1PreparedStatement {
+    const lease = this.#leaseAuthEvent(now);
     return this.#database
       .prepare(
         `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
@@ -4051,9 +4755,9 @@ export class RemoteControlPlane {
          FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)${condition ? ` AND ${condition.sql}` : ""}`,
       )
       .bind(
-        crypto.randomUUID(),
+        lease.eventId,
         now,
-        now,
+        lease.until,
         hostId,
         ownerUserId ?? null,
         ownerUserId ?? null,
@@ -4065,6 +4769,7 @@ export class RemoteControlPlane {
     this: RemoteControlPlane,
   ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
+    const leasedEventIds = this.#leasedAuthEventIds.splice(0);
     const delivery = Effect.suspend(() =>
       deliverRemoteAuthEvents({
         database: dependencies.database,
@@ -4072,6 +4777,7 @@ export class RemoteControlPlane {
         webhookSecret: dependencies.webhookSecret,
         fetch: dependencies.fetch,
         now: dependencies.now(),
+        leasedEventIds,
       }),
     );
     if (!dependencies.schedule) return yield* delivery;
@@ -4096,13 +4802,14 @@ export function authEventStatement(
   event: RemoteAuthEvent,
   now: number,
   condition?: SqlCondition,
+  lease: { eventId: string; until: number } = { eventId: crypto.randomUUID(), until: now },
 ): D1PreparedStatement {
   return database
     .prepare(
       `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
        SELECT ?, ?, ?, 0, ?${condition ? ` WHERE ${condition.sql}` : ""}`,
     )
-    .bind(crypto.randomUUID(), JSON.stringify(event), now, now, ...(condition?.binds ?? []));
+    .bind(lease.eventId, JSON.stringify(event), now, lease.until, ...(condition?.binds ?? []));
 }
 
 function remoteSignalNotConfigured(): RemoteControlPlaneError {
@@ -4197,9 +4904,28 @@ function configuredSignalHome(signal: RemoteSignalPlan, id: string | null): Remo
   return id !== null && url !== undefined ? { id, url } : null;
 }
 
-function nearSignalHomes(signal: RemoteSignalPlan, failedSignalUrl: string | null, place: SignalHostPlace): string[] {
+function signalHomeAtUrl(signal: RemoteSignalPlan, url: string | null): RemoteSignalHome | null {
+  if (url === null) return null;
+  for (const [id, homeUrl] of signal.homes) if (homeUrl === url) return { id, url };
+  return null;
+}
+
+function avoidedSignalUrls(
+  signal: RemoteSignalPlan,
+  host: RemoteHostRow,
+  failedSignalUrl: string | null,
+  now: number,
+): string[] {
+  const failedRecently =
+    host.signal_home_failed_at !== null && now - host.signal_home_failed_at < SIGNAL_HOME_FAILURE_HOLD_MS
+      ? configuredSignalHome(signal, host.signal_home_failed)
+      : null;
+  return [failedSignalUrl, failedRecently?.url ?? null].filter((url): url is string => url !== null);
+}
+
+function nearSignalHomes(signal: RemoteSignalPlan, avoided: readonly string[], place: SignalHostPlace): string[] {
   const homes = [...signal.homes];
-  const available = homes.filter(([, url]) => url !== failedSignalUrl);
+  const available = homes.filter(([, url]) => !avoided.includes(url));
   const ids = (available.length > 0 ? available : homes).map(([id]) => id);
   const countryHomes = place.country === null ? undefined : signal.countries.get(place.country);
   const inCountry = ids.filter((id) => countryHomes?.includes(id));
@@ -4326,25 +5052,116 @@ export function deliverPendingRemoteAuthEvents(
   });
 }
 
+export function retryPendingHostStateInvalidations(bindings: RemoteAuthEventBindings, now: number) {
+  return retryHostStateInvalidations({
+    database: bindings.DB,
+    hostState: hostStateStore(bindings.HOST_STATE, bindings.HOST_STATE_MODE),
+    now,
+  });
+}
+
+function hostStateRetryStatement(database: D1Database, hostId: string, now: number): D1PreparedStatement {
+  return database
+    .prepare(
+      `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at, pending_targets)
+       VALUES (?, json_object('type', 'host-state-invalidate', 'hostId', ?), ?, 0, ?, ?)`,
+    )
+    .bind(crypto.randomUUID(), hostId, now, now, HOST_STATE_RETRY_TARGETS);
+}
+
+const decodeHostStateRetry = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ type: Schema.Literal("host-state-invalidate"), hostId: Schema.String })),
+);
+
+const retryHostStateInvalidations = Effect.fn("RemoteControlPlane.retryHostStateInvalidations")(function* (input: {
+  database: D1Database;
+  hostState: HostStateStore | null;
+  now: number;
+}) {
+  const { database, hostState, now } = input;
+  if (!hostState) return;
+  const claimed = yield* remoteCall(() =>
+    database
+      .prepare(
+        `UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ?
+           WHERE event_id IN (
+             SELECT event_id FROM remote_auth_events
+              WHERE next_attempt_at <= ? AND pending_targets = ? ORDER BY created_at LIMIT 50
+           )
+           RETURNING event_id, payload, created_at`,
+      )
+      .bind(now + HOST_STATE_RETRY_MS, now, HOST_STATE_RETRY_TARGETS)
+      .all<{ event_id: string; payload: string; created_at: number }>(),
+  );
+  const byHost = new Map<string, string[]>();
+  const done: string[] = [];
+  for (const event of claimed.results ?? []) {
+    const retry = Option.getOrUndefined(decodeHostStateRetry(event.payload));
+    if (!retry || event.created_at <= now - HOST_STATE_RECHECK_MS) done.push(event.event_id);
+    else byHost.set(retry.hostId, [...(byHost.get(retry.hostId) ?? []), event.event_id]);
+  }
+  const applied = yield* Effect.forEach(
+    [...byHost],
+    ([hostId, events]) => hostState.invalidate(hostId).pipe(Effect.map((ok) => (ok ? events : []))),
+    { concurrency: AUTH_EVENT_SEND_CONCURRENCY },
+  );
+  const deleted = [...done, ...applied.flat()];
+  if (deleted.length === 0) return;
+  yield* remoteCall(() =>
+    database
+      .prepare("DELETE FROM remote_auth_events WHERE event_id IN (SELECT value FROM json_each(?))")
+      .bind(JSON.stringify(deleted))
+      .run(),
+  );
+});
+
 const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents")(function* (input: {
   database: D1Database;
   webhookUrls: readonly string[];
   webhookSecret: string | null;
   fetch: RemoteFetch;
   now: number;
+  leasedEventIds?: readonly string[];
 }) {
   const { webhookUrls, webhookSecret } = input;
   if (webhookUrls.length === 0 || !webhookSecret) return;
-  const result = yield* remoteCall(() =>
-    input.database
-      .prepare(
-        `UPDATE remote_auth_events SET next_attempt_at = ?
-         WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
-         RETURNING event_id, payload, attempts, pending_targets`,
-      )
-      .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
-      .all<RemoteAuthEventRow>(),
-  );
+  const leasedEventIds = input.leasedEventIds ?? [];
+  const leased =
+    leasedEventIds.length === 0
+      ? []
+      : ((yield* remoteCall(() =>
+          input.database
+            .prepare(
+              `SELECT event_id, payload, attempts, pending_targets, created_at FROM remote_auth_events
+               WHERE event_id IN (SELECT value FROM json_each(?)) ORDER BY created_at`,
+            )
+            .bind(JSON.stringify(leasedEventIds))
+            .all<RemoteAuthEventRow & { created_at: number }>(),
+        )).results ?? []);
+  const due =
+    leasedEventIds.length === 0 ||
+    (yield* remoteCall(() =>
+      replicaD1(input.database)
+        .prepare("SELECT 1 FROM remote_auth_events WHERE next_attempt_at <= ? AND pending_targets IS NOT ? LIMIT 1")
+        .bind(input.now, HOST_STATE_RETRY_TARGETS)
+        .first(),
+    )) !== null;
+  const claimed = due
+    ? ((yield* remoteCall(() =>
+        input.database
+          .prepare(
+            `UPDATE remote_auth_events SET next_attempt_at = ?, attempted_at = ?
+             WHERE event_id IN (
+               SELECT event_id FROM remote_auth_events
+                WHERE next_attempt_at <= ? AND pending_targets IS NOT ? ORDER BY created_at LIMIT 50
+             )
+             RETURNING event_id, payload, attempts, pending_targets, created_at`,
+          )
+          .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now, input.now, HOST_STATE_RETRY_TARGETS)
+          .all<RemoteAuthEventRow & { created_at: number }>(),
+      )).results ?? [])
+    : [];
+  const events = [...claimed, ...leased].sort((left, right) => left.created_at - right.created_at);
   const send = Effect.fn("RemoteControlPlane.sendAuthEvent")(function* (url: string, payload: string) {
     const timestamp = Math.floor(input.now / 1_000).toString();
     const signature = yield* hmacSha256(webhookSecret, `${timestamp}.${payload}`).pipe(
@@ -4367,7 +5184,7 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
     if (!response.ok) return yield* new RemoteOperationError({});
   });
   yield* Effect.forEach(
-    result.results ?? [],
+    events,
     (event) =>
       Effect.gen(function* () {
         const targets = pendingAuthEventTargets(event.pending_targets, webhookUrls);
@@ -4378,20 +5195,25 @@ const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents"
         );
         const failed = sent.filter((target) => Result.isFailure(target.delivery)).map((target) => target.url);
         if (failed.length === 0) {
-          const deleted = yield* Effect.result(
+          const delivered = yield* Effect.result(
             remoteCall(() =>
-              input.database.prepare("DELETE FROM remote_auth_events WHERE event_id = ?").bind(event.event_id).run(),
+              input.database
+                .prepare(
+                  "UPDATE remote_auth_events SET next_attempt_at = ?, attempted_at = ?, pending_targets = NULL WHERE event_id = ?",
+                )
+                .bind(REMOTE_AUTH_EVENT_DELIVERED, input.now, event.event_id)
+                .run(),
             ),
           );
-          if (Result.isSuccess(deleted)) return;
+          if (Result.isSuccess(delivered)) return;
         }
         const delay = Math.min(AUTH_EVENT_RETRY_MS * 2 ** Math.min(event.attempts, 6), 60 * 60_000);
         yield* remoteCall(() =>
           input.database
             .prepare(
-              "UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ?, pending_targets = ? WHERE event_id = ?",
+              "UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ?, attempted_at = ?, pending_targets = ? WHERE event_id = ?",
             )
-            .bind(input.now + delay, JSON.stringify(failed), event.event_id)
+            .bind(input.now + delay, input.now, JSON.stringify(failed), event.event_id)
             .run(),
         );
       }),

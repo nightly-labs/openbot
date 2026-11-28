@@ -4,6 +4,7 @@ import { FEEDBACK_REPOSITORY } from "@openbot/contracts/feedback";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
+import { isAccessToken } from "./access-tokens";
 import { type AccountAnalytics, createAccountAnalytics } from "./account-analytics";
 import { AccountAttribution } from "./account-attribution";
 import { adminTokenMatches } from "./admin-token";
@@ -64,6 +65,7 @@ import {
   RemoteControlPlaneError,
   verifyRemoteServiceSignature,
 } from "./remote-control-plane";
+import { SessionCache } from "./session-cache";
 import { SkillMarketplace, SkillMarketplaceError } from "./skill-marketplace";
 import { SlackAppError, SlackAppService } from "./slack-app";
 import {
@@ -95,7 +97,8 @@ export function requestAuthService(): AuthService {
   const exposeDevelopmentCode = bindings.AUTH_EXPOSE_DEVELOPMENT_CODE === "true";
   const analytics = accountAnalytics(bindings);
   return new AuthService({
-    repository: new D1AuthRepository(bindings.DB),
+    repository: new D1AuthRepository(bindings.DB, { sessionCache: new SessionCache(bindings.DB) }),
+    accessTokenSecret: bindings.SITE_REPORT_HASH_SECRET,
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings, analytics),
     exposeDevelopmentCode,
     storeReviewSignIn: readStoreReviewSignIn(bindings.STORE_REVIEW_EMAIL, bindings.STORE_REVIEW_CODE),
@@ -113,12 +116,12 @@ export function requestAuthService(): AuthService {
 
 export function requestCompanySignIn(): CompanySignInService {
   const bindings = requireWorkerBindings(env);
-  const remote = new RemoteControlPlane(bindings, { schedule });
+  const remote = lazyRemoteControlPlane(bindings);
   return new CompanySignInService(bindings, {
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
     revokeMembership: (actorUserId, hostId, membershipId) =>
-      remote.changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
-    joinServer: (hostId, userId, options) => remote.joinByCompanySignIn(hostId, userId, options),
+      remote().changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
+    joinServer: (hostId, userId, options) => remote().joinByCompanySignIn(hostId, userId, options),
   });
 }
 
@@ -488,10 +491,22 @@ export function marketplaceErrorResponse(error: unknown): Response {
   return skillErrorResponse(error);
 }
 
+const STRICT_ACCOUNT_PATHS = [/^\/v1\/me\/(?:billing|license|credits)(?:\/|$)/u, /\/checkout(?:\/|$)/u];
+
+function strictSessionRequest(request: Request): boolean {
+  if (request.method === "GET" || request.method === "HEAD") return false;
+  const path = new URL(request.url).pathname;
+  return STRICT_ACCOUNT_PATHS.some((pattern) => pattern.test(path));
+}
+
 export function requestUser(request: Request, reads: SessionReads = "replica") {
-  const token = bearerToken(request);
-  if (!token) return Effect.succeed(null);
-  return requestAuthService().authenticate(token, reads);
+  const credential = bearerCredential(request);
+  if (!credential) return Effect.succeed(null);
+  const checked = strictSessionRequest(request) ? "strict" : reads;
+  const service = requestAuthService();
+  return isAccessToken(credential)
+    ? service.authenticateAccessToken(credential, checked)
+    : service.authenticate(credential, checked);
 }
 
 export function skillErrorResponse(error: unknown): Response {
@@ -549,6 +564,14 @@ export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule });
 }
 
+function lazyRemoteControlPlane(bindings: WorkerBindings): () => RemoteControlPlane {
+  let remote: RemoteControlPlane | null = null;
+  return () => {
+    remote ??= new RemoteControlPlane(bindings, { schedule });
+    return remote;
+  };
+}
+
 export function requestWatchSessions(): WatchSessions {
   const bindings = requireWorkerBindings(env);
   const limiter = bindings.WATCH_TICKET_RATE_LIMITER;
@@ -572,12 +595,12 @@ export function requestHostedServerService(request?: Request): HostedServerServi
 
 function requestHostedBilling(developerKey: string | null = null) {
   const bindings = requireWorkerBindings(env);
-  const remote = new RemoteControlPlane(bindings, { schedule });
+  const remote = lazyRemoteControlPlane(bindings);
   return createHostedBilling(bindings, {
-    removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
+    removeHost: (ownerUserId, hostId) => remote().deleteHost(ownerUserId, hostId),
     developerKey,
-    planChanged: (hostId) => remote.planChanged(hostId),
-    licenseChanged: (userId) => remote.licenseChanged(userId),
+    planChanged: (hostId) => remote().planChanged(hostId),
+    licenseChanged: (userId) => remote().licenseChanged(userId),
     schedule,
   });
 }
@@ -634,11 +657,16 @@ export function discordAppErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-export function bearerToken(request: Request): string | null {
+export function bearerCredential(request: Request): string | null {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;
   const token = authorization.slice("Bearer ".length);
   return token && token.length <= 512 ? token : null;
+}
+
+export function bearerToken(request: Request): string | null {
+  const token = bearerCredential(request);
+  return token && !isAccessToken(token) ? token : null;
 }
 
 export function json(value: unknown, status = 200): Response {

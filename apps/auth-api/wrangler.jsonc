@@ -75,7 +75,8 @@
     "CF_ACCESS_TEAM_DOMAIN": "openbot-run.cloudflareaccess.com",
     "CF_ACCESS_ADMIN_AUD": "087700ccf63ad1cec5cdf08e7036f8be2c246d0a76ea48046392a40a5671d18a",
     "APNS_TEAM_ID": "8A47NKRZSJ",
-    "APNS_TOPIC": "run.openbot.mobile"
+    "APNS_TOPIC": "run.openbot.mobile",
+    "HOST_STATE_MODE": "off"
   },
   "services": [
     {
@@ -93,6 +94,7 @@
       "allowed_sender_addresses": ["no_reply@openbot.run"]
     }
   ],
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "d1_databases": [
     {
       "binding": "DB",
@@ -193,8 +195,10 @@
         "REMOTE_AUTH_WEBHOOK_URLS": "",
         "SIGNAL_ENTRY_ZONE_ID": "",
         "CF_ACCESS_TEAM_DOMAIN": "",
-        "CF_ACCESS_ADMIN_AUD": ""
+        "CF_ACCESS_ADMIN_AUD": "",
+        "HOST_STATE_MODE": "off"
       },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "d1_databases": [
         {
           "binding": "DB",
@@ -303,8 +307,14 @@
         "CF_ACCESS_ADMIN_AUD": "",
         "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
         "APNS_TEAM_ID": "8A47NKRZSJ",
-        "APNS_TOPIC": "run.openbot.mobile"
+        "APNS_TOPIC": "run.openbot.mobile",
+        "HOST_STATE_MODE": "off"
       },
+      "durable_objects": {
+        "bindings": [{ "name": "HOST_STATE", "class_name": "HostState" }]
+      },
+      "migrations": [{ "tag": "host-state-v1", "new_sqlite_classes": ["HostState"] }],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "d1_databases": [
         {
           "binding": "DB",

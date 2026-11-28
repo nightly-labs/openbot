@@ -1197,8 +1197,10 @@ export class HostedServerService {
       if (machine.seen_at === null || machine.seen_at <= now - POOL_SEEN_WRITE_AFTER_MS) {
         yield* hostedCall(() =>
           dependencies.database
-            .prepare("UPDATE operator_hosts SET seen_at = ? WHERE host_id = ? AND assign_token_hash = ?")
-            .bind(now, hostId, tokenHash)
+            .prepare(
+              "UPDATE operator_hosts SET seen_at = ? WHERE host_id = ? AND assign_token_hash = ? AND (seen_at IS NULL OR seen_at <= ?)",
+            )
+            .bind(now, hostId, tokenHash, now - POOL_SEEN_WRITE_AFTER_MS)
             .run(),
         );
       }

@@ -520,6 +520,7 @@ export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
   effortCategories: ["thought_level", "thinking"],
   probeCloseDelayMs: 5_000,
   sessionProcesses: true,
+  openToolStallMs: 30 * 60_000,
 };
 
 function ompSessionNotFound(error: RequestError, sessionId: string): boolean | null {

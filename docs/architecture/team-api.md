@@ -54,7 +54,9 @@ is also a move. A change that involves a VPN, such as a VPN or Tailscale that tu
 reports the type as unknown, Android as VPN), keeps the connection: the peer renews its Signal socket
 and restarts ICE, which gathers the candidates of the new interface and keeps the old path until a
 new one answers, and it checks the path with the compatibility read (`networkChanged`,
-`apps/mobile/src/shared/lib/network-change.ts`). A dead path then makes a new connection. Such a
+`apps/mobile/src/shared/lib/network-change.ts`). While a VPN is on, iOS reports the type as unknown on
+Wi-Fi and on mobile data, and `getIpAddressAsync` gives the Wi-Fi address or no address. Thus a new,
+lost or returned address with a VPN type is also such a change. A dead path then makes a new connection. Such a
 change waits 1 s, so that a short series of changes sends one restart; a move goes at once. In other cases, a probe of the path waits up
 to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
 at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
@@ -67,7 +69,10 @@ of the 10 restarts are left. A failed attempt is retried after 0.5, 1.2, 2.7 and
 up to 20 % more, then the recovery waits 15 s before the next 5 attempts (`REMOTE_RETRY_DELAYS_MS`,
 `REMOTE_RETRY_COOLDOWN_MS`). Each next wait is two times longer, up to 5 minutes
 (`REMOTE_RETRY_COOLDOWN_MAX_MS`). A connection, a refresh, a return to the app and a network change
-start the waits again at 15 s. A new connection to a known host opens its Signal socket while the ticket request runs,
+start the waits again at 15 s. When Signal answers `host_unavailable`, the host is off: the quick
+retries stop, and each attempt waits 15 s, then two times longer, up to 5 minutes. A return to the
+app keeps this wait, but tries again no later than 15 s after the last attempt; a refresh and a
+network change try at once. A new connection to a known host opens its Signal socket while the ticket request runs,
 and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
 holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
@@ -306,9 +311,8 @@ would give a ticket with the old auth epoch, and a Signal that started after the
 would accept it with no check. An expired token also needs one
 durable check before Signal issues a replacement. Later reconnects use the in-memory trust cache.
 This is not a heartbeat. Signal collects these checks for 25 ms and sends up to 100 of them in one
-signed `/v2/remote/resume/validate-batch` request, which reads the D1 read replica with one host
-query and one session query, and reads the primary again only for the claims that the replica does
-not confirm, so a restart that reconnects every host costs about one request per 100 hosts, not
+signed `/v2/remote/resume/validate-batch` request, which reads the D1 primary with one host query and
+one session query, so a restart that reconnects every host costs about one request per 100 hosts, not
 one per host. Signal sends at most 128 batch requests at a time, and closes a socket with 1013 when
 its check has no answer after 15 s. One batch request takes 0.2 to 3.3 s in production
 (2026-11-28), also with 128 requests at a time, so a home with 18,000 sockets is checked in about
@@ -319,21 +323,23 @@ after 10 minutes.
 The account service can accept a revoked credential for up to 60 s (developer decision,
 2026-11-28). Thus these checks read the D1 read replica first and read the primary only when the
 replica has no row or the row does not match: the machine token check of notifications and route
-tickets, resume validation, the notification session check, the role check of the member, invitation
+tickets, the notification session check, the role check of the member, invitation
 and logo reads, the host list, the server list of the credits page and the pool machine token. A new
 host, session, role or machine works at once, and the primary decides each refusal. The machine token
 check also keeps an accepted token hash for 30 s in each Worker isolate, so a rotated or revoked token
-works for at most 30 s plus the replica lag. Host tickets, money paths, writes, ticket consume,
-invitation redeem and owner transfer accept still read the primary.
-`apps/auth-api/scripts/host-replica-reads-e2e.ts` counts the queries for each check.
+works for at most 30 s plus the replica lag. Host tickets, resume validation, money paths, writes, ticket
+consume, invitation redeem and owner transfer accept still read the primary: Signal trusts a resumed
+token until it expires, and after a restart it does not know the revocations that it had before.
+The pool machine writes its `seen_at` only when the primary value is more than 60 s old, so a late
+replica does not add writes. `apps/auth-api/scripts/host-replica-reads-e2e.ts` counts the queries for each check.
 One rule in `apps/auth-api/src/server/d1-request-session.ts` sets the D1 session of each request. A GET
 or HEAD reads the replica: from the request bookmark when the client sends one, otherwise
 `first-unconstrained`. When that GET answers 403 or 404, the Worker runs it once more on a
 `first-primary` session and sends that answer, so a row that the replica does not have yet does not
 cause a refusal. Other methods use a `first-primary` session. In them, the bearer check of the session and the
 checks above read the replica first, and read the primary when the replica has no row. The own account
-(`/v1/me` and the browser session) without a bookmark, sign-in codes, host tickets, credit holds and
-charges, invitation and owner transfer accept, and Stripe webhook dedupe still read the primary.
+(`/v1/me` and the browser session) without a bookmark, the bearer check of billing, license, credits
+and checkout writes, sign-in codes, host tickets, credit holds and charges, invitation and owner transfer accept, and Stripe webhook dedupe still read the primary.
 `apps/auth-api/scripts/d1-replica-reads-all-e2e.ts` counts primary and replica statements for each
 request type.
 Session endings and access changes use a durable D1 outbox. Cloudflare sends each revocation to Signal
@@ -342,8 +348,9 @@ without losing revocations when Signal is temporarily unavailable.
 A host does not need its Signal socket to keep a WebRTC connection, so Signal must tell it about a
 session that ended while the host socket was away. Signal keeps the ended session IDs of each host for
 24 hours and sends them in a `sessions-ended` frame each time a host socket authenticates, and at once
-to a host socket that is connected. The host closes the child peer of each listed session. Signal
-forgets these IDs when it restarts, so the host also fails closed: after each new host Signal socket,
+to a host socket that is connected. The host closes the child peer of each listed session. A
+[Signal handoff](signal-restart.md) keeps these IDs, and a crash restart keeps them from the last
+snapshot; a restart with no snapshot forgets them. So the host also fails closed: after each new host Signal socket,
 every child peer must be confirmed again by a `peer-ready` for its session, or the host closes it.
 Each child peer has 11 minutes for this (`CLIENT_RECONFIRM_MS` in `team-webrtc.ts`): the 10-minute
 client reconnect grace of Signal and 1 minute more. The time counts only while the host has a ready

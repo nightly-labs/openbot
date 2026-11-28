@@ -248,8 +248,25 @@ What moves when a machine stops:
 - Its hosts: after 20 seconds without Signal, the host asks the Worker for a new ticket and names its
   home as failed. The Worker gives it the other machine.
 - Their clients: after 2 failed sockets, or 10 seconds of `host-waiting`, a client gets a new ticket,
-  which names the host's new home. The client drops its resume token, because the other machine does
-  not know the socket.
+  which names the host's new home. The other machine does not know the socket, so the client sends
+  the new ticket as `token` and its last resume token as `resumeFrom`. The new home checks the
+  `resumeFrom` signature with `REMOTE_SESSION_SECRET` and its session, host, user, membership, auth
+  epoch and client key against the new ticket. When they agree, the host gets `peer-ready` with
+  `resumed: true` and keeps the client's WebRTC peer. Otherwise, or for a client from before this
+  field, the host builds the peer again. The ticket keeps the `signal` claim check, and a revoked
+  session cannot get a ticket. The homes must have the same `REMOTE_SESSION_SECRET`; with different
+  values, clients build the peer again.
+- Open peers: a host that moves only its Signal socket keeps each client whose WebRTC data channel is
+  open. It drops the others. A client that does not reconfirm on the new home within the reconfirm
+  window goes.
+- Planned moves: `POST /admin/go-away` on the health port (loopback in the container, with
+  `REMOTE_ADMIN_TOKEN`) sends `go-away` in waves to the hosts of the home that announced `goAway` in
+  their hello. Body: `waveSize` (default 50), `waveIntervalMs` (default 10000) and `withinMs` (default
+  60000, at most 600000). Each host moves at a random time in `withinMs`, with the home as
+  `failedSignalUrl`, and keeps its open peers. When a drained host leaves, its clients that announced
+  `goAway` get `go-away` and follow it within 5 seconds. Signal sends the `go-away` and `resume-from`
+  capabilities in `ready` only to peers that announced `goAway`. Old hosts and clients see no change.
+  Without `REMOTE_ADMIN_TOKEN`, the route gives 404. The steps are in the `signal-deploy` skill.
 - The entry: each minute the account Worker checks `/health/ready` of the machine that
   `signal.openbot.run` gives. When it fails three checks 20 seconds apart, the Worker sets the record to
   the address of the first other home in `REMOTE_SIGNAL_HOMES` that answers. When no machine answers,

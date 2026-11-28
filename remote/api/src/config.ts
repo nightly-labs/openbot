@@ -17,6 +17,7 @@ export interface RemoteApiConfig {
   turnPort: number;
   turnTlsPort: number;
   metricsToken: string | null;
+  adminToken: string | null;
   maximumConnectionsPerUser: number;
   maximumConnectionsPerIp: number;
   maximumMessagesPerMinute: number;
@@ -28,6 +29,11 @@ export interface RemoteApiConfig {
   discord: DiscordBotConfig | null;
   signalId: string | null;
   entry: SignalEntryConfig | null;
+  stateDirectory: string | null;
+  handoffPeerPort: number | null;
+  handoffToken: string | null;
+  drainSeconds: number;
+  snapshotSeconds: number;
 }
 
 export interface SignalEntryConfig {
@@ -41,6 +47,7 @@ export interface DiscordBotConfig {
   botToken: string;
   applicationId: string;
   messageContent: boolean;
+  apiOrigin: string | null;
 }
 
 interface SlackSigningSecret {
@@ -120,13 +127,18 @@ function readDiscordBot(
   token: string | undefined,
   applicationId: string | undefined,
   messageContent: string | undefined,
+  testApiOrigin: string | undefined,
 ): DiscordBotConfig | null {
   const botToken = token?.trim();
   const id = applicationId?.trim();
   if (!botToken || !id) return null;
   if (!/^[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,256}$/u.test(botToken)) return null;
   if (!/^[0-9]{17,20}$/u.test(id)) return null;
-  return { botToken, applicationId: id, messageContent: messageContent !== "false" };
+  const testOrigin = optional(testApiOrigin);
+  const apiOrigin = testOrigin && /^http:\/\/127\.0\.0\.1:[0-9]{1,5}$/u.test(testOrigin) ? testOrigin : null;
+  if (testOrigin && !apiOrigin)
+    console.error("DISCORD_TEST_API_ORIGIN must be http://127.0.0.1:<port>. It is ignored.");
+  return { botToken, applicationId: id, messageContent: messageContent !== "false", apiOrigin };
 }
 
 export function readRemoteApiConfig(environment: Record<string, string | undefined> = process.env): RemoteApiConfig {
@@ -152,6 +164,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     turnPort: positiveInteger(environment.TURN_PORT, 3478),
     turnTlsPort: positiveInteger(environment.TURN_TLS_PORT, 5349),
     metricsToken: optional(environment.REMOTE_METRICS_TOKEN),
+    adminToken: optional(environment.REMOTE_ADMIN_TOKEN),
     maximumConnectionsPerUser: positiveInteger(environment.REMOTE_MAX_CONNECTIONS_PER_USER, 32),
     maximumConnectionsPerIp: positiveInteger(environment.REMOTE_MAX_CONNECTIONS_PER_IP, 32),
     maximumMessagesPerMinute: positiveInteger(environment.REMOTE_MAX_MESSAGES_PER_MINUTE, 600),
@@ -164,10 +177,28 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
       environment.DISCORD_BOT_TOKEN,
       environment.DISCORD_APPLICATION_ID,
       environment.DISCORD_MESSAGE_CONTENT,
+      environment.DISCORD_TEST_API_ORIGIN,
     ),
     signalId: readSignalId(environment.SIGNAL_ID),
     entry: readEntryConfig(environment),
+    stateDirectory: optional(environment.REMOTE_STATE_DIR),
+    handoffPeerPort: optionalPort(environment.REMOTE_HANDOFF_PEER_PORT),
+    handoffToken: readHandoffToken(environment.REMOTE_HANDOFF_TOKEN, environment.REMOTE_METRICS_TOKEN),
+    drainSeconds: positiveInteger(environment.REMOTE_DRAIN_SECONDS, 90),
+    snapshotSeconds: positiveInteger(environment.REMOTE_STATE_SNAPSHOT_SECONDS, 30),
   };
+}
+
+function optionalPort(value: string | undefined): number | null {
+  return optional(value) ? positiveInteger(value, 0) : null;
+}
+
+function readHandoffToken(token: string | undefined, metricsToken: string | undefined): string | null {
+  if (optional(token)) return strongSecret(token, "REMOTE_HANDOFF_TOKEN");
+  const fallback = optional(metricsToken);
+  if (!fallback || new TextEncoder().encode(fallback).byteLength >= 32) return fallback;
+  console.error("REMOTE_METRICS_TOKEN has fewer than 32 bytes. The Signal handoff is off.");
+  return null;
 }
 
 function readGitHubWebhookSecret(value: string | undefined): string | null {

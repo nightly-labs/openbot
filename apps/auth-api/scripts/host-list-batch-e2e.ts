@@ -58,7 +58,17 @@ function countedD1(database: DatabaseSync, counts: CallCounts): D1Database {
       return source.batch(statements);
     },
     exec: (query) => source.exec(query),
-    withSession: (constraintOrBookmark) => source.withSession(constraintOrBookmark),
+    withSession: (constraintOrBookmark) => {
+      const session = source.withSession(constraintOrBookmark);
+      return {
+        prepare: (query: string) => counted(session.prepare(query)),
+        batch: (statements) => {
+          counts.calls += statements.length;
+          return session.batch(statements);
+        },
+        getBookmark: () => session.getBookmark(),
+      };
+    },
     dump: () => source.dump(),
   };
 }
@@ -206,7 +216,7 @@ async function main() {
 
   counts.calls = 0;
   const none = await Effect.runPromise(plane.listHosts("user-unknown"));
-  check("an account with no servers takes one D1 statement", none.length === 0 && counts.calls === 1, {
+  check("an account with no servers reads the replica, then the primary", none.length === 0 && counts.calls === 2, {
     calls: counts.calls,
   });
 

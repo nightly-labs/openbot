@@ -19,6 +19,7 @@ const ROOT = resolve(import.meta.dirname, "../../..");
 const OUT = join(ROOT, ".openbot-build", "watch-sessions-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const SIGNAL_URL = "wss://signal.example.test";
+const SIGNAL_HOMES = "a=wss://signal1.example.test/v1/signal,b=wss://signal2.example.test/v1/signal";
 const OWNER = "user-owner";
 const OTHER = "user-other";
 const HOST_ID = "host-1";
@@ -98,9 +99,9 @@ async function setup(parentLifetimeMs = PARENT_LIFETIME_MS) {
            ('other-phone', '${OTHER}', '${otherHash}', ${now + PARENT_LIFETIME_MS}, ${now}, ${now});
     INSERT INTO mobile_auth_sessions(session_id, user_id, device_id, device_name, platform, created_at)
     VALUES ('phone', '${OWNER}', 'device-1', 'iPhone', 'ios', ${now});
-    INSERT INTO remote_hosts(host_id, owner_user_id, name, auth_epoch, created_at, updated_at)
-    VALUES ('${HOST_ID}', '${OTHER}', 'Studio', 3, ${now}, ${now}),
-           ('${FOREIGN_HOST_ID}', '${OTHER}', 'Private', 1, ${now}, ${now});
+    INSERT INTO remote_hosts(host_id, owner_user_id, name, auth_epoch, created_at, updated_at, signal_home)
+    VALUES ('${HOST_ID}', '${OTHER}', 'Studio', 3, ${now}, ${now}, 'b'),
+           ('${FOREIGN_HOST_ID}', '${OTHER}', 'Private', 1, ${now}, ${now}, NULL);
     INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at)
     VALUES ('membership-owner', '${HOST_ID}', '${OWNER}', 'member', 'active', ${now}, ${now}),
            ('membership-other', '${HOST_ID}', '${OTHER}', 'owner', 'active', ${now}, ${now}),
@@ -113,6 +114,7 @@ async function setup(parentLifetimeMs = PARENT_LIFETIME_MS) {
       REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [ticketPublicJwk] }),
       REMOTE_TICKET_KEY_ID: "ticket-1",
       REMOTE_SIGNAL_URL: SIGNAL_URL,
+      REMOTE_SIGNAL_HOMES: SIGNAL_HOMES,
     },
     { now: () => clock.now, schedule: () => undefined },
   );
@@ -174,7 +176,11 @@ async function aPairedWatchGetsATicket() {
   const issued = await ticket(session.token, key, session.watchSessionId);
   check("the watch gets a ticket with a valid proof", issued.code === null, issued.code);
   if (!issued.value) return;
-  check("the ticket answer names the Signal URL", issued.value.signalUrl === SIGNAL_URL, issued.value.signalUrl);
+  check(
+    "the ticket answer names the Signal entry, where the host ingress socket is, and not the host's WebRTC home",
+    issued.value.signalUrl === SIGNAL_URL,
+    issued.value.signalUrl,
+  );
   check(
     "the ticket lasts the watch ticket lifetime",
     issued.value.expiresAt === (Math.floor(clock.now / 1_000) + WATCH_TICKET_TTL_SECONDS) * 1_000,

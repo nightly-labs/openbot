@@ -16,6 +16,7 @@ const REPORT = OUT_ARGUMENT
   : join(ROOT, ".openbot-build", "host-replica-reads-e2e", "report.json");
 const REQUESTS = 100;
 const REPLICA_LAG_MS = 20_000;
+const POOL_SEEN_WRITE_AFTER_MS = 60_000;
 const REVOCATION_WINDOW_MS = 60_000;
 const START = Date.UTC(2026, 10, 28, 12);
 const SESSION_EXPIRES_AT = START + 30 * 86_400_000;
@@ -216,9 +217,31 @@ function operatorHost(hostId: string, token: string, place: Write = "both") {
   );
 }
 
-function copySeenAtToReplica(hostId: string) {
-  const seen = primary.prepare("SELECT seen_at FROM operator_hosts WHERE host_id = ?").get(hostId);
-  replica.prepare("UPDATE operator_hosts SET seen_at = ? WHERE host_id = ?").run(Number(seen?.seen_at), hostId);
+const seenAtWrites: { hostId: string; seenAt: number; writtenAt: number }[] = [];
+const poolSeenAtWriteTimes: number[] = [];
+
+function primarySeenAt(hostId: string): number {
+  return Number(primary.prepare("SELECT seen_at FROM operator_hosts WHERE host_id = ?").get(hostId)?.seen_at);
+}
+
+function copyLaggedSeenAtToReplica() {
+  while (seenAtWrites.length > 0 && (seenAtWrites[0]?.writtenAt ?? clock.now) <= clock.now - REPLICA_LAG_MS) {
+    const entry = seenAtWrites.shift();
+    if (entry)
+      replica.prepare("UPDATE operator_hosts SET seen_at = ? WHERE host_id = ?").run(entry.seenAt, entry.hostId);
+  }
+}
+
+async function pollWithLaggedReplica(hostId: string, token: string): Promise<boolean> {
+  copyLaggedSeenAtToReplica();
+  const before = primarySeenAt(hostId);
+  const answered = await accepted(hosted.poolAssignment(hostId, token));
+  const after = primarySeenAt(hostId);
+  if (after !== before) {
+    seenAtWrites.push({ hostId, seenAt: after, writtenAt: clock.now });
+    poolSeenAtWriteTimes.push(clock.now);
+  }
+  return answered;
 }
 
 async function accepted<A, E>(effect: Effect.Effect<A, E>): Promise<boolean> {
@@ -282,10 +305,9 @@ const measured: Record<string, number> = {
   "credits state": await measure("credits state", async () =>
     Boolean(await value(billing.credits.getState("member", "replica"))),
   ),
-  "pool assignment poll": await measure("pool assignment poll", () => {
-    copySeenAtToReplica("leaseweb:100");
-    return accepted(hosted.poolAssignment("leaseweb:100", POOL_TOKEN_100));
-  }),
+  "pool assignment poll": await measure("pool assignment poll", () =>
+    pollWithLaggedReplica("leaseweb:100", POOL_TOKEN_100),
+  ),
   "host ticket and money checks (authenticateHost)": await measure(
     "host ticket and money checks (authenticateHost)",
     () => accepted(plane.authenticateHost("host-measure", "token-measure")),
@@ -293,6 +315,14 @@ const measured: Record<string, number> = {
 };
 const queriesPer100 = Object.fromEntries(
   Object.keys(measured).map((type) => [type, counts.get(type) ?? { primary: 0, replica: 0 }]),
+);
+const poolSeenAtGaps = poolSeenAtWriteTimes.slice(1).map((time, index) => time - (poolSeenAtWriteTimes[index] ?? 0));
+check(
+  `a pool machine writes seen_at at most once each ${POOL_SEEN_WRITE_AFTER_MS / 1000} s while the replica is ${REPLICA_LAG_MS / 1000} s late`,
+  poolSeenAtWriteTimes.length >= 1 &&
+    poolSeenAtWriteTimes.length <= Math.ceil(REQUESTS / (POOL_SEEN_WRITE_AFTER_MS / 1000)) + 1 &&
+    poolSeenAtGaps.every((gap) => gap >= POOL_SEEN_WRITE_AFTER_MS),
+  { writes: poolSeenAtWriteTimes.length, gaps: poolSeenAtGaps },
 );
 check(
   `each measured request type answers all ${REQUESTS} requests`,

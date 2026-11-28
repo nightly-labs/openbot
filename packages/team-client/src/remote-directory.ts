@@ -15,6 +15,7 @@ import {
   type AcceptedOwnerTransfer,
   decodeAcceptedOwnerTransfer,
   decodeIncomingOwnerTransfers,
+  decodeListedOwnerTransfers,
   decodeOwnerTransfer,
   decodePendingOwnerTransfer,
   type OwnerTransfer,
@@ -28,6 +29,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
+import { accountAccessTokens } from "./account-access-token";
 import { accountBookmarkHeaders, rememberAccountBookmark } from "./account-bookmark";
 import { runTeamEffect } from "./effect-boundary";
 import {
@@ -37,6 +39,7 @@ import {
   remoteHostFingerprint,
 } from "./host-key-handover";
 import type { TeamClientFetch } from "./index";
+import { ListedOwnerTransfers } from "./listed-owner-transfers";
 
 export interface RemoteTeamHost {
   hostId: string;
@@ -153,6 +156,7 @@ export class RemoteTeamDirectoryClient {
   readonly #inviteLinks: InviteLinkOptions;
   readonly #verifyHostKeySignature: HostKeySignatureCheck;
   readonly #pinLock = Semaphore.makeUnsafe(1);
+  readonly #listedTransfers = new ListedOwnerTransfers();
 
   constructor(
     input: {
@@ -185,6 +189,7 @@ export class RemoteTeamDirectoryClient {
       const value = yield* this.#request("/v2/remote/hosts/");
       if (!isDynamicRecord(value) || !Array.isArray(value.hosts))
         return yield* directoryFailure("The server list is invalid.");
+      this.#listedTransfers.record(decodeListedOwnerTransfers(value));
       const handoversByHost = new Map<string, HostKeyHandover[]>();
       const hosts = yield* Effect.all(
         value.hosts.map((candidate) =>
@@ -402,9 +407,15 @@ export class RemoteTeamDirectoryClient {
 
   incomingOwnerTransfers(): Effect.Effect<OwnerTransfer[], DirectoryFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<OwnerTransfer[], DirectoryFailure> {
+      const listed = this.#listedTransfers.fresh();
+      if (listed) return listed;
       const value = yield* this.#request("/v2/remote/owner-transfers/");
       return yield* directoryDecode(() => decodeIncomingOwnerTransfers(value));
     });
+  }
+
+  listedOwnerTransfersKey(): string | null {
+    return this.#listedTransfers.key();
   }
 
   acceptOwnerTransfer(transferId: string): Effect.Effect<AcceptedOwnerTransfer, DirectoryFailure> {
@@ -412,6 +423,7 @@ export class RemoteTeamDirectoryClient {
       const value = yield* this.#request(`/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/accept`, {
         method: "POST",
       });
+      this.#listedTransfers.settle(transferId);
       return yield* directoryDecode(() => decodeAcceptedOwnerTransfer(value));
     });
   }
@@ -421,6 +433,7 @@ export class RemoteTeamDirectoryClient {
       yield* this.#request(`/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/decline`, {
         method: "POST",
       });
+      this.#listedTransfers.settle(transferId);
     });
   }
 
@@ -623,34 +636,48 @@ export class RemoteTeamDirectoryClient {
       }),
       ({ controller }) =>
         Effect.gen({ self: this }, function* () {
-          const browser = this.#authentication.kind === "browser";
+          const authentication = this.#authentication;
+          const browser = authentication.kind === "browser";
           const url = new URL(browser ? `/api/browser${path}` : path, this.#apiUrl);
-          const response = yield* Effect.tryPromise({
-            try: () =>
-              this.#fetch(url, {
-                ...(browser ? { credentials: "same-origin" as const } : {}),
-                method: options.method ?? "GET",
-                headers: {
-                  ...accountBookmarkHeaders(url),
-                  ...(this.#authentication.kind === "bearer" && options.authenticated !== false
-                    ? { Authorization: `Bearer ${this.#authentication.token}` }
+          const method = options.method ?? "GET";
+          const send = (bearer: string | null) =>
+            Effect.tryPromise({
+              try: () =>
+                this.#fetch(url, {
+                  ...(browser ? { credentials: "same-origin" as const } : {}),
+                  method,
+                  headers: {
+                    ...accountBookmarkHeaders(url),
+                    ...(bearer === null ? {} : { Authorization: `Bearer ${bearer}` }),
+                    ...(browser
+                      ? { "X-OpenBot-Browser": "1", "Content-Type": "application/json" }
+                      : options.body
+                        ? { "Content-Type": "application/json" }
+                        : {}),
+                  },
+                  ...(options.body || (browser && options.method === "POST")
+                    ? { body: JSON.stringify(options.body ?? {}) }
                     : {}),
-                  ...(browser
-                    ? { "X-OpenBot-Browser": "1", "Content-Type": "application/json" }
-                    : options.body
-                      ? { "Content-Type": "application/json" }
-                      : {}),
-                },
-                ...(options.body || (browser && options.method === "POST")
-                  ? { body: JSON.stringify(options.body ?? {}) }
-                  : {}),
-                signal: controller.signal,
-              }),
-            catch: () =>
-              controller.signal.aborted
-                ? directoryFailure(sourceText("error.remote.directoryTimeout"), "timeout/directory")
-                : directoryFailure(sourceText("error.remote.directoryUnreachable"), "network/directory"),
-          });
+                  signal: controller.signal,
+                }),
+              catch: () =>
+                controller.signal.aborted
+                  ? directoryFailure(sourceText("error.remote.directoryTimeout"), "timeout/directory")
+                  : directoryFailure(sourceText("error.remote.directoryUnreachable"), "network/directory"),
+            });
+          const response =
+            authentication.kind === "bearer" && options.authenticated !== false
+              ? yield* accountAccessTokens.send(
+                  {
+                    apiUrl: this.#apiUrl,
+                    sessionToken: authentication.token,
+                    path,
+                    method,
+                    fetch: (input, init) => this.#fetch(input, init),
+                  },
+                  send,
+                )
+              : yield* send(null);
           rememberAccountBookmark(url, response);
           const value = yield* directoryIO(() => response.json()).pipe(Effect.catch(() => Effect.succeed(null)));
           if (!response.ok) return yield* directoryError(response.status, value);

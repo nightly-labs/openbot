@@ -6,8 +6,16 @@ description: Check and deploy Signal (the `remote-api` service in `remote/`) to 
 # Signal deploy
 
 Signal runs on `sui-alexandria` in the Compose project `openbot-remote` (`/opt/openbot/remote`). It
-has no database: a restart closes the signalling WebSockets and empties the in-memory rooms, routes
-and resume-token cache. Active WebRTC data channels stay up. coturn is a separate container.
+has no database. A home runs in one of two layouts:
+
+- **Single** (`remote-api`): a restart closes the signalling WebSockets and empties the in-memory
+  rooms, routes and resume-token cache. Each host then needs a check in the account service.
+- **Slots** (`remote-api-blue` and `remote-api-green`, Compose profile `slots`): the new slot joins
+  the running slot on the same port, takes its signed state, and the old slot moves its sockets with
+  close code 1012 in waves. The moved peers need no account service check. See
+  [Signal restart](../../../docs/architecture/signal-restart.md).
+
+Active WebRTC data channels stay up in both layouts. coturn is a separate container.
 
 [docs/remote-session-deployment.md](../../../docs/remote-session-deployment.md) is the source for
 the staging, build and rollback commands. This skill adds the checks before and after them.
@@ -120,13 +128,57 @@ Signal closed hosts with 1013 for about 5 minutes.
 - Restart the entry home last: the home whose `/metrics` shows `openbot_remote_signal_entry` with
   the value 1. The entry can move between homes. Restart the other homes in this order: `signal-sg`, `signal-au`,
   `signal-us`, `signal2`, `signal1`.
-- Before each restart, read `openbot_remote_peer_connections` from the local `/metrics` route of
-  that home (health port, `Authorization: Bearer $REMOTE_METRICS_TOKEN` read on the host). Print
-  only the metric lines, never the token.
+- Before each restart, read `openbot_remote_peer_connections` and
+  `openbot_remote_auth_unavailable_total` from the local `/metrics` route of that home (health port
+  9642, or 9643 when `remote-api-green` runs, `Authorization: Bearer $REMOTE_METRICS_TOKEN` read on
+  the host). Print only the metric lines, never the token.
 - After each restart, go to the next home only when `/health/ready` succeeds, the gauge is again at
   90% or more of the value before (or 5 minutes went by), and `openbot_remote_auth_unavailable_total`
   stays 0. That counter grows when Signal closes a host with 1013 because the account service did
-  not answer. If it grows, stop and report.
+  not answer. A new process starts the counter at 0, so read it on the new slot. If it grows, or the
+  account Worker log shows D1 `7429` errors, stop and report. Do not restart the next home.
+
+### Drain a home with go-away
+
+A home that runs a release with `/admin/go-away` and has `REMOTE_ADMIN_TOKEN` set can move its hosts
+before the restart. Each host that announced `goAway` gets a new ticket with this home as
+`failedSignalUrl`, at a random time in `withinMs`, and keeps its open WebRTC peers. Clients follow
+their host. Old hosts and clients keep the old path: they move when the socket closes.
+
+The route answers only on the health port, only from loopback inside the container, and only with
+the token. A call from the machine itself comes from the Docker gateway and gets 404. Run it in the
+container, so that the token stays in the container environment:
+
+```sh
+docker exec openbot-remote-remote-api-1 bun -e 'const r = await fetch("http://127.0.0.1:8080/admin/go-away", { method: "POST", headers: { authorization: `Bearer ${process.env.REMOTE_ADMIN_TOKEN}` }, body: JSON.stringify({ waveSize: 50, waveIntervalMs: 10000, withinMs: 60000 }) }); console.log(r.status, await r.text())'
+```
+
+The answer gives `hosts`, `waves` and `withoutCapability`. Each host renewal is a Worker call, so
+keep about 300 hosts per minute or less (the defaults above), and watch D1 as step 4 says. Wait
+until `openbot_remote_peer_connections` stops falling, then restart the home. The drain stays on
+until the restart: a host that connects to this home again gets go-away at once.
+
+### Ingress backup in Nginx
+
+`remote/nginx/signal.openbot.run.conf` sends the Slack, GitHub, Telegram, Discord and webhook
+locations to the `openbot_signal_ingress` upstream. Its backup server, `127.0.0.1:8091`, sends the
+request over TLS to the other home when the local Signal refuses the connection or does not connect
+in 2 s. A request that the local Signal received is not sent again. Applying this needs developer
+approval. On each machine that serves `signal.openbot.run`:
+
+1. `cp /etc/nginx/conf.d/openbot-remote.conf /etc/nginx/conf.d/openbot-remote.conf.bak-<date>-ingress-backup`.
+2. Add the `upstream openbot_signal_ingress` block and the `127.0.0.1:8091` server from the repository
+   file. On `signal2`, set `proxy_pass`, `proxy_ssl_name` and `Host` to `signal1.openbot.run`.
+3. In the five locations, replace `proxy_pass http://127.0.0.1:8081;` with the three lines from the
+   repository file. Keep `location /` on `127.0.0.1:8081`: WebSockets do not use the backup.
+4. `nginx -t`, then `systemctl reload nginx`.
+5. Check that `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8091/health/ready` gives 200,
+   and that an unauthenticated `POST https://signal.openbot.run/v1/webhooks/x` still gives 401.
+6. Rollback: copy the backup file back, `nginx -t`, `systemctl reload nginx`.
+
+The other home does not hold the entry ingress peer, so the backup only keeps the routes that it can
+answer (the delivery queue and its host wake, when that home has a route waker, and the signature and route checks). This is not confirmed on production. Signal on
+the other home sees the address of this machine, not the address of the sender.
 
 Report the results of steps 1 to 3 and get approval. Then follow "Deployment procedure" in
 [docs/remote-session-deployment.md](../../../docs/remote-session-deployment.md) with these changes:
@@ -136,12 +188,32 @@ Report the results of steps 1 to 3 and get approval. Then follow "Deployment pro
 - Tag the running image as `openbot-remote-api:before-<tag>` before the build.
 - Build from the release directory. The document's build command passes its name, the tag commit,
   as `--build-arg OPENBOT_SOURCE_COMMIT`, and stops when the name is not a full commit SHA.
-- Run the Compose commands with `-p openbot-remote`, and build and start only `remote-api`.
+- Run the Compose commands with `-p openbot-remote`, and build only `remote-api`. The slots use the
+  same image name (`openbot-remote-remote-api`), so this build also serves them.
+- On a **single** home, start only `remote-api` as the document says.
+- On a **slots** home, do not run `up` for a slot that runs: that recreates it and closes its sockets
+  without a handoff. Run the handoff script instead:
+
+  ```sh
+  remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+    remote/scripts/signal-handoff.sh
+  ```
+
+  It finds the running slot, starts the other slot, waits until it is `ready` and linked, stops the
+  old slot (SIGTERM runs the drain, up to 120 s), and prints the socket counts before, during and
+  after. When the new slot does not join, the script stops it, and the old slot keeps all sockets.
+  The script prints no token: the status probe runs in the container and reads the token there.
 
 ## 5. Verify
 
 - `docker inspect openbot-remote-remote-api-1 --format '{{.Image}} {{.State.Health.Status}}'` shows
-  the new image and `healthy`.
+  the new image and `healthy`. On a slots home, inspect the running slot
+  (`openbot-remote-remote-api-blue-1` or `openbot-remote-remote-api-green-1`), and check that the
+  other slot is stopped.
+- On a slots home, the script output shows `Handoff complete.`, the `After` sockets are near the
+  `Before` sockets, and the new slot log shows `OpenBot Signal joined the running process and took
+  its state.` A log line `refused the state` or `could not read the recent auth events` means that
+  each peer was checked again in the account service; check `openbot_remote_auth_unavailable_total`.
 - `curl --fail https://signal1.openbot.run/health/ready` succeeds (not `signal.openbot.run`: the entry name can point to `signal2`).
 - `curl --fail https://signal1.openbot.run/health/live` shows `commit` equal to the tag commit (tags
   from before this field show no `commit`; use the checksums then).
@@ -166,7 +238,53 @@ see "Regional Signal machines" in the deployment document. Their Release, `runti
 If a check fails, use the rollback commands of the deployment document with the `before-<tag>` image.
 Keep that image until the developer confirms the device checks of the deployment document.
 
+On a slots home, roll back with a handoff: tag `openbot-remote-api:before-<tag>` as
+`openbot-remote-remote-api`, then run the handoff script again. This works only when the
+`before-<tag>` image has the handoff (this change or later). For an older image, a rollback is a cold
+restart: stop the running slot, then start `remote-api` with the old image.
+
+## 6. Move a home to the slots
+
+Each home moves one time, and each move needs its own approval from the developer. The move is one
+cold restart, like a deploy today: the single `remote-api` publishes its port through Docker, so a
+slot cannot listen on the same port while it runs. After the move, each deploy of that home is a
+handoff.
+
+Move the homes in the deploy order (`signal-sg`, `signal-au`, `signal-us`, `signal2`, then `signal1`),
+at most one home per hour, and the entry home last. Before the move:
+
+- Deploy a tag that has the slots to the home, in the single layout, and check it (steps 1 to 5).
+- The host Nginx proxies to `127.0.0.1:<REMOTE_SIGNAL_PUBLIC_PORT>` (8081, or 8091 on `signal2`) and
+  `REMOTE_SIGNAL_BIND_ADDRESS=127.0.0.1` is in the host file. The slots use host networking and listen
+  on that address and port directly, so Nginx needs no change. Check with `grep proxy_pass` on the
+  Nginx file of the host.
+- Ports 9642 and 9643 on `127.0.0.1` are free on the host, apart from the Docker proxy of
+  `remote-api` on 9642 (`ss -ltnp | grep -E ':964[23] '`).
+- coturn uses host networking and its own ports (3478, 5349, 9641, the relay range), and acme only
+  writes the certificate volume. The slots do not change them. Do not recreate them.
+
+The move (one command block, after approval):
+
+```sh
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml stop remote-api
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml --profile slots up -d --no-build --no-deps remote-api-blue
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml up -d --no-build --no-deps --force-recreate capacity-report
+```
+
+Then check `/health/ready` on the public name of the home, the gauge and
+`openbot_remote_auth_unavailable_total` on port 9642, as in step 4. Keep the stopped `remote-api`
+container until the first handoff on that home passes. To go back to the single layout, stop the
+running slot and start `remote-api`.
+
+The state volume `openbot-remote_remote-api-state` holds the signed snapshot
+(`signal-state.json`, HMAC with `REMOTE_SESSION_SECRET`). It holds IDs (ticket, resume token,
+session and host IDs), auth epochs and expiry times. It holds no ticket, token, secret or message,
+and it is not a backup. Do not copy it to another home: a snapshot of another `SIGNAL_ID` is refused.
+
 ## Report
 
-One table: running commit before and after (from `/health/live`, or from checksums), image IDs, each secret key status, each regression area,
+One table: layout (single or slots) and running slot, running commit before and after (from `/health/live`, or from checksums), image IDs, each secret key status, each regression area,
 health, test result, and the checks that need a device or the developer.

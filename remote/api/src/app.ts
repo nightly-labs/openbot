@@ -173,6 +173,43 @@ const authEventSchema = z.discriminatedUnion("type", [
   }),
 ]) satisfies z.ZodType<RemoteAuthEvent>;
 
+export const HANDOFF_NOT_HELD_HEADER = "OpenBot-Handoff";
+export const HANDOFF_NOT_HELD = "not-held";
+
+export interface AppHandoff {
+  linked(): boolean;
+  isOld(): boolean;
+  forwarded(request: Request): boolean;
+  address(request: Request): string | null;
+  forward(request: Request, body: Uint8Array<ArrayBuffer>, remoteAddress: string | undefined): Promise<Response | null>;
+  authEvent(body: string): Promise<boolean>;
+  discordCall(contentType: string, body: Uint8Array<ArrayBuffer>): Promise<Response | null>;
+}
+
+export interface RemoteApiAppOptions {
+  handoff?: AppHandoff | null;
+  authEventApplied?: () => void;
+}
+
+export function applyAuthEvent(signal: SignalService, event: RemoteAuthEvent): void {
+  if (event.type === "remote-auth-changed") signal.revoke(event.hostId, event.authEpoch);
+  else if (event.type === "account-profile-changed") signal.profileChanged(event.userId);
+  else if (event.type === "account-servers-changed") signal.serversChanged(event.userId);
+  else if (event.type === "slack-route-revoked") signal.revokeSlackRoute(event.appId, event.teamId, event.through);
+  else if (event.type === "telegram-route-revoked")
+    signal.revokeTelegramRoute(event.botId, event.chatId, event.through);
+  else if (event.type === "discord-route-revoked") signal.revokeDiscordRoute(event.guildId, event.through);
+  else if (event.type === "webhook-route-revoked") signal.revokeWebhookRoute(event.routeId, event.through);
+  else signal.revokeSession(event.sessionId, event.hostId);
+}
+
+function notHeldResponse(): Response {
+  return new Response(null, {
+    status: 421,
+    headers: { "Cache-Control": "no-store", [HANDOFF_NOT_HELD_HEADER]: HANDOFF_NOT_HELD },
+  });
+}
+
 export function createRemoteApiApp(
   config: RemoteApiConfig,
   signal: SignalService,
@@ -180,7 +217,24 @@ export function createRemoteApiApp(
   turnRelays: TurnRelays,
   entry: SignalEntry,
   discordApi: () => DiscordApi | null = () => null,
+  options: RemoteApiAppOptions = {},
 ) {
+  const handoff = options.handoff ?? null;
+  const handOff = async (
+    request: Request,
+    body: Uint8Array<ArrayBuffer>,
+    remoteAddress: string | undefined,
+  ): Promise<Response | null> => {
+    if (!handoff?.linked()) return null;
+    if (handoff.forwarded(request)) return handoff.isOld() ? notHeldResponse() : null;
+    return handoff.forward(request, body, handoff.address(request) ?? remoteAddress);
+  };
+  const clientAddress = (request: Request, remoteAddress: string | undefined) =>
+    signalClientIp(
+      handoff?.address(request) ?? remoteAddress,
+      request.headers.get("x-forwarded-for"),
+      config.trustProxy,
+    );
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
@@ -210,15 +264,12 @@ export function createRemoteApiApp(
         set.status = 400;
         return { error: { code: "invalid_event", message: "The auth event is invalid." } };
       }
-      if (event.type === "remote-auth-changed") signal.revoke(event.hostId, event.authEpoch);
-      else if (event.type === "account-profile-changed") signal.profileChanged(event.userId);
-      else if (event.type === "account-servers-changed") signal.serversChanged(event.userId);
-      else if (event.type === "slack-route-revoked") signal.revokeSlackRoute(event.appId, event.teamId, event.through);
-      else if (event.type === "telegram-route-revoked")
-        signal.revokeTelegramRoute(event.botId, event.chatId, event.through);
-      else if (event.type === "discord-route-revoked") signal.revokeDiscordRoute(event.guildId, event.through);
-      else if (event.type === "webhook-route-revoked") signal.revokeWebhookRoute(event.routeId, event.through);
-      else signal.revokeSession(event.sessionId, event.hostId);
+      applyAuthEvent(signal, event);
+      options.authEventApplied?.();
+      if (handoff?.linked() && !(await handoff.authEvent(body))) {
+        set.status = 503;
+        return { error: { code: "handoff_unavailable", message: "The other Signal process did not take the event." } };
+      }
       return new Response(null, { status: 204 });
     })
     .post(
@@ -239,11 +290,7 @@ export function createRemoteApiApp(
           verifySlackSignature(body, timestamp, signature, secret),
         );
         if (!signer) {
-          const address = signalClientIp(
-            server?.requestIP(request)?.address,
-            request.headers.get("x-forwarded-for"),
-            config.trustProxy,
-          );
+          const address = clientAddress(request, server?.requestIP(request)?.address);
           return slackResponse({ status: signal.acceptSlackRequest(`address:${address}`) ? 401 : 429 });
         }
         const slack = slackRequest(kind, body);
@@ -252,6 +299,10 @@ export function createRemoteApiApp(
           return slackResponse({ status: 200, contentType: "text/plain", body: slack.challenge });
         }
         if (slack.appId !== signer.appId) return slackResponse({ status: 401 });
+        if (!signal.holdsSlackRoute(slack.appId, slack.teamId)) {
+          const moved = await handOff(request, body, server?.requestIP(request)?.address);
+          if (moved) return moved;
+        }
         if (!signal.acceptSlackRequest(`team:${slack.teamId}`)) return slackResponse({ status: 429 });
         const retryNum = Number(request.headers.get("x-slack-retry-num") ?? "");
         const retryReason = request.headers.get("x-slack-retry-reason");
@@ -289,18 +340,21 @@ export function createRemoteApiApp(
         if (mediaType !== "application/json") return answer(415);
         const signed = webhookSignedHeaders(request.headers);
         if (!signed) return answer(401);
-        const address = signalClientIp(
-          server?.requestIP(request)?.address,
-          request.headers.get("x-forwarded-for"),
-          config.trustProxy,
-        );
+        const address = clientAddress(request, server?.requestIP(request)?.address);
+        let body: Uint8Array<ArrayBuffer> | null = null;
         if (!signal.holdsWebhookRoute(routeId)) {
+          if (handoff?.linked()) {
+            body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
+            if (!body) return answer(413);
+            const moved = await handOff(request, body, server?.requestIP(request)?.address);
+            if (moved) return moved;
+          }
           signal.wakeWebhookRoute(routeId, address);
           return answer(503);
         }
         if (signed.format && !signal.webhookRouteAccepts(routeId, signed.format)) return answer(401);
         if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return answer(429);
-        const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
+        body ??= await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
         if (!body) return answer(413);
         const result = await runtime.runPromise(signal.deliverWebhook(routeId, { ...signed, body }), {
           signal: request.signal,
@@ -324,12 +378,7 @@ export function createRemoteApiApp(
         const event = request.headers.get(GITHUB_EVENT_HEADER) ?? "";
         const deliveryId = request.headers.get(GITHUB_DELIVERY_HEADER) ?? "";
         const signature = request.headers.get(GITHUB_SIGNATURE_HEADER) ?? "";
-        const address = () =>
-          signalClientIp(
-            server?.requestIP(request)?.address,
-            request.headers.get("x-forwarded-for"),
-            config.trustProxy,
-          );
+        const address = () => clientAddress(request, server?.requestIP(request)?.address);
         if (
           !GITHUB_EVENT_PATTERN.test(event) ||
           !GITHUB_DELIVERY_ID_PATTERN.test(deliveryId) ||
@@ -344,6 +393,10 @@ export function createRemoteApiApp(
           return emptyResponse(signal.acceptGitHubRequest(`address:${address()}`) ? 401 : 429);
         const github = githubRequest(body);
         if (!github) return emptyResponse(204);
+        if (!signal.holdsGitHubRepository(github.installationId, github.repositoryId)) {
+          const moved = await handOff(request, body, server?.requestIP(request)?.address);
+          if (moved) return moved;
+        }
         if (!signal.acceptGitHubRequest(`installation:${github.installationId}`)) return emptyResponse(429);
         const result = await runtime.runPromise(signal.deliverGitHub({ ...github, event, deliveryId, body }), {
           signal: request.signal,
@@ -360,11 +413,7 @@ export function createRemoteApiApp(
           await request.body?.cancel();
           return watchError(413, "too_large");
         }
-        const address = signalClientIp(
-          server?.requestIP(request)?.address,
-          request.headers.get("x-forwarded-for"),
-          config.trustProxy,
-        );
+        const address = clientAddress(request, server?.requestIP(request)?.address);
         if (!signal.acceptWatchRequest(address)) {
           await request.body?.cancel();
           return watchError(429, "rate_limited");
@@ -384,26 +433,30 @@ export function createRemoteApiApp(
     )
     .post(
       DISCORD_API_PATH,
-      async ({ request }) => {
+      async ({ request, server }) => {
         const discord = discordApi();
-        if (!discord) return discordError(503, "unavailable");
+        if (!discord && !handoff?.linked()) return discordError(503, "unavailable");
         const token = DISCORD_SESSION_PATTERN.exec(request.headers.get("authorization") ?? "")?.[1];
         const session = token ? signal.discordCaller(token, null) : null;
-        if (!token || !session?.ok) return discordError(401, "unauthorized");
+        if (!token || !session?.ok) {
+          if (!handoff?.linked()) return discordError(401, "unauthorized");
+          const raw = await readDiscordBytes(request);
+          if ("status" in raw) return discordError(raw.status, "invalid_request");
+          return (
+            (await handOff(request, raw.body, server?.requestIP(request)?.address)) ?? discordError(401, "unauthorized")
+          );
+        }
         const retryAfterMs = signal.acceptDiscordCall(session.hostId);
         if (retryAfterMs !== null) return discordError(429, "rate_limited", retryAfterMs);
-        const input = await readDiscordCall(request);
+        const raw = await readDiscordBytes(request);
+        if ("status" in raw) return discordError(raw.status, "invalid_request");
+        const input = await parseDiscordCall(raw.contentType, raw.body);
         if ("status" in input) return discordError(input.status, "invalid_request");
         const caller = signal.discordCaller(token, input.request.guildId);
         if (!caller.ok) return discordError(caller.code === "unauthorized" ? 401 : 403, caller.code);
-        const result = await runtime.runPromise(discord.call(input.request, input.file).pipe(Effect.result), {
-          signal: request.signal,
-        });
-        signal.recordDiscordCall(Result.isSuccess(result));
-        if (Result.isFailure(result)) {
-          return discordError(result.failure.status, result.failure.code, result.failure.retryAfterMs);
-        }
-        return Response.json(result.success, { headers: { "Cache-Control": "no-store" } });
+        if (!discord)
+          return (await handoff?.discordCall(raw.contentType, raw.body)) ?? discordError(503, "unavailable");
+        return discordCallResponse(signal, runtime, discord, input, request.signal);
       },
       { parse: "none" },
     )
@@ -416,17 +469,17 @@ export function createRemoteApiApp(
         if (!telegram?.bot.hasBot(botId)) return emptyResponse(404);
         if (!telegram.bot.verifyWebhook(botId, request.headers.get("x-telegram-bot-api-secret-token") ?? "")) {
           await request.body?.cancel();
-          const address = signalClientIp(
-            server?.requestIP(request)?.address,
-            request.headers.get("x-forwarded-for"),
-            config.trustProxy,
-          );
+          const address = clientAddress(request, server?.requestIP(request)?.address);
           return emptyResponse(signal.acceptTelegramRequest(`address:${address}`) ? 401 : 429);
         }
         const body = await readBody(request, TELEGRAM_UPDATE_BYTES_LIMIT);
         const update = body ? telegramUpdate(body) : null;
         if (!body || !update || !signal.acceptTelegramRequest(`chat:${botId}:${update.chatId}`))
           return emptyResponse(200);
+        if (!signal.holdsTelegramChat(botId, update.chatId)) {
+          const moved = await handOff(request, body, server?.requestIP(request)?.address);
+          if (moved) return moved;
+        }
         const linked = update.linkCode
           ? await runtime.runPromise(signal.linkTelegramChat(botId, update.chatId, update.linkCode))
           : false;
@@ -666,19 +719,56 @@ function webhookResponse(status: WebhookDeliveryStatus | 415): Response {
   return new Response(null, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-async function readDiscordCall(
-  request: Request,
-): Promise<{ request: DiscordApiRequest; file: DiscordUpload | null } | { status: 400 | 413 }> {
-  const contentType = request.headers.get("content-type") ?? "";
+export async function discordCallResponse(
+  signal: SignalService,
+  runtime: ManagedRuntime.ManagedRuntime<SignalTokens, never>,
+  discord: DiscordApi,
+  input: { request: DiscordApiRequest; file: DiscordUpload | null },
+  abort: AbortSignal,
+): Promise<Response> {
+  const result = await runtime.runPromise(discord.call(input.request, input.file).pipe(Effect.result), {
+    signal: abort,
+  });
+  signal.recordDiscordCall(Result.isSuccess(result));
+  if (Result.isFailure(result)) {
+    return discordError(result.failure.status, result.failure.code, result.failure.retryAfterMs);
+  }
+  return Response.json(result.success, { headers: { "Cache-Control": "no-store" } });
+}
+
+export { discordError };
+
+function discordMediaType(contentType: string): "multipart" | "json" | null {
   const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
-  const multipart = mediaType === "multipart/form-data";
-  if (!multipart && mediaType !== "application/json") return { status: 400 };
-  const limit = multipart ? DISCORD_UPLOAD_BODY_BYTES_LIMIT : DISCORD_JSON_BODY_BYTES_LIMIT;
+  if (mediaType === "multipart/form-data") return "multipart";
+  return mediaType === "application/json" ? "json" : null;
+}
+
+export async function readDiscordBytes(
+  request: Request,
+): Promise<{ contentType: string; body: Uint8Array<ArrayBuffer> } | { status: 400 | 413 }> {
+  const contentType = request.headers.get("content-type") ?? "";
+  const media = discordMediaType(contentType);
+  if (!media) return { status: 400 };
+  const limit = media === "multipart" ? DISCORD_UPLOAD_BODY_BYTES_LIMIT : DISCORD_JSON_BODY_BYTES_LIMIT;
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(declaredLength) || declaredLength > limit) return { status: 413 };
   try {
     const body = await readBounded(request, limit);
-    if (!body) return { status: 413 };
+    return body ? { contentType, body } : { status: 413 };
+  } catch {
+    return { status: 400 };
+  }
+}
+
+export async function parseDiscordCall(
+  contentType: string,
+  body: Uint8Array<ArrayBuffer>,
+): Promise<{ request: DiscordApiRequest; file: DiscordUpload | null } | { status: 400 | 413 }> {
+  const media = discordMediaType(contentType);
+  if (!media) return { status: 400 };
+  const multipart = media === "multipart";
+  try {
     if (!multipart) {
       const call = decodeDiscordApiRequest(JSON.parse(new TextDecoder().decode(body)));
       return call && call.op !== "upload" ? { request: call, file: null } : { status: 400 };
@@ -810,7 +900,7 @@ function telegramMessageAddresses(message: TelegramMessage): boolean {
   );
 }
 
-function decodeAuthEvent(body: string): RemoteAuthEvent | null {
+export function decodeAuthEvent(body: string): RemoteAuthEvent | null {
   try {
     const result = authEventSchema.safeParse(JSON.parse(body));
     return result.success ? result.data : null;

@@ -1,5 +1,36 @@
 name: openbot-remote
 
+x-remote-api-environment: &remote-api-environment
+  REMOTE_TLS_DISABLED: ${REMOTE_TLS_DISABLED:-false}
+  REMOTE_TLS_CERT_PATH: /acme/certificates/${SIGNAL_DOMAIN}.crt
+  REMOTE_TLS_KEY_PATH: /acme/certificates/${SIGNAL_DOMAIN}.key
+  REMOTE_TICKET_JWKS_URL: ${REMOTE_TICKET_JWKS_URL:?REMOTE_TICKET_JWKS_URL is required}
+  REMOTE_CONTROL_PLANE_URL: ${REMOTE_CONTROL_PLANE_URL:?REMOTE_CONTROL_PLANE_URL is required}
+  REMOTE_SESSION_SECRET: ${REMOTE_SESSION_SECRET:?REMOTE_SESSION_SECRET is required}
+  REMOTE_AUTH_WEBHOOK_SECRET: ${REMOTE_AUTH_WEBHOOK_SECRET:?REMOTE_AUTH_WEBHOOK_SECRET is required}
+  SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+  GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+  DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+  DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID:-}
+  DISCORD_MESSAGE_CONTENT: ${DISCORD_MESSAGE_CONTENT:-}
+  TELEGRAM_BOT_TOKENS: ${TELEGRAM_BOT_TOKENS:-}
+  TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+  TELEGRAM_WEBHOOK_ORIGIN: ${TELEGRAM_WEBHOOK_ORIGIN:-}
+  REMOTE_METRICS_TOKEN: ${REMOTE_METRICS_TOKEN:?REMOTE_METRICS_TOKEN is required}
+  REMOTE_ADMIN_TOKEN: ${REMOTE_ADMIN_TOKEN:-}
+  REMOTE_MAX_CONNECTIONS_PER_USER: ${REMOTE_MAX_CONNECTIONS_PER_USER:-32}
+  REMOTE_MAX_CONNECTIONS_PER_IP: ${REMOTE_MAX_CONNECTIONS_PER_IP:-32}
+  REMOTE_MAX_MESSAGES_PER_MINUTE: ${REMOTE_MAX_MESSAGES_PER_MINUTE:-600}
+  REMOTE_TRUST_PROXY: ${REMOTE_TRUST_PROXY:-false}
+  TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?TURN_SHARED_SECRET is required}
+  TURN_HOST: ${TURN_DOMAIN}
+  TURN_EXTRA_HOSTS: ${TURN_EXTRA_HOSTS:-}
+  SIGNAL_ID: ${SIGNAL_ID:-}
+  SIGNAL_ENTRY_HOST: ${SIGNAL_ENTRY_HOST:-}
+  SIGNAL_PUBLIC_IPV4: ${SIGNAL_PUBLIC_IPV4:-}
+  TURN_PORT: 3478
+  TURN_TLS_PORT: 5349
+
 services:
   acme:
     image: goacme/lego:v5.3.1
@@ -22,60 +53,67 @@ services:
       retries: 30
 
   remote-api:
-    build:
+    build: &remote-api-build
       context: ..
       dockerfile: remote/api/Dockerfile
       args:
         OPENBOT_SOURCE_COMMIT: ${OPENBOT_SOURCE_COMMIT:-unknown}
     restart: unless-stopped
-    depends_on:
+    depends_on: &remote-api-depends-on
       acme:
         condition: service_healthy
     environment:
+      <<: *remote-api-environment
       REMOTE_SIGNAL_HOST: 0.0.0.0
       REMOTE_SIGNAL_PORT: ${REMOTE_SIGNAL_PORT:-8443}
       REMOTE_HEALTH_HOST: 0.0.0.0
       REMOTE_HEALTH_PORT: 8080
-      REMOTE_TLS_DISABLED: ${REMOTE_TLS_DISABLED:-false}
-      REMOTE_TLS_CERT_PATH: /acme/certificates/${SIGNAL_DOMAIN}.crt
-      REMOTE_TLS_KEY_PATH: /acme/certificates/${SIGNAL_DOMAIN}.key
-      REMOTE_TICKET_JWKS_URL: ${REMOTE_TICKET_JWKS_URL:?REMOTE_TICKET_JWKS_URL is required}
-      REMOTE_CONTROL_PLANE_URL: ${REMOTE_CONTROL_PLANE_URL:?REMOTE_CONTROL_PLANE_URL is required}
-      REMOTE_SESSION_SECRET: ${REMOTE_SESSION_SECRET:?REMOTE_SESSION_SECRET is required}
-      REMOTE_AUTH_WEBHOOK_SECRET: ${REMOTE_AUTH_WEBHOOK_SECRET:?REMOTE_AUTH_WEBHOOK_SECRET is required}
-      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
-      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
-      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
-      DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID:-}
-      DISCORD_MESSAGE_CONTENT: ${DISCORD_MESSAGE_CONTENT:-}
-      TELEGRAM_BOT_TOKENS: ${TELEGRAM_BOT_TOKENS:-}
-      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
-      TELEGRAM_WEBHOOK_ORIGIN: ${TELEGRAM_WEBHOOK_ORIGIN:-}
-      REMOTE_METRICS_TOKEN: ${REMOTE_METRICS_TOKEN:?REMOTE_METRICS_TOKEN is required}
-      REMOTE_MAX_CONNECTIONS_PER_USER: ${REMOTE_MAX_CONNECTIONS_PER_USER:-32}
-      REMOTE_MAX_CONNECTIONS_PER_IP: ${REMOTE_MAX_CONNECTIONS_PER_IP:-32}
-      REMOTE_MAX_MESSAGES_PER_MINUTE: ${REMOTE_MAX_MESSAGES_PER_MINUTE:-600}
-      REMOTE_TRUST_PROXY: ${REMOTE_TRUST_PROXY:-false}
-      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?TURN_SHARED_SECRET is required}
-      TURN_HOST: ${TURN_DOMAIN}
-      TURN_EXTRA_HOSTS: ${TURN_EXTRA_HOSTS:-}
-      SIGNAL_ID: ${SIGNAL_ID:-}
-      SIGNAL_ENTRY_HOST: ${SIGNAL_ENTRY_HOST:-}
-      SIGNAL_PUBLIC_IPV4: ${SIGNAL_PUBLIC_IPV4:-}
-      TURN_PORT: 3478
-      TURN_TLS_PORT: 5349
     ports:
       - "${REMOTE_SIGNAL_BIND_ADDRESS:-0.0.0.0}:${REMOTE_SIGNAL_PUBLIC_PORT:-443}:${REMOTE_SIGNAL_PORT:-8443}/tcp"
       - "127.0.0.1:9642:8080/tcp"
-    group_add:
+    group_add: &remote-api-groups
       - "${ACME_CERTIFICATE_GROUP_ID:-2000}"
     volumes:
       - acme-data:/acme:ro
     read_only: true
-    tmpfs:
+    tmpfs: &remote-api-tmpfs
       - /tmp:size=16m,mode=1777
-    security_opt:
+    security_opt: &remote-api-security
       - no-new-privileges:true
+
+  remote-api-blue: &remote-api-slot
+    image: openbot-remote-remote-api
+    build: *remote-api-build
+    profiles: ["slots"]
+    restart: unless-stopped
+    network_mode: host
+    stop_grace_period: 120s
+    depends_on: *remote-api-depends-on
+    environment: &remote-api-blue-environment
+      <<: *remote-api-environment
+      REMOTE_SIGNAL_HOST: ${REMOTE_SIGNAL_BIND_ADDRESS:-127.0.0.1}
+      REMOTE_SIGNAL_PORT: ${REMOTE_SIGNAL_PUBLIC_PORT:-8081}
+      REMOTE_HEALTH_HOST: 127.0.0.1
+      REMOTE_HEALTH_PORT: 9642
+      REMOTE_HANDOFF_PEER_PORT: 9643
+      REMOTE_HANDOFF_TOKEN: ${REMOTE_HANDOFF_TOKEN:-}
+      REMOTE_DRAIN_SECONDS: ${REMOTE_DRAIN_SECONDS:-90}
+      REMOTE_STATE_SNAPSHOT_SECONDS: ${REMOTE_STATE_SNAPSHOT_SECONDS:-30}
+      REMOTE_STATE_DIR: /var/lib/openbot-signal
+    group_add: *remote-api-groups
+    volumes:
+      - acme-data:/acme:ro
+      - remote-api-state:/var/lib/openbot-signal
+    read_only: true
+    tmpfs: *remote-api-tmpfs
+    security_opt: *remote-api-security
+
+  remote-api-green:
+    <<: *remote-api-slot
+    environment:
+      <<: *remote-api-blue-environment
+      REMOTE_HEALTH_PORT: 9643
+      REMOTE_HANDOFF_PEER_PORT: 9642
 
   coturn:
     build:
@@ -124,6 +162,7 @@ services:
       OPENPANEL_CLIENT_ID: ${OPENPANEL_CLIENT_ID:-}
       OPENPANEL_CLIENT_SECRET: ${OPENPANEL_CLIENT_SECRET:-}
       REMOTE_METRICS_TOKEN: ${REMOTE_METRICS_TOKEN:?REMOTE_METRICS_TOKEN is required}
+      SIGNAL_METRICS_URL: ${SIGNAL_METRICS_URL:-http://127.0.0.1:9642/metrics,http://127.0.0.1:9643/metrics}
       TURN_DOMAIN: ${TURN_DOMAIN}
     healthcheck:
       disable: true
@@ -135,3 +174,4 @@ services:
 
 volumes:
   acme-data:
+  remote-api-state:
