@@ -22,6 +22,7 @@ import {
   forgetDictatedMessage,
   noteDictatedMessage,
   onDictatedReplyEnd,
+  onDictatedReplyStart,
 } from "../../speech/speech-replies";
 import { EMPTY_DRAFT } from "../composer-draft";
 import type { ConversationRuntime } from "../conversation-runtime";
@@ -139,6 +140,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let held = false;
   let heldAt: number | undefined;
   let heldReplyEnded = false;
+  let followingReplies = 0;
   let sentHeard = "";
   let waitingSend = 0;
   let sending = 0;
@@ -181,9 +183,22 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
   }
 
+  const stopReplyStart = onDictatedReplyStart((agent) => {
+    if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
+    if (held || step === "waiting") followingReplies += 1;
+    else if (step === "listening" && !turn?.spoke && sending === 0) {
+      setStep("waiting");
+      setState((draft) => {
+        draft.heard = sentHeard;
+        draft.levels = quietLevels();
+      });
+    }
+  });
+
   const stopReplyEnd = onDictatedReplyEnd((agent) => {
     if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
-    if (held) heldReplyEnded = true;
+    if (followingReplies > 0 && (held || step === "waiting")) followingReplies -= 1;
+    else if (held) heldReplyEnded = true;
     else if (step === "waiting") resumeListening();
   });
 
@@ -357,6 +372,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   function dropReply(): void {
     held = false;
+    followingReplies = 0;
     dropDictatedReply(target);
   }
 
@@ -889,6 +905,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       turn_count: sentTurns,
     });
     generation += 1;
+    stopReplyStart();
     stopReplyEnd();
     removeDownloadListeners();
     releaseTurn();
