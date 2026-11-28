@@ -35,6 +35,7 @@ export function ChatApprovalCard({
   showAgentName,
   serverName,
   canAnswer,
+  connected,
   respond,
   readsWhole,
   loadWhole,
@@ -44,6 +45,7 @@ export function ChatApprovalCard({
   showAgentName: boolean;
   serverName: string;
   canAnswer: boolean;
+  connected: boolean;
   respond: (decision: ApprovalDecision) => Promise<void>;
   readsWhole: boolean;
   loadWhole: () => Promise<void>;
@@ -59,6 +61,7 @@ export function ChatApprovalCard({
   const disabled = !canAnswer || pending !== null;
   const report = feedbackApproval(approval);
   const reading = partial && readsWhole && canAnswer;
+  const canRead = reading && connected;
   const phoneReport = report?.phone === true;
   const { agentId, requestId } = approval;
   const phone = useMemo(
@@ -73,7 +76,7 @@ export function ChatApprovalCard({
   const loadWholeRef = useRef(loadWhole);
   loadWholeRef.current = loadWhole;
   useEffect(() => {
-    if (!reading) return;
+    if (!canRead) return;
     let current = true;
     setWholeFailed(false);
     loadWholeRef.current().then(
@@ -87,13 +90,15 @@ export function ChatApprovalCard({
     return () => {
       current = false;
     };
-  }, [reading]);
+  }, [canRead]);
   function retryWhole() {
     setWholeFailed(false);
     loadWhole().then(
       () => setWholeFailed(true),
       (error: unknown) => {
-        if (wholeReadFailed(error)) setWholeFailed(true);
+        if (error instanceof InactiveRequestError)
+          showWarningAlert("turn", t("mobile.chat.approval.inactiveTitle"), error.message);
+        else setWholeFailed(true);
       },
     );
   }
@@ -111,7 +116,7 @@ export function ChatApprovalCard({
       ? t("mobile.chat.approval.partial", names)
       : !reading
         ? null
-        : wholeFailed
+        : wholeFailed && connected
           ? t("mobile.chat.approval.loadFailed")
           : t("mobile.chat.approval.loading")
     : report
@@ -308,7 +313,7 @@ export function ChatApprovalCard({
           <Button.Label className="font-sans font-semibold">{declineLabel}</Button.Label>
         </Button>
         {report ? acceptButton() : null}
-        {reading && wholeFailed ? (
+        {canRead && wholeFailed ? (
           <Button
             size="sm"
             variant="tertiary"
