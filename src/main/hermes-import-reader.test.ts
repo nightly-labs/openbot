@@ -78,6 +78,7 @@ describe("Hermes import reader", () => {
       memoryLimit: () => 64,
       initializeMemorySelection: () => undefined,
       saveMcpServer: () => Effect.die("unused"),
+      instructionsSaving: () => () => undefined,
     };
     const service = new HermesImportService(
       agents,

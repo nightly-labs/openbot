@@ -3092,6 +3092,7 @@ export async function createApplicationServices({
       initializeMemorySelection: (agentId) => service.initializeMemorySelection(agentId),
       listMcpServers: () => service.listMcpServers(),
       saveMcpServer: (config) => service.saveMcpServer({ config }),
+      instructionsSaving: (agentId, text) => service.instructionsSaving(agentId, text),
     },
     { library: () => skills.requireLocalLibrary(), installLocal: (input) => skills.installLocal(input) },
     join(app.getPath("userData"), HERMES_IMPORT_LINKS_FILE),

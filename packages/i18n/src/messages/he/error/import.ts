@@ -57,6 +57,8 @@ export const messages = {
   "error.import.hermesSkillCodeAdded": "נוסף אליה קוד שלא היה בה כשהפרופילים נקראו. יש לקרוא אותם שוב כדי לאפשר זאת.",
   "error.import.hermesLinkNotSaved":
     "{name}: OpenBot לא הצליח לשמור איזה סוכן הגיע מהפרופיל הזה, ולכן הייבוא הבא יוסיף אותו כסוכן חדש.",
+  "error.import.hermesNameNotSaved":
+    "{name}: OpenBot לא הצליח להוסיף את שם הסוכן להוראות שלו. אם הסוכן משתמש בשם אחר, הוסיפו את שמו שם.",
   "error.import.transferRemoteTooLarge":
     "קובץ העברה לשרת שהצטרפת אליו חייב להיות קטן מ-100 MB. יש לכבות את קובצי סביבת העבודה, או לייצא פחות סוכנים.",
   "error.import.transferNotFile": "הקובץ הזה אינו קובץ העברה של OpenBot.",

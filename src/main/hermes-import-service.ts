@@ -18,7 +18,8 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Result } from "effect";
+import { Effect, Exit, Result } from "effect";
+import { readAgentInstructionsFile, saveAgentInstructionsFile } from "../backend/agent/workspace-instructions";
 import { parseStoredJson, writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { writeTreeEffect } from "./agent-archive";
 import type { AgentImportAgents, AgentImportSkills } from "./agent-import-service";
@@ -36,6 +37,7 @@ const SKILL_STAGING = ".openbot/import-skills";
 const SOUL_COPY = ["imported", "hermes", "SOUL.md"] as const;
 const SOUL_POINTER = "\n\nThe full persona is in imported/hermes/SOUL.md. Read it before your first task.";
 const LINKS_VERSION = 1;
+const NAME_RULE = /\byour name is\b/iu;
 
 export interface HermesImportAgents
   extends Pick<
@@ -53,6 +55,7 @@ export interface HermesImportAgents
   listRoutines(agentId: string): ReadonlyArray<{ name: string }>;
   listMcpServers(): McpServerConfig[];
   saveMcpServer(config: McpServerConfig): Effect.Effect<unknown, { cause: unknown }>;
+  instructionsSaving(agentId: string, text: string): (written: boolean) => void;
 }
 
 interface Staged {
@@ -204,6 +207,9 @@ export class HermesImportService {
                 }),
               );
             }
+            const named = yield* Effect.result(this.#addNameRule(agent));
+            if (Result.isFailure(named))
+              warnings.push(sourceText("error.import.hermesNameNotSaved", { name: profile.name }));
             for (const skill of profile.skills) {
               const allowed = allow.has(`skill:${skill.slug}`);
               if (skill.scripts && !allowed) continue;
@@ -298,6 +304,21 @@ export class HermesImportService {
             .pipe(Effect.uninterruptible);
         }),
       () => archiveCall(() => rm(target, { recursive: true, force: true })),
+    );
+  });
+
+  readonly #addNameRule = Effect.fn("HermesImportService.addNameRule")(function* (
+    this: HermesImportService,
+    agent: AgentSummary,
+  ) {
+    const file = yield* readAgentInstructionsFile(agent.workspacePath);
+    if (NAME_RULE.test(file.text)) return;
+    const name = agent.name.replace(/\s+/gu, " ").trim();
+    const rule = `# Identity\n\n- Your name is ${name}. Introduce yourself as ${name}.\n`;
+    const text = file.text.trim() ? `${file.text.trimEnd()}\n\n${rule}` : rule;
+    const saved = this.agents.instructionsSaving(agent.id, text);
+    yield* saveAgentInstructionsFile(agent.workspacePath, text, file.text).pipe(
+      Effect.onExit((exit) => Effect.sync(() => saved(Exit.isSuccess(exit)))),
     );
   });
 
