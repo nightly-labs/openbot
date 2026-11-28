@@ -60,6 +60,11 @@ the [root changelog](../../CHANGELOG.md).
 - A chat starts to load its messages when you tap its row, before the chat screen opens, so it opens with less wait.
 - Long chats scroll and stream more smoothly. A new piece of a reply now updates only the reply that changes, not each message in the chat.
 - Plan limits now shows a connected Gemini account with "No usage reading", as the desktop app does. Gemini does not give its plan limit to other apps, so no bar shows for it. Before, Gemini was not in the list, and it was not clear why.
+- The app now signs account requests with a short access token that lasts about 10 minutes, not
+  with the sign-in token. The account service can then check most requests without a database read.
+  Sign-out, billing and the session list still use the sign-in token.
+- The app gets the server transfers that wait for you with the server list, and makes fewer calls
+  to the account service.
 
 ### Fixed
 
@@ -113,6 +118,11 @@ the [root changelog](../../CHANGELOG.md).
   quick tries again. A refresh and a network change still try again at once.
 - Ask to wake only hosted servers. Before, the app also asked to wake your own servers when they
   were offline, which could never work.
+- The plan limit rings at the top of the agent list show, for each provider, the account with the
+  most limit left. Before, a provider account with no limit left hid a second account of the same
+  provider that still had limit left.
+- Keep the connection to a server when its Signal machine stops or moves. Before, the app connected
+  again from the start and loaded the server again. The server must also be on the new version.
 
 ## [1.4.14.2] - 2026-11-27
 
