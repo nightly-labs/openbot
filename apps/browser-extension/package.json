@@ -19,7 +19,7 @@
     "@openbot/ui": "workspace:*",
     "@solidjs/signals": "catalog:",
     "@solidjs/web": "catalog:",
-    "solid-js": "2.0.3"
+    "solid-js": "2.0.4"
   },
   "devDependencies": {
     "@solidjs/vite-plugin": "catalog:",
