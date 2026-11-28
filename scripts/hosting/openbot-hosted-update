@@ -136,6 +136,7 @@ prepare_release() {
 copy_release() {
   rm -rf "$2"
   cp -a --no-preserve=ownership "$1" "$2"
+  sync -f "$2"
 }
 
 repair_release_modes() {
@@ -146,18 +147,29 @@ repair_release_modes() {
 
 swap_in() {
   : >"$INSTALL/.applying"
+  sync -f "$INSTALL"
   copy_release "$INSTALL/staged" "$INSTALL/app"
 }
 
+discard_staged() {
+  if [ -e "$INSTALL/staged.ready" ]; then
+    rm -f "$INSTALL/staged.ready"
+    sync -f "$INSTALL"
+  fi
+  rm -rf "$INSTALL/staged"
+}
+
 finish_swap() {
+  sync -f "$INSTALL" /etc
   rm -f "$INSTALL/.applying"
-  rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"
+  discard_staged
 }
 
 stage_release() {
   rm -f "$INSTALL/staged.ready"
   copy_release "$1" "$INSTALL/staged"
   version_of "$INSTALL/staged" >"$INSTALL/staged.ready"
+  sync -f "$INSTALL"
 }
 
 recover() {
@@ -360,7 +372,7 @@ stage() {
   [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "The release manifest has no valid version."
   [ "$path" = "OpenBot-$version-$architecture.AppImage" ] || fail "The release manifest names another file."
   [[ $sha512 =~ ^[A-Za-z0-9+/]{86}==$ ]] || fail "The release manifest has no valid SHA-512."
-  if [ "$(staged_version)" != "$version" ]; then rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"; fi
+  if [ "$(staged_version)" != "$version" ]; then discard_staged; fi
   current=$(version_of "$INSTALL/app")
   [ -n "$current" ] || fail "The installed version is not known."
   newer "$version" "$current" || return 0
@@ -395,7 +407,7 @@ apply() {
   fi
   current=$(version_of "$INSTALL/app")
   if [ ! -e "$INSTALL/.applying" ] && [ -d "$INSTALL/app" ] && ! newer "$staged" "$current"; then
-    rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"
+    discard_staged
     return 0
   fi
   swap_in

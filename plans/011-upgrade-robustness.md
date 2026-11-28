@@ -244,6 +244,12 @@ The copy is already safe without a rename:
   partial `staged`.
 - `swap_in` writes `.applying` first and keeps `staged` until `finish_swap`, so a stop or a failure
   during the copy makes the next `apply` copy again.
+- Each step writes its files to disk with `sync -f` before the next marker changes (#16886): the
+  staged copy before `staged.ready`, `staged.ready` before staging ends, `.applying` before the copy, the new `app` and the hosting files
+  in `/etc` before `finish_swap` removes `.applying` and `staged.ready`, and that removal before it
+  removes `staged`. So a hard stop of the machine, not only of the process, makes the next `apply`
+  copy again. `scripts/hosting/hosted-update-durability-e2e.ts` starts the recovery from each of these
+  points.
 - `swap_in` removes `app` before the copy, so the copy needs about the same free disk space that the
   removal gives back.
 - A container has no `copy_release`: Docker pulls the release as an image, and `staged.ready` is
